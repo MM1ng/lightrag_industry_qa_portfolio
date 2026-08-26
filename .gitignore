@@ -1,0 +1,100 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+.python-version
+
+# Python caches and build outputs
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Local debugging and agent/browser artifacts
+.tmp*
+*.tmp
+pytest_gate*.txt
+.playwright-cli/
+.playwright-mcp/
+.agents/
+/output/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Runtime state
+logs/**
+!logs/.gitkeep
+*.log
+*.log.err
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+.cache/
+tmp/
+
+# Model, vector, and LightRAG runtime artifacts
+models/
+model_cache/
+.model_cache/
+lightrag_data/
+lightrag_storage*/
+rag_storage/
+vector_store/
+graph_storage/
+
+# Phase 3A parser experiment raw payloads (large binaries; kept on disk, not in git)
+evaluation/experiments/parser_backend/P1/**/mineru_raw/
+evaluation/mineru_smoke/
+evaluation/experiments/parser_backend/fixed_model/cache/
+evaluation/experiments/phase4/parent_expansion/cache/
+evaluation/experiments/phase4/rerank/cache/
+evaluation/experiments/phase5/cache/
+evaluation/experiments/phase5b/cache/
+evaluation/experiments/phase6/cache/
+
+# Protected source data and generated processing outputs
+data/raw_dataset/**
+data/manuals/**
+!data/manuals/README.md
+data/processed/**
+
+# Notebook and editor state
+.ipynb_checkpoints/
+.idea/
+.vscode/
+.claude/
+.worktrees/
+*.swp
+*.swo
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local process pid files (Phase 7 scripts)
+.run/
+
+# Local workbench and evaluation artifacts
+runtime/**
+evaluation/**
+reports/**
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+current-ui.png
