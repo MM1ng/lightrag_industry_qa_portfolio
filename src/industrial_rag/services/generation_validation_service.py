@@ -57,6 +57,30 @@ class GenerationValidationService:
         started = time.perf_counter()
         gates: dict[str, Any] = {}
 
+        from industrial_rag.services.generation_artifacts import (
+            GenerationArtifactError,
+            load_generation_manifest,
+        )
+
+        try:
+            manifest = load_generation_manifest(
+                Path(generation.workspace_path),
+                expected_generation_id=generation.generation,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
+            gates["frozen_snapshot_consistency"] = {
+                "passed": True,
+                "detail": {
+                    "child_manifest_hash": manifest.child_manifest_hash,
+                    "chunk_count": manifest.count,
+                },
+            }
+        except GenerationArtifactError as error:
+            gates["frozen_snapshot_consistency"] = {
+                "passed": False,
+                "detail": str(error),
+            }
+
         from industrial_rag.services.canonical_validation_runner import (
             CanonicalValidationRunner,
             write_validation_artifact,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from industrial_rag.services.generation_artifacts import child_manifest_hash
 from industrial_rag.services.generation_fingerprint_service import (
     build_generation_fingerprint,
 )
@@ -47,3 +48,12 @@ def test_generation_fingerprint_changes_when_current_document_version_changes() 
     changed = build_generation_fingerprint(_kb(), [(document, _Child("chunk-a", "A"))])
 
     assert changed.document_manifest_hash != original.document_manifest_hash
+
+
+def test_generation_fingerprint_uses_the_frozen_snapshot_hash_contract() -> None:
+    document = SimpleNamespace(id="a" * 32, version=1, file_hash="a" * 64)
+    pairs = [(document, _Child("chunk-a", "A"))]
+
+    fingerprint = build_generation_fingerprint(_kb(), pairs)
+
+    assert fingerprint.child_chunks_manifest_hash == child_manifest_hash(pairs)

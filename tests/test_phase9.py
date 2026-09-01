@@ -734,6 +734,23 @@ def test_15_generation_mixing_is_detected(ctx: Phase9Ctx):
     _run(_test())
 
 
+def test_validation_rejects_a_tampered_frozen_child_snapshot(ctx: Phase9Ctx) -> None:
+    async def _test():
+        kb_id = await ctx.create_kb()
+        candidate = await ctx.add(kb_id, "P9-SNAPSHOT generation artifact integrity", "snapshot.pdf")
+        async with ctx.factory() as session:
+            generation = await ctx.service(session)._generation_repo.get(
+                candidate["candidate_generation_id"]
+            )
+            snapshot = Path(generation.workspace_path) / "retrieval" / "child_chunks.jsonl"
+            snapshot.write_text('{"chunk_id":"tampered"}\n', encoding="utf-8")
+        report = await ctx.validate(kb_id, candidate["candidate_generation_id"])
+        assert report["passed"] is False
+        assert report["gates"]["frozen_snapshot_consistency"]["passed"] is False
+
+    _run(_test())
+
+
 def test_16_production_resources_untouched(ctx: Phase9Ctx, tmp_path: Path):
     async def _test():
         # All work used the fake Qdrant and the isolated test DB.

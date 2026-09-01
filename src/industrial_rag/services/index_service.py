@@ -21,6 +21,10 @@ from industrial_rag.repositories.task_repository import TaskRepository
 from industrial_rag.repositories.vector_index_generation_repository import (
     VectorIndexGenerationRepository,
 )
+from industrial_rag.services.generation_artifacts import (
+    freeze_generation_child_chunks,
+    load_generation_child_chunks,
+)
 from industrial_rag.services.generation_fingerprint_service import build_generation_fingerprint
 from industrial_rag.services.parse_service import load_child_chunks
 from industrial_rag.services.qdrant_collection_service import QdrantCollectionService
@@ -109,6 +113,24 @@ class IndexService:
         if shadow_workspace.exists():
             shutil.rmtree(shadow_workspace, ignore_errors=True)
         shadow_workspace.mkdir(parents=True, exist_ok=True)
+        snapshot = freeze_generation_child_chunks(
+            shadow_workspace,
+            generation_id=generation_name,
+            document_children=all_children,
+        )
+        if snapshot.child_manifest_hash != fingerprint.child_chunks_manifest_hash:
+            raise RuntimeError("generation snapshot hash does not match its persisted fingerprint")
+        frozen_children = load_generation_child_chunks(
+            shadow_workspace,
+            expected_generation_id=generation_name,
+            expected_child_manifest_hash=record.child_chunks_manifest_hash,
+        )
+        all_children = [
+            (document, child)
+            for document in active_docs
+            for child in frozen_children
+            if child.document_id == document.id
+        ]
         kb_settings = settings_for_knowledge_base(
             settings,
             kb,

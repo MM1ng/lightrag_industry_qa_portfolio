@@ -47,6 +47,11 @@ from industrial_rag.repositories.update_job_repository import UpdateJobRepositor
 from industrial_rag.repositories.vector_index_generation_repository import (
     VectorIndexGenerationRepository,
 )
+from industrial_rag.services.generation_artifacts import (
+    freeze_generation_child_chunks,
+    load_generation_child_chunks,
+)
+from industrial_rag.services.generation_fingerprint_service import build_generation_fingerprint
 from industrial_rag.services.kb_lease_service import KBLeaseService
 from industrial_rag.storage_layout import (
     document_stored_path,
@@ -892,8 +897,42 @@ class IncrementalUpdateService:
                 t0 = time.perf_counter()
                 await self._parse_document_pymupdf(kb, doc)
                 t_parse += time.perf_counter() - t0
+
+            snapshot_pairs, previous_children = await self._candidate_snapshot_pairs(
+                kb_id=kb_id,
+                active=active,
+                job=job,
+                changed_document=doc,
+                old_document=old_doc,
+            )
+            snapshot = freeze_generation_child_chunks(
+                candidate_workspace,
+                generation_id=token,
+                document_children=snapshot_pairs,
+                replace_existing=active is not None,
+            )
+            fingerprint = build_generation_fingerprint(kb, snapshot_pairs)
+            if snapshot.child_manifest_hash != fingerprint.child_chunks_manifest_hash:
+                raise RuntimeError("candidate generation snapshot hash is not reproducible")
+            generation.document_manifest_hash = fingerprint.document_manifest_hash
+            generation.child_chunks_manifest_hash = fingerprint.child_chunks_manifest_hash
+            generation.embedding_config_hash = fingerprint.embedding_config_hash
+            generation.chunking_config_hash = fingerprint.chunking_config_hash
+            frozen_children = load_generation_child_chunks(
+                candidate_workspace,
+                expected_generation_id=token,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
+
+            if job.operation in (UpdateOperation.add, UpdateOperation.replace) and doc is not None:
                 t0 = time.perf_counter()
-                added = await self._ingest_document(kb, generation, candidate_workspace, doc)
+                added = await self._ingest_document(
+                    kb,
+                    generation,
+                    candidate_workspace,
+                    doc,
+                    children=[child for child in frozen_children if child.document_id == doc.id],
+                )
                 stats["added_chunks"] = added
                 t_embed += time.perf_counter() - t0
 
@@ -903,7 +942,11 @@ class IncrementalUpdateService:
             ):
                 t0 = time.perf_counter()
                 removed_internal_ids = await self._remove_document_points(
-                    kb_id, generation, candidate_workspace, old_doc
+                    kb_id,
+                    generation,
+                    candidate_workspace,
+                    old_doc,
+                    children=previous_children.get(old_doc.id, []),
                 )
                 stats["invalidated_chunks"] = len(removed_internal_ids)
                 t_graph += time.perf_counter() - t0
@@ -937,9 +980,6 @@ class IncrementalUpdateService:
                 "documents": await self._document_state_snapshot(kb_id, job),
                 "candidate_generation": token,
             }
-            generation.document_manifest_hash = self._manifest_hash(
-                await self._doc_repo.list_active_for_kb(kb_id)
-            )
             await self._session.flush()
             return {
                 "status": "candidate_built",
@@ -1039,6 +1079,60 @@ class IncrementalUpdateService:
                 await client.close()
         return reused
 
+    async def _candidate_snapshot_pairs(
+        self,
+        *,
+        kb_id: str,
+        active: Any | None,
+        job: Any,
+        changed_document: Any | None,
+        old_document: Any | None,
+    ) -> tuple[list[tuple[Any, Any]], dict[str, list[Any]]]:
+        """Build the candidate's complete ChildChunk input before LightRAG sees it.
+
+        Unchanged documents come from the active generation's frozen snapshot;
+        only a newly parsed candidate document may be sourced from ``current``.
+        """
+        from industrial_rag.services.parse_service import load_child_chunks
+
+        active_documents = await self._doc_repo.list_active_for_kb(kb_id)
+        documents = [
+            document
+            for document in active_documents
+            if old_document is None or document.id != old_document.id
+        ]
+        if (
+            changed_document is not None
+            and job.operation in (UpdateOperation.add, UpdateOperation.replace)
+            and all(document.id != changed_document.id for document in documents)
+        ):
+            documents.append(changed_document)
+
+        previous_children: dict[str, list[Any]] = {}
+        if active is not None:
+            active_children = load_generation_child_chunks(
+                Path(active.workspace_path),
+                expected_generation_id=active.generation,
+                expected_child_manifest_hash=active.child_chunks_manifest_hash,
+            )
+            for child in active_children:
+                previous_children.setdefault(child.document_id, []).append(child)
+
+        pairs: list[tuple[Any, Any]] = []
+        for document in documents:
+            if changed_document is not None and document.id == changed_document.id:
+                children = load_child_chunks(kb_parsed_documents_dir(kb_id) / document.id)
+            elif active is not None:
+                children = previous_children.get(document.id, [])
+            else:
+                children = load_child_chunks(kb_parsed_documents_dir(kb_id) / document.id)
+            if not children:
+                raise RuntimeError(
+                    f"No provable child snapshot available for candidate document {document.id}"
+                )
+            pairs.extend((document, child) for child in children)
+        return pairs, previous_children
+
     async def _parse_document_pymupdf(self, kb: Any, doc: Any) -> dict[str, Any]:
         from industrial_rag.document_parser import parse_pdf
         from industrial_rag.structured_chunker import (
@@ -1121,12 +1215,13 @@ class IncrementalUpdateService:
         generation: Any,
         candidate_workspace: Path,
         doc: Any,
+        *,
+        children: list[Any] | None = None,
     ) -> int:
         from industrial_rag.citation_formatter import Citation, encode_chunk_header
         from industrial_rag.lightrag_service import LightRAGService
-        from industrial_rag.services.parse_service import load_child_chunks
-
-        children = load_child_chunks(kb_parsed_documents_dir(kb.id) / doc.id)
+        if children is None:
+            raise RuntimeError("LightRAG ingestion requires a frozen generation child snapshot")
         if not children:
             raise RuntimeError(f"No child chunks for document {doc.id}")
         settings = settings_for_knowledge_base(
@@ -1234,10 +1329,11 @@ class IncrementalUpdateService:
         generation: Any,
         candidate_workspace: Path,
         doc: Any,
+        *,
+        children: list[Any] | None = None,
     ) -> list[str]:
-        from industrial_rag.services.parse_service import load_child_chunks
-
-        children = load_child_chunks(kb_parsed_documents_dir(kb_id) / doc.id)
+        if children is None:
+            raise RuntimeError("removal requires the prior generation child snapshot")
         identity = ""
         internal_ids: list[str] = []
         if children:

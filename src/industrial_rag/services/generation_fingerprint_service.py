@@ -8,6 +8,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from industrial_rag.services.generation_artifacts import child_manifest_hash
+
 
 @dataclass(frozen=True, slots=True)
 class GenerationFingerprint:
@@ -36,23 +38,9 @@ def build_generation_fingerprint(
         }
         for doc, _ in pairs
     }
-    children = sorted(
-        (
-            {
-                "document_id": str(doc.id),
-                "chunk_id": str(child.chunk_id),
-                "parent_chunk_id": str(child.parent_chunk_id),
-                "page_start": child.page_start,
-                "page_end": child.page_end,
-                "content": child.embedding_content or child.content,
-            }
-            for doc, child in pairs
-        ),
-        key=lambda value: (value["document_id"], value["chunk_id"]),
-    )
     return GenerationFingerprint(
         document_manifest_hash=_hash([documents[key] for key in sorted(documents)]),
-        child_chunks_manifest_hash=_hash(children),
+        child_chunks_manifest_hash=child_manifest_hash(pairs),
         embedding_config_hash=_hash(
             {
                 "model": knowledge_base.embedding_model,
