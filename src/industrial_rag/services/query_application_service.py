@@ -23,6 +23,10 @@ from industrial_rag.repositories.vector_index_generation_repository import (
     VectorIndexGenerationRepository,
 )
 from industrial_rag.safety_policy import evaluate_input
+from industrial_rag.services.generation_artifacts import (
+    GenerationArtifactError,
+    GenerationArtifactResolver,
+)
 from industrial_rag.vector_collections import VectorBackend
 
 
@@ -45,11 +49,13 @@ class QueryApplicationService:
         base_settings: Settings,
         runtime_manager,
         query_rewriter: QueryRewriter | None = None,
+        artifact_resolver: GenerationArtifactResolver | None = None,
     ) -> None:
         self._session = session
         self._base_settings = base_settings
         self._runtime_manager = runtime_manager
         self._query_rewriter = query_rewriter or QueryRewriter()
+        self._artifact_resolver = artifact_resolver or GenerationArtifactResolver()
         self._kb_repository = KnowledgeBaseRepository(session)
         self._generation_repository = VectorIndexGenerationRepository(session)
         self._document_repository = DocumentRepository(session)
@@ -111,6 +117,18 @@ class QueryApplicationService:
                 "Generation 当前不可查询。",
                 status_code=409,
             )
+        try:
+            self._artifact_resolver.resolve_registry(
+                Path(generation.workspace_path),
+                expected_generation_id=generation.generation,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
+        except GenerationArtifactError as error:
+            raise AppError(
+                AppErrorCode.generation_invalid_state,
+                "Generation 的冻结检索快照不可验证。",
+                status_code=409,
+            ) from error
         rewrite = await self._query_rewriter.rewrite(question, history)
         rewrite_details = rewrite.to_trace()
         if rewrite.status == "ambiguous":

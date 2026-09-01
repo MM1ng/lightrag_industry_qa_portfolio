@@ -7,6 +7,7 @@ CleanupService).  No stub handlers remain.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from industrial_rag.db.models import TaskType
 from industrial_rag.services.cleanup_service import KnowledgeBaseCleanupService
@@ -207,8 +208,10 @@ async def handle_rollback_to_nano(ctx: TaskExecutionContext) -> TaskExecutionRes
         from industrial_rag.repositories.vector_index_generation_repository import (
             VectorIndexGenerationRepository,
         )
-        from industrial_rag.services.parse_service import load_child_chunks
-        from industrial_rag.storage_layout import kb_parsed_dir
+        from industrial_rag.services.generation_artifacts import (
+            load_generation_child_chunks,
+            load_generation_manifest,
+        )
 
         kb = await ctx.kb_repo.get(ctx.task.knowledge_base_id)
         if kb is None:
@@ -227,14 +230,34 @@ async def handle_rollback_to_nano(ctx: TaskExecutionContext) -> TaskExecutionRes
         )
         if nano is None:
             return TaskExecutionResult(False, "nano_generation_missing", "没有可回滚的 Nano generation")
-        document_children = []
-        for document in await ctx.doc_repo.list_active_for_kb(kb.id):
-            document_children.extend(
-                (document, child)
-                for child in load_child_chunks(kb_parsed_dir(kb.id) / "documents" / document.id)
+        manifest = load_generation_manifest(
+            Path(nano.workspace_path),
+            expected_generation_id=nano.generation,
+            expected_child_manifest_hash=nano.child_chunks_manifest_hash,
+        )
+        documents = {
+            document.id: document
+            for document in await ctx.doc_repo.list_by_kb(kb.id, include_deleted=True)
+        }
+        bindings = {str(binding["document_id"]): binding for binding in manifest.documents}
+        if set(documents) & set(bindings) != set(bindings):
+            return TaskExecutionResult(False, "nano_generation_stale", "Nano generation 缺少绑定文档")
+        for document_id, binding in bindings.items():
+            document = documents[document_id]
+            if (
+                int(document.version) != int(binding["document_version"])
+                or str(document.file_hash) != str(binding["file_hash"])
+                or str(document.original_file_name) != str(binding["document_name"])
+            ):
+                return TaskExecutionResult(False, "nano_generation_stale", "Nano generation 文档绑定不一致")
+        document_children = [
+            (documents[child.document_id], child)
+            for child in load_generation_child_chunks(
+                Path(nano.workspace_path),
+                expected_generation_id=nano.generation,
+                expected_child_manifest_hash=nano.child_chunks_manifest_hash,
             )
-        if not document_children:
-            return TaskExecutionResult(False, "nano_generation_stale", "当前知识库没有可验证的 ChildChunk")
+        ]
         fingerprint = build_generation_fingerprint(kb, document_children)
         if (
             nano.document_manifest_hash != fingerprint.document_manifest_hash

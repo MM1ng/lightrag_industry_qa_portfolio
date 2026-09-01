@@ -21,6 +21,7 @@ from industrial_rag.db.models import (
 from industrial_rag.db.session import get_session_factory, init_db, reset_for_testing
 from industrial_rag.lightrag_service import QueryResult
 from industrial_rag.retrieval_trace import RetrievalExecutionTrace
+from industrial_rag.services.generation_artifacts import freeze_generation_child_chunks
 from industrial_rag.services.runtime_manager import KnowledgeBaseRuntimeManager
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -93,6 +94,12 @@ async def multi_instance_state(tmp_path):
     old_id = "b" * 32
     new_id = "c" * 32
     kb_id = "a" * 32
+    old_manifest = freeze_generation_child_chunks(
+        tmp_path / "old", generation_id="g-old", document_children=[]
+    )
+    new_manifest = freeze_generation_child_chunks(
+        tmp_path / "new", generation_id="g-new", document_children=[]
+    )
     async with factory() as session:
         kb = KnowledgeBase(
             id=kb_id,
@@ -114,7 +121,7 @@ async def multi_instance_state(tmp_path):
             workspace_path=str(tmp_path / "old"),
             collections={"chunks": "old_chunks"},
             document_manifest_hash="1" * 64,
-            child_chunks_manifest_hash="2" * 64,
+            child_chunks_manifest_hash=old_manifest.child_manifest_hash,
             embedding_config_hash="3" * 64,
             chunking_config_hash="4" * 64,
         )
@@ -127,7 +134,7 @@ async def multi_instance_state(tmp_path):
             workspace_path=str(tmp_path / "new"),
             collections={"chunks": "new_chunks"},
             document_manifest_hash="5" * 64,
-            child_chunks_manifest_hash="6" * 64,
+            child_chunks_manifest_hash=new_manifest.child_manifest_hash,
             embedding_config_hash="7" * 64,
             chunking_config_hash="8" * 64,
         )
@@ -168,6 +175,29 @@ async def test_candidate_query_does_not_change_active_pointer(multi_instance_sta
     assert result.result.answer == "candidate:g-new"
     assert kb is not None
     assert kb.active_vector_generation_id == old_id
+    await manager.close_all()
+
+
+@pytest.mark.asyncio
+async def test_generation_query_rejects_a_missing_frozen_snapshot_before_runtime(
+    multi_instance_state,
+) -> None:
+    from industrial_rag.errors import AppError
+    from industrial_rag.services.query_application_service import QueryApplicationService
+
+    factory, kb_id, _old_id, new_id, tmp_path = multi_instance_state
+    (tmp_path / "new" / "retrieval" / "child_chunks.jsonl").unlink()
+    manager = KnowledgeBaseRuntimeManager(service_factory=_GenerationRuntime)
+    async with factory() as session:
+        with pytest.raises(AppError) as caught:
+            await QueryApplicationService(
+                session,
+                base_settings=_base_settings(tmp_path),
+                runtime_manager=manager,
+            ).query_generation(kb_id, new_id, "candidate")
+
+    assert caught.value.code == "generation_invalid_state"
+    assert manager.is_cached(kb_id) is False
     await manager.close_all()
 
 
@@ -413,6 +443,12 @@ async def test_admin_candidate_query_route_returns_actual_generation_without_swi
     await init_db()
     factory = get_session_factory()
     kb_id, active_id, candidate_id = "d" * 32, "e" * 32, "f" * 32
+    active_snapshot = freeze_generation_child_chunks(
+        tmp_path / "active", generation_id="g-active", document_children=[]
+    )
+    candidate_snapshot = freeze_generation_child_chunks(
+        tmp_path / "candidate", generation_id="g-candidate", document_children=[]
+    )
     async with factory() as session:
         session.add_all(
             [
@@ -436,7 +472,7 @@ async def test_admin_candidate_query_route_returns_actual_generation_without_swi
                     workspace_path=str(tmp_path / "active"),
                     collections={"chunks": "active_chunks"},
                     document_manifest_hash="1" * 64,
-                    child_chunks_manifest_hash="2" * 64,
+                    child_chunks_manifest_hash=active_snapshot.child_manifest_hash,
                     embedding_config_hash="3" * 64,
                     chunking_config_hash="4" * 64,
                 ),
@@ -449,7 +485,7 @@ async def test_admin_candidate_query_route_returns_actual_generation_without_swi
                     workspace_path=str(tmp_path / "candidate"),
                     collections={"chunks": "candidate_chunks"},
                     document_manifest_hash="5" * 64,
-                    child_chunks_manifest_hash="6" * 64,
+                    child_chunks_manifest_hash=candidate_snapshot.child_manifest_hash,
                     embedding_config_hash="7" * 64,
                     chunking_config_hash="8" * 64,
                 ),

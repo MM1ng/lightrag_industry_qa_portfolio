@@ -9,6 +9,7 @@ from industrial_rag.services.generation_artifacts import (
     GenerationArtifactError,
     GenerationArtifactResolver,
     freeze_generation_child_chunks,
+    generation_artifact_evidence,
     load_generation_child_chunks,
 )
 
@@ -223,3 +224,82 @@ def test_empty_generation_snapshot_is_valid_for_deleting_the_final_document(
 
     assert manifest.count == 0
     assert registry.hydrate(["former-child"])["former-child"].hydration_status == "missing"
+
+
+def test_resolver_hydrates_the_same_snapshot_bytes_it_validates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A second file read could race a valid manifest check and must not control hydration."""
+    workspace = tmp_path / "workspace"
+    manifest = freeze_generation_child_chunks(
+        workspace,
+        generation_id="g1",
+        document_children=[(_document("doc-1", 1), _child("doc-1", "child-a", "A"))],
+    )
+    snapshot = workspace / "retrieval" / "child_chunks.jsonl"
+    original_read_bytes = Path.read_bytes
+    reads = 0
+
+    def race_read_bytes(path: Path, *args, **kwargs):
+        nonlocal reads
+        if path == snapshot:
+            reads += 1
+            if reads == 2:
+                return (json.dumps(_child("doc-1", "child-a", "B")) + "\n").encode()
+        return original_read_bytes(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_bytes", race_read_bytes)
+    registry = GenerationArtifactResolver().resolve_registry(
+        workspace,
+        expected_generation_id="g1",
+        expected_child_manifest_hash=manifest.child_manifest_hash,
+    )
+
+    assert registry.hydrate(["child-a"])["child-a"].text == "A"
+    assert reads == 1
+
+
+def test_manifest_rejects_missing_document_version_hash_or_name_binding(tmp_path: Path) -> None:
+    """Document ID alone cannot prove a generation contains the intended revision."""
+    workspace = tmp_path / "workspace"
+    manifest = freeze_generation_child_chunks(
+        workspace,
+        generation_id="g1",
+        document_children=[(_document("doc-1", 7), _child("doc-1", "child-a", "A"))],
+    )
+    manifest_path = workspace / "retrieval" / "chunk_manifest.json"
+    raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del raw["documents"][0]["file_hash"]
+    manifest_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    with pytest.raises(GenerationArtifactError, match="chunk manifest"):
+        load_generation_child_chunks(
+            workspace,
+            expected_generation_id="g1",
+            expected_child_manifest_hash=manifest.child_manifest_hash,
+        )
+
+
+def test_verified_evidence_binds_the_exact_manifest_bytes(tmp_path: Path) -> None:
+    """Formatting changes still invalidate validation evidence even when JSON semantics match."""
+    workspace = tmp_path / "workspace"
+    manifest = freeze_generation_child_chunks(
+        workspace,
+        generation_id="g1",
+        document_children=[(_document("doc-1", 1), _child("doc-1", "child-a", "A"))],
+    )
+    first = generation_artifact_evidence(
+        workspace,
+        expected_generation_id="g1",
+        expected_child_manifest_hash=manifest.child_manifest_hash,
+    )
+    manifest_path = workspace / "retrieval" / "chunk_manifest.json"
+    manifest_path.write_text("\n" + manifest_path.read_text(encoding="utf-8"), encoding="utf-8")
+    second = generation_artifact_evidence(
+        workspace,
+        expected_generation_id="g1",
+        expected_child_manifest_hash=manifest.child_manifest_hash,
+    )
+
+    assert first.manifest_bytes_sha256 != second.manifest_bytes_sha256
+    assert first.snapshot_bytes_sha256 == second.snapshot_bytes_sha256

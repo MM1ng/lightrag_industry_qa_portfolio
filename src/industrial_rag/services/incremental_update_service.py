@@ -529,6 +529,7 @@ class IncrementalUpdateService:
                     self._qdrant_client_factory or self._new_qdrant_client
                 ),
             ).require_eligible(kb_id, generation)
+            self._require_frozen_generation_snapshot(generation)
             now = _utcnow()
             switched = await KBLeaseService(self._session).switch_active_generation(
                 lease,
@@ -614,6 +615,7 @@ class IncrementalUpdateService:
                     f"只能回滚到验收通过的 archived/ready Generation（当前 {target.status.value}）",
                     status_code=409,
                 )
+            self._require_frozen_generation_snapshot(target)
             now = _utcnow()
             switched = await KBLeaseService(self._session).switch_active_generation(
                 lease,
@@ -1635,6 +1637,26 @@ class IncrementalUpdateService:
             for d in sorted(docs, key=lambda d: d.id)
         ]
         return hashlib.sha256("\n".join(payload).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _require_frozen_generation_snapshot(generation: Any) -> None:
+        from industrial_rag.services.generation_artifacts import (
+            GenerationArtifactError,
+            load_generation_manifest,
+        )
+
+        try:
+            load_generation_manifest(
+                Path(generation.workspace_path),
+                expected_generation_id=generation.generation,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
+        except GenerationArtifactError as error:
+            raise AppError(
+                AppErrorCode.generation_invalid_state,
+                "Generation 的冻结检索快照不可验证。",
+                status_code=409,
+            ) from error
 
     async def _resolve_active_version(self, kb_id: str, doc: Any) -> Any:
         """Return the active row of the same logical document (by identity)."""

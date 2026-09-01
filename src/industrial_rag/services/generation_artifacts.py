@@ -49,6 +49,16 @@ class GenerationChunkManifest:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class GenerationArtifactEvidence:
+    """One immutable read of the manifest and snapshot used for verification."""
+
+    manifest: GenerationChunkManifest
+    records: tuple[dict[str, object], ...]
+    manifest_bytes_sha256: str
+    snapshot_bytes_sha256: str
+
+
 def generation_retrieval_dir(workspace: Path) -> Path:
     return Path(workspace) / _RETRIEVAL_DIRNAME
 
@@ -110,14 +120,42 @@ def load_generation_manifest(
     expected_child_manifest_hash: str | None = None,
 ) -> GenerationChunkManifest:
     """Read and validate the manifest and exact snapshot bytes."""
+    return generation_artifact_evidence(
+        workspace,
+        expected_generation_id=expected_generation_id,
+        expected_child_manifest_hash=expected_child_manifest_hash,
+    ).manifest
+
+
+def generation_artifact_evidence(
+    workspace: Path,
+    *,
+    expected_generation_id: str | None = None,
+    expected_child_manifest_hash: str | None = None,
+) -> GenerationArtifactEvidence:
+    """Return hashes for the exact manifest/snapshot bytes that were validated."""
+    return _load_validated_generation_artifact(
+        workspace,
+        expected_generation_id=expected_generation_id,
+        expected_child_manifest_hash=expected_child_manifest_hash,
+    )
+
+
+def _load_validated_generation_artifact(
+    workspace: Path,
+    *,
+    expected_generation_id: str | None,
+    expected_child_manifest_hash: str | None,
+) -> GenerationArtifactEvidence:
     retrieval_dir = generation_retrieval_dir(workspace)
     manifest_path = retrieval_dir / _MANIFEST_FILENAME
     snapshot_path = retrieval_dir / _SNAPSHOT_FILENAME
     if not manifest_path.is_file() or not snapshot_path.is_file():
         raise GenerationArtifactError("generation retrieval snapshot or manifest is missing")
     try:
-        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+        manifest_bytes = manifest_path.read_bytes()
+        raw = json.loads(manifest_bytes.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise GenerationArtifactError("generation chunk manifest is unreadable") from error
     manifest = _manifest_from_dict(raw)
     if expected_generation_id is not None and manifest.generation_id != expected_generation_id:
@@ -127,13 +165,25 @@ def load_generation_manifest(
         and manifest.child_manifest_hash != expected_child_manifest_hash
     ):
         raise GenerationArtifactError("expected child manifest hash does not match the chunk manifest")
-    records = _read_snapshot_records(snapshot_path)
+    try:
+        snapshot_bytes = snapshot_path.read_bytes()
+    except OSError as error:
+        raise GenerationArtifactError("generation child snapshot is unreadable") from error
+    try:
+        records = _read_snapshot_records(snapshot_path, payload=snapshot_bytes.decode("utf-8"))
+    except UnicodeDecodeError as error:
+        raise GenerationArtifactError("generation child snapshot is unreadable") from error
     if len(records) != manifest.count:
         raise GenerationArtifactError("generation snapshot count does not match the chunk manifest")
     if _hash_records(records) != manifest.child_manifest_hash:
         raise GenerationArtifactError("generation snapshot hash does not match the chunk manifest")
     _validate_document_bindings(records, manifest.documents)
-    return manifest
+    return GenerationArtifactEvidence(
+        manifest=manifest,
+        records=tuple(records),
+        manifest_bytes_sha256=hashlib.sha256(manifest_bytes).hexdigest(),
+        snapshot_bytes_sha256=hashlib.sha256(snapshot_bytes).hexdigest(),
+    )
 
 
 def load_generation_child_chunks(
@@ -143,7 +193,7 @@ def load_generation_child_chunks(
     expected_child_manifest_hash: str,
 ) -> list[Any]:
     """Load ChildChunks from a validated generation-local snapshot only."""
-    load_generation_manifest(
+    evidence = _load_validated_generation_artifact(
         workspace,
         expected_generation_id=expected_generation_id,
         expected_child_manifest_hash=expected_child_manifest_hash,
@@ -152,9 +202,7 @@ def load_generation_child_chunks(
 
     return [
         ChildChunk.from_dict(record)
-        for record in _read_snapshot_records(
-            generation_retrieval_dir(workspace) / _SNAPSHOT_FILENAME
-        )
+        for record in evidence.records
     ]
 
 
@@ -171,20 +219,21 @@ class GenerationArtifactResolver:
         expected_generation_id: str,
         expected_child_manifest_hash: str,
     ) -> RuntimeChunkHydrator:
-        manifest = load_generation_manifest(
+        evidence = _load_validated_generation_artifact(
             workspace,
             expected_generation_id=expected_generation_id,
             expected_child_manifest_hash=expected_child_manifest_hash,
         )
         workspace_key = str(Path(workspace).resolve())
-        key = (workspace_key, manifest.child_manifest_hash)
+        key = (workspace_key, evidence.manifest.child_manifest_hash)
         stale = [cached for cached in self._registries if cached[0] == workspace_key and cached != key]
         for cached in stale:
             self._registries.pop(cached, None)
         registry = self._registries.get(key)
         if registry is None:
-            registry = RuntimeChunkHydrator.from_jsonl(
-                [generation_retrieval_dir(workspace) / _SNAPSHOT_FILENAME]
+            registry = RuntimeChunkHydrator.from_records(
+                evidence.records,
+                source=str(generation_retrieval_dir(workspace) / _SNAPSHOT_FILENAME),
             )
             self._registries[key] = registry
         return registry
@@ -206,6 +255,9 @@ def _snapshot_records(document_children: Iterable[tuple[Any, Any]]) -> list[dict
         if not chunk_id:
             raise GenerationArtifactError("snapshot child has no chunk_id")
         record["document_id"] = document_id
+        record["document_version"] = str(int(getattr(document, "version", 1)))
+        record["document_file_hash"] = str(getattr(document, "file_hash", ""))
+        record["document_name"] = str(getattr(document, "original_file_name", ""))
         records.append(record)
     records.sort(key=lambda item: (str(item["document_id"]), str(item["chunk_id"])))
     duplicate_ids = [
@@ -299,6 +351,14 @@ def _manifest_from_dict(value: Any) -> GenerationChunkManifest:
             raise ValueError
         if not isinstance(documents_raw, list) or not all(isinstance(item, Mapping) for item in documents_raw):
             raise ValueError
+        required_document_fields = {
+            "document_id",
+            "document_version",
+            "file_hash",
+            "document_name",
+        }
+        if any(not required_document_fields <= set(item) for item in documents_raw):
+            raise ValueError
         return GenerationChunkManifest(
             generation_id=str(value["generation_id"]),
             schema_version=schema_version,
@@ -311,10 +371,11 @@ def _manifest_from_dict(value: Any) -> GenerationChunkManifest:
         raise GenerationArtifactError("generation chunk manifest is invalid") from error
 
 
-def _read_snapshot_records(path: Path) -> list[dict[str, object]]:
+def _read_snapshot_records(path: Path, *, payload: str | None = None) -> list[dict[str, object]]:
     records: list[dict[str, object]] = []
     try:
-        for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        source = payload if payload is not None else path.read_text(encoding="utf-8")
+        for line_number, line in enumerate(source.splitlines(), 1):
             if not line.strip():
                 continue
             record = json.loads(line)
@@ -330,19 +391,29 @@ def _read_snapshot_records(path: Path) -> list[dict[str, object]]:
 def _validate_document_bindings(
     records: list[dict[str, object]], documents: tuple[dict[str, object], ...]
 ) -> None:
-    bound_ids = {str(document.get("document_id") or "") for document in documents}
+    bindings = {str(document.get("document_id") or ""): document for document in documents}
     snapshot_ids = {str(record.get("document_id") or "") for record in records}
-    if "" in snapshot_ids or snapshot_ids != bound_ids:
+    if "" in snapshot_ids or snapshot_ids != set(bindings):
         raise GenerationArtifactError("generation snapshot document bindings do not match manifest")
+    for record in records:
+        binding = bindings[str(record["document_id"])]
+        if (
+            str(record.get("document_version") or "") != str(binding["document_version"])
+            or str(record.get("document_file_hash") or "") != str(binding["file_hash"])
+            or str(record.get("document_name") or "") != str(binding["document_name"])
+        ):
+            raise GenerationArtifactError("generation snapshot document binding does not match manifest")
 
 
 __all__ = [
     "CHUNK_MANIFEST_SCHEMA_VERSION",
     "GenerationArtifactError",
+    "GenerationArtifactEvidence",
     "GenerationArtifactResolver",
     "GenerationChunkManifest",
     "child_manifest_hash",
     "freeze_generation_child_chunks",
+    "generation_artifact_evidence",
     "generation_retrieval_dir",
     "load_generation_child_chunks",
     "load_generation_manifest",

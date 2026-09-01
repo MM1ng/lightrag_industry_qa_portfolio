@@ -9,6 +9,7 @@ from pathlib import Path
 from industrial_rag.config import Settings
 from industrial_rag.errors import AppError, AppErrorCode
 from industrial_rag.repositories.validation_run_repository import ValidationRunRepository
+from industrial_rag.services.generation_artifacts import GenerationArtifactError
 from industrial_rag.services.generation_content_fingerprint import (
     GenerationContentFingerprintService,
     stable_hash,
@@ -44,7 +45,10 @@ class ValidationGateService:
         artifact = Path(run.result_artifact_path or "")
         if not artifact.is_file() or hashlib.sha256(artifact.read_bytes()).hexdigest() != run.result_artifact_sha256:
             self._stale("validation artifact missing or changed")
-        current = await self._fingerprints.calculate(kb_id, generation)
+        try:
+            current = await self._fingerprints.calculate(kb_id, generation)
+        except GenerationArtifactError:
+            self._stale("frozen generation snapshot is missing or changed")
         expected = {
             "app_git_commit": current.app_git_commit,
             "strategy": current.strategy_fingerprint,

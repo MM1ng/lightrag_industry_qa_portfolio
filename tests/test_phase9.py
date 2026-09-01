@@ -734,6 +734,57 @@ def test_15_generation_mixing_is_detected(ctx: Phase9Ctx):
     _run(_test())
 
 
+def test_actual_build_activate_rollback_runtime_uses_g1_snapshot_after_current_mutates(
+    ctx: Phase9Ctx,
+) -> None:
+    """Rollback query construction must remain viable after all mutable parsed artifacts disappear."""
+    class Runtime:
+        def __init__(self, _settings) -> None:
+            self.initialized = False
+
+        async def initialize(self) -> None:
+            self.initialized = True
+
+        async def close(self) -> None:
+            self.initialized = False
+
+        async def query(self, question: str, *, mode: str):
+            from industrial_rag.lightrag_service import QueryResult
+
+            return QueryResult(answer=f"runtime:{question}", citations=(), mode=mode)
+
+    async def _test():
+        from industrial_rag.config import Settings
+        from industrial_rag.services.query_application_service import QueryApplicationService
+        from industrial_rag.services.runtime_manager import KnowledgeBaseRuntimeManager
+
+        kb_id = await ctx.create_kb()
+        g1 = await ctx.add(kb_id, "G1-SNAPSHOT retained value", "manual.pdf")
+        await ctx.promote(kb_id, g1["candidate_generation_id"])
+        g2 = await ctx.replace(kb_id, g1["document_id"], "G2-CURRENT replacement value", "manual.pdf")
+        await ctx.promote(kb_id, g2["candidate_generation_id"])
+        await ctx.rollback(kb_id, g1["candidate_generation_id"])
+
+        parsed_documents = Path(os.environ["KB_DATA_ROOT"]) / kb_id / "parsed" / "documents"
+        for current in parsed_documents.rglob("current"):
+            for artifact in current.glob("*.jsonl"):
+                artifact.unlink()
+
+        manager = KnowledgeBaseRuntimeManager(service_factory=Runtime)
+        async with ctx.factory() as session:
+            result = await QueryApplicationService(
+                session,
+                base_settings=Settings.from_env(),
+                runtime_manager=manager,
+            ).query_active(kb_id, "what does G1 say?")
+        await manager.close_all()
+
+        assert result.generation_id == g1["candidate_generation_id"]
+        assert result.result.answer == "runtime:what does G1 say?"
+
+    _run(_test())
+
+
 def test_validation_rejects_a_tampered_frozen_child_snapshot(ctx: Phase9Ctx) -> None:
     async def _test():
         kb_id = await ctx.create_kb()
@@ -747,6 +798,54 @@ def test_validation_rejects_a_tampered_frozen_child_snapshot(ctx: Phase9Ctx) -> 
         report = await ctx.validate(kb_id, candidate["candidate_generation_id"])
         assert report["passed"] is False
         assert report["gates"]["frozen_snapshot_consistency"]["passed"] is False
+
+    _run(_test())
+
+
+def test_promotion_rechecks_snapshot_after_validation_before_pointer_switch(
+    ctx: Phase9Ctx,
+) -> None:
+    async def _test():
+        from industrial_rag.errors import AppError
+
+        kb_id = await ctx.create_kb()
+        candidate = await ctx.add(kb_id, "P9-PROMOTE snapshot verification", "promote.pdf")
+        validation = await ctx.validate(kb_id, candidate["candidate_generation_id"])
+        assert validation["passed"] is True
+        async with ctx.factory() as session:
+            generation = await ctx.service(session)._generation_repo.get(
+                candidate["candidate_generation_id"]
+            )
+            snapshot = Path(generation.workspace_path) / "retrieval" / "child_chunks.jsonl"
+            snapshot.write_text('{"chunk_id":"tampered"}\n', encoding="utf-8")
+            with pytest.raises(AppError) as caught:
+                await ctx.service(session).promote_generation(
+                    kb_id, candidate["candidate_generation_id"]
+                )
+        assert caught.value.code == "generation_validation_stale"
+
+    _run(_test())
+
+
+def test_promotion_rejects_manifest_byte_changes_after_validation(ctx: Phase9Ctx) -> None:
+    async def _test():
+        from industrial_rag.errors import AppError
+
+        kb_id = await ctx.create_kb()
+        candidate = await ctx.add(kb_id, "P9-PROMOTE manifest byte evidence", "manifest.pdf")
+        validation = await ctx.validate(kb_id, candidate["candidate_generation_id"])
+        assert validation["passed"] is True
+        async with ctx.factory() as session:
+            generation = await ctx.service(session)._generation_repo.get(
+                candidate["candidate_generation_id"]
+            )
+            manifest = Path(generation.workspace_path) / "retrieval" / "chunk_manifest.json"
+            manifest.write_text("\n" + manifest.read_text(encoding="utf-8"), encoding="utf-8")
+            with pytest.raises(AppError) as caught:
+                await ctx.service(session).promote_generation(
+                    kb_id, candidate["candidate_generation_id"]
+                )
+        assert caught.value.code == "generation_validation_stale"
 
     _run(_test())
 

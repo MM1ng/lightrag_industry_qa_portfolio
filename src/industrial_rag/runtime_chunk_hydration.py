@@ -67,6 +67,27 @@ class RuntimeChunkHydrator:
                 records.setdefault(chunk_id, current)
         return cls(records)
 
+    @classmethod
+    def from_records(
+        cls,
+        values: Iterable[Mapping[str, Any]],
+        *,
+        source: str,
+    ) -> RuntimeChunkHydrator:
+        """Build a registry from already-validated in-memory artifact rows."""
+        records: dict[str, tuple[str, str]] = {}
+        for value in values:
+            _reject_evaluation_labels(value)
+            chunk_id = str(value.get("chunk_id") or value.get("id") or "").strip()
+            content = str(value.get("content") or "")
+            if not chunk_id or not content:
+                continue
+            previous = records.get(chunk_id)
+            if previous is not None and previous[0] != content:
+                raise ValueError(f"duplicate chunk_id has different text: {chunk_id}")
+            records.setdefault(chunk_id, (content, source))
+        return cls(records)
+
     @property
     def available_chunk_ids(self) -> frozenset[str]:
         return frozenset(self._records)

@@ -210,6 +210,13 @@ class IndexService:
 
             if self._runtime_manager is not None:
                 await self._runtime_manager.close_runtime(kb_id)
+            from industrial_rag.services.generation_artifacts import load_generation_manifest
+
+            load_generation_manifest(
+                shadow_workspace,
+                expected_generation_id=generation_name,
+                expected_child_manifest_hash=record.child_chunks_manifest_hash,
+            )
             await self._generation_repo.activate(record)
             storage_root = (
                 shadow_workspace / kb_settings.vector_workspace

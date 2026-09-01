@@ -21,6 +21,7 @@ from industrial_rag.db.models import (
 from industrial_rag.errors import AppError, AppErrorCode
 from industrial_rag.repositories.validation_run_repository import ValidationRunRepository
 from industrial_rag.services.canonical_validation_runner import CanonicalValidationRunner
+from industrial_rag.services.generation_artifacts import freeze_generation_child_chunks
 from industrial_rag.services.generation_content_fingerprint import (
     GenerationContentFingerprintService,
     stable_hash,
@@ -70,6 +71,9 @@ async def validation_state(tmp_path):
         validation_artifact_dir=tmp_path / "validation",
     )
     kb_id, generation_id = "a" * 32, "b" * 32
+    snapshot = freeze_generation_child_chunks(
+        tmp_path / "workspace", generation_id="g1", document_children=[]
+    )
     async with factory() as session:
         session.add_all(
             [
@@ -91,7 +95,7 @@ async def validation_state(tmp_path):
                     workspace_path=str(tmp_path / "workspace"),
                     collections={"chunks": "chunks-g1"},
                     document_manifest_hash="1" * 64,
-                    child_chunks_manifest_hash="2" * 64,
+                    child_chunks_manifest_hash=snapshot.child_manifest_hash,
                     embedding_config_hash="3" * 64,
                     chunking_config_hash="4" * 64,
                 ),

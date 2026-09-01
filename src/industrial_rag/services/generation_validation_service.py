@@ -100,7 +100,13 @@ class GenerationValidationService:
             self._session,
             settings=self._settings,
             qdrant_client_factory=client_factory,
-        ).calculate(kb_id, generation)
+        ).calculate(
+            kb_id,
+            generation,
+            require_frozen_artifact=bool(
+                gates["frozen_snapshot_consistency"].get("passed")
+            ),
+        )
         now = datetime.now(UTC)
         validation_run = await self._validation_runs.create(
             knowledge_base_id=kb_id,
