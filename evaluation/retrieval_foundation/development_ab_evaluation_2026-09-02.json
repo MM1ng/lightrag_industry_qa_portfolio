@@ -1,0 +1,42 @@
+{
+  "status": "BLOCKED",
+  "scope": "development_only",
+  "reason": "A populated real LightRAG workspace cannot be reliably reconstructed from this checkout",
+  "question_ids": ["S014", "S015", "S006", "S003", "S016", "S011"],
+  "dataset": {
+    "path": "evaluation/retrieval_foundation/dev_cases.jsonl",
+    "provenance_manifest": "evaluation/retrieval_foundation/development_dataset_manifest.json",
+    "split": "development",
+    "count": 6,
+    "hard_guard": true
+  },
+  "frozen_generation": null,
+  "label_mapping_audit": {
+    "source": "evaluation/experiments/parser_backend/fixed_model/comparison/evidence_mapping_p0.json",
+    "mapped_case_ids": ["S014", "S015", "S006", "S003", "S016", "S011"],
+    "unmapped_case_ids": [],
+    "mapping_kind": "exact",
+    "mapping_reliable": true
+  },
+  "variants": ["A0_lightrag", "A1_lightrag_bm25_rrf", "A2_lightrag_bm25_rrf_reranker"],
+  "metrics": null,
+  "reranker": null,
+  "per_question": null,
+  "validation_or_holdout_accessed": false,
+  "assets_missing": [
+    "populated LightRAG workspace (the only marker is an empty legacy lightrag_storage directory)",
+    "original Development source PDFs"
+  ],
+  "implementation": {
+    "builder": "scripts/build_retrieval_foundation_dev_generation.py",
+    "runner": "scripts/run_retrieval_foundation_dev_ab.py",
+    "a0_contract": "LightRAG only",
+    "a1_contract": "LightRAG + BM25 + RRF",
+    "a2_contract": "A1 + fail-safe reranker"
+  },
+  "verification": {
+    "ruff": "passed for new modules and tests",
+    "focused_pytest": "blocked: repository .venv points to missing C:/Users/mming/AppData/Local/Programs/Python/Python311/python.exe",
+    "generation_build": "blocked before write; builder requires an explicit real LightRAG workspace"
+  }
+}

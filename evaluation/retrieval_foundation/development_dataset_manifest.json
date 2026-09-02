@@ -1,0 +1,16 @@
+{
+  "schema_version": "retrieval-foundation-development-dataset-v1",
+  "split": "development",
+  "source_dataset": "evaluation/retrieval_foundation/dev_cases.jsonl",
+  "source_sha256": "191414e2a7accada6ab64b7207ab3e73f8ad093c9ded5c4d85e661a4ac5a27e4",
+  "canonical_golden_set_sha256": "fc52600fcce019d7f3cab04e0d0306ce336c468873ba2aef44391cc863e37aaf",
+  "source_policy": "scripts/build_phase10_golden_set.py::DEVELOPMENT_IDS",
+  "question_bindings": [
+    {"id": "S014", "question": "用塞尺法设置 2196-R 型泵叶轮间隙时，最终塞尺厚度如何确定？"},
+    {"id": "S015", "question": "SUMMIT 手册中，泵不输送液体的常见原因和对应处理方法有哪些？"},
+    {"id": "S006", "question": "SUMMIT 手册规定的最高轴承工作温度是多少？"},
+    {"id": "S003", "question": "SUMMIT 2196 系列泵出口管路中的止回阀、隔离阀和异径接头应怎样布置？"},
+    {"id": "S016", "question": "SUMMIT 手册中，轴承高温运行通常由什么原因造成，如何处理？"},
+    {"id": "S011", "question": "按 SUMMIT 手册，离心泵的标准启动步骤是什么？"}
+  ]
+}
