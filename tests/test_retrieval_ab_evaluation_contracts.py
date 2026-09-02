@@ -8,6 +8,7 @@ from industrial_rag.services.retrieval_ab_evaluation import (
     EvaluationBlocked,
     Variant,
     assert_development_only,
+    audit_label_compatibility,
     build_variant_plan,
     map_expected_evidence,
 )
@@ -44,6 +45,16 @@ def test_expected_labels_must_map_to_frozen_chunk_universe() -> None:
     assert map_expected_evidence(cases, mapping, {"child-1"})[0]["relevant_chunk_ids"] == ["child-1"]
     with pytest.raises(EvaluationBlocked, match="unmapped"):
         map_expected_evidence(cases, {}, {"child-1"})
+
+
+def test_label_audit_uses_source_location_not_retrieval_results() -> None:
+    result = audit_label_compatibility(
+        [{"id": "S001", "relevant_chunk_ids": ["old-1"]}],
+        {"gold-1": ["old-1"]},
+        {"old-1": {"document_name": "manual.pdf", "page_start": 2, "content": "evidence"}},
+        [{"chunk_id": "new-1", "document_name": "manual.pdf", "page_start": 2, "page_end": 2, "content": "evidence"}],
+    )
+    assert result[0]["status"] == "equivalent"
 
 
 def test_generation_contract_requires_light_rag_workspace(tmp_path: Path) -> None:

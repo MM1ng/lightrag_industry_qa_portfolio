@@ -133,6 +133,72 @@ def map_expected_evidence(
     return tuple(mapped_cases)
 
 
+def audit_label_compatibility(
+    cases: Sequence[Mapping[str, Any]],
+    historical_targets: Mapping[str, Sequence[str]],
+    historical_chunks: Mapping[str, Mapping[str, Any]],
+    v2_records: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    """Map labels by source location and text, never by retrieval results."""
+    by_document: dict[str, list[Mapping[str, Any]]] = {}
+    for record in v2_records:
+        by_document.setdefault(str(record.get("document_name") or ""), []).append(record)
+    audits: list[dict[str, Any]] = []
+    for case in cases:
+        historical_ids = [str(value) for value in case.get("relevant_chunk_ids", ())]
+        candidates: list[dict[str, Any]] = []
+        statuses: list[str] = []
+        reasons: list[str] = []
+        for historical_id in historical_ids:
+            old = historical_chunks.get(historical_id)
+            if old is None:
+                statuses.append("missing")
+                reasons.append(f"historical chunk {historical_id} not found")
+                continue
+            old_doc = str(old.get("document_name") or "")
+            old_page = old.get("page_start")
+            old_content = _normal_text(old.get("content"))
+            pool = [
+                record
+                for record in by_document.get(old_doc, ())
+                if _page_overlaps(old_page, record.get("page_start"), record.get("page_end"))
+            ]
+            exact = [record for record in pool if str(record.get("chunk_id")) == historical_id]
+            equivalent = [record for record in pool if old_content and old_content == _normal_text(record.get("content"))]
+            if exact:
+                matched, status, reason = exact, "exact", "chunk identity is unchanged"
+            elif equivalent:
+                matched, status, reason = equivalent, "equivalent", "same document/page and identical evidence text"
+            elif len(pool) == 1:
+                matched, status, reason = pool, "equivalent", "single document/page candidate"
+            elif not pool:
+                matched, status, reason = [], "missing", "no candidate in same document/page"
+            else:
+                matched, status, reason = pool, "ambiguous", "multiple candidates in same document/page"
+            statuses.append(status)
+            reasons.append(reason)
+            candidates.extend(
+                {"historical_chunk_id": historical_id, "v2_chunk_id": str(item.get("chunk_id")), "status": status}
+                for item in matched
+            )
+        overall = "missing" if "missing" in statuses else "ambiguous" if "ambiguous" in statuses else "exact" if statuses and all(item == "exact" for item in statuses) else "equivalent"
+        audits.append({"question_id": str(case.get("id") or case.get("question_id") or ""), "historical_evidence_identity": historical_ids, "v2_candidate_evidence": candidates, "status": overall, "confidence": 1.0 if overall == "exact" else 0.85 if overall == "equivalent" else 0.0, "reason": "; ".join(reasons)})
+    return tuple(audits)
+
+
+def _normal_text(value: object) -> str:
+    return " ".join(str(value or "").casefold().split())
+
+
+def _page_overlaps(old_page: object, start: object, end: object) -> bool:
+    if old_page is None or start is None or end is None:
+        return False
+    try:
+        return int(start) <= int(old_page) <= int(end)
+    except (TypeError, ValueError):
+        return False
+
+
 def load_development_cases(dataset_path: Path, manifest_path: Path) -> tuple[dict[str, Any], ...]:
     """Load six labeled cases through an explicit Development provenance manifest."""
     try:
@@ -394,6 +460,7 @@ __all__ = [
     "Variant",
     "VariantConfig",
     "assert_development_only",
+    "audit_label_compatibility",
     "build_variant_plan",
     "load_development_cases",
     "map_expected_evidence",

@@ -1,0 +1,34 @@
+{
+  "status": "BLOCKED_ENVIRONMENT",
+  "scope": "development_only",
+  "source_corpus": [
+    {"file_name": "2196-ANSI-Manual-Chinese.pdf", "size_bytes": 1561387, "sha256": "e0f80874dd923d03ea15584f4fe25046ba184675062d6d16e1decafa2a6c8700", "readable": true, "historical_document_id": "doc-4ffb6df91a9a"},
+    {"file_name": "t1739cn.pdf", "size_bytes": 4532306, "sha256": "77fd7ebf86ef6c574de11eac446dc321de04fd0773cd7d844287da7fa4d6c4ae", "readable": true, "historical_document_id": "doc-6a9ea3ff1f42"}
+  ],
+  "generation_id": null,
+  "corpus_fingerprint": null,
+  "source_file_fingerprints": ["e0f80874dd923d03ea15584f4fe25046ba184675062d6d16e1decafa2a6c8700", "77fd7ebf86ef6c574de11eac446dc321de04fd0773cd7d844287da7fa4d6c4ae"],
+  "parent_chunk_fingerprint": null,
+  "child_chunk_fingerprint": null,
+  "retrieval_config_fingerprint": null,
+  "parent_chunk_count": null,
+  "child_chunk_count": null,
+  "lightrag_workspace_populated": false,
+  "lexical_index_valid": false,
+  "label_compatibility": null,
+  "question_ids": ["S014", "S015", "S006", "S003", "S016", "S011"],
+  "allow_ab": false,
+  "validation_or_holdout_accessed": false,
+  "blockers": [
+    "The checked-in .venv points to C:/Users/mming/AppData/Local/Programs/Python/Python311/python.exe, which is missing.",
+    "Generation V2 builder and label audit cannot execute until Python 3.11 is restored."
+  ],
+  "commands": {
+    "source_audit": "Get-ChildItem D:/基于Lightrag的工业手册问答系统/lightrag_industry_qa_portfolio/data/manuals -Filter *.pdf; Get-FileHash -Algorithm SHA256",
+    "builder": "\.venv\\Scripts\\python.exe scripts/build_retrieval_foundation_dev_generation.py --source-dir D:/基于Lightrag的工业手册问答系统/lightrag_industry_qa_portfolio/data/manuals --output evaluation/retrieval_foundation/dev_generation_v2 --generation-id dev-v2-20260902 --env-file D:/基于Lightrag的工业手册问答系统/lightrag_industry_qa_portfolio/.env",
+    "label_audit": "\.venv\\Scripts\\python.exe scripts/audit_retrieval_foundation_dev_labels.py --generation evaluation/retrieval_foundation/dev_generation_v2 --output-json evaluation/retrieval_foundation/dev_label_audit_v2.json --output-md evaluation/retrieval_foundation/dev_label_audit_v2.md",
+    "focused_tests": "\.venv\\Scripts\\pytest.exe -q tests/test_retrieval_ab_evaluation_contracts.py",
+    "ruff": "\.venv\\Scripts\\ruff.exe check ."
+  },
+  "verification": {"ruff": "passed", "focused_tests": "blocked by missing interpreter", "builder": "not started; environment blocked"}
+}

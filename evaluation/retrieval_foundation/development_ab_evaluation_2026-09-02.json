@@ -1,7 +1,7 @@
 {
-  "status": "BLOCKED",
+  "status": "BLOCKED_ENVIRONMENT",
   "scope": "development_only",
-  "reason": "A populated real LightRAG workspace cannot be reliably reconstructed from this checkout",
+  "reason": "The real source corpus is available, but the checked-in virtual environment points to a missing Python interpreter",
   "question_ids": ["S014", "S015", "S006", "S003", "S016", "S011"],
   "dataset": {
     "path": "evaluation/retrieval_foundation/dev_cases.jsonl",
@@ -10,6 +10,10 @@
     "count": 6,
     "hard_guard": true
   },
+  "source_corpus": [
+    {"file_name": "2196-ANSI-Manual-Chinese.pdf", "size_bytes": 1561387, "sha256": "e0f80874dd923d03ea15584f4fe25046ba184675062d6d16e1decafa2a6c8700", "readable": true, "historical_document_id": "doc-4ffb6df91a9a"},
+    {"file_name": "t1739cn.pdf", "size_bytes": 4532306, "sha256": "77fd7ebf86ef6c574de11eac446dc321de04fd0773cd7d844287da7fa4d6c4ae", "readable": true, "historical_document_id": "doc-6a9ea3ff1f42"}
+  ],
   "frozen_generation": null,
   "label_mapping_audit": {
     "source": "evaluation/experiments/parser_backend/fixed_model/comparison/evidence_mapping_p0.json",
@@ -28,7 +32,8 @@
     "original Development source PDFs"
   ],
   "implementation": {
-    "builder": "scripts/build_retrieval_foundation_dev_generation.py",
+    "builder": "scripts/build_retrieval_foundation_dev_generation.py --source-dir D:/基于Lightrag的工业手册问答系统/lightrag_industry_qa_portfolio/data/manuals --output evaluation/retrieval_foundation/dev_generation_v2 --generation-id dev-v2-20260902",
+    "label_audit": "scripts/audit_retrieval_foundation_dev_labels.py (runs only after generation exists)",
     "runner": "scripts/run_retrieval_foundation_dev_ab.py",
     "a0_contract": "LightRAG only",
     "a1_contract": "LightRAG + BM25 + RRF",
