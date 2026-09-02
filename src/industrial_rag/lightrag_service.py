@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import partial
 from typing import Any, Literal, Protocol, cast
@@ -22,6 +22,7 @@ from industrial_rag.citation_formatter import (
     Citation,
     collect_citations,
     encode_chunk_header,
+    encode_source_ref,
     is_provenance_only_fragment,
     strip_provenance_metadata,
 )
@@ -53,6 +54,13 @@ from industrial_rag.retrieval_trace import (
     feature_flag_retrieval_config,
 )
 from industrial_rag.runtime_chunk_hydration import ChunkRegistry
+from industrial_rag.services.generation_artifacts import (
+    generation_artifact_evidence,
+    generation_retrieval_dir,
+)
+from industrial_rag.services.lexical_retrieval import BM25Index, load_lexical_index
+from industrial_rag.services.reranker_runtime import RerankerRuntime, RerankProvider
+from industrial_rag.services.retrieval_fusion import HybridRetriever
 from industrial_rag.structured_citation_output import (
     RequirementRegistry,
     SourceRegistry,
@@ -379,11 +387,59 @@ def _extract_retrieved(evidence: dict[str, Any]) -> list[dict[str, Any]]:
                     "score": score if isinstance(score, (int, float)) else None,
                     "rank": len(out) + 1,
                     "retrieval_source": retrieval_source,
-                    "section_path": tuple(str(part) for part in section_path if str(part)),
-                    "content": value.get("content") if isinstance(value.get("content"), str) else "",
+                "section_path": tuple(str(part) for part in section_path if str(part)),
+                "content": value.get("content") if isinstance(value.get("content"), str) else "",
+                "reranked_rank": value.get("reranked_rank"),
+                "reranked_score": value.get("reranked_score"),
                 }
             )
     return out
+
+
+def _fused_evidence_payload(
+    fused: Sequence[Any],
+    registry: ChunkRegistry | None,
+    *,
+    rerank_scores: Mapping[str, tuple[int, float]] | None = None,
+) -> dict[str, Any]:
+    """Adapt RRF candidates back to the existing evidence payload contract."""
+    if registry is None:
+        return {"data": {"chunks": [], "references": []}}
+    rows: list[dict[str, Any]] = []
+    for candidate in fused:
+        record = registry.record_for_chunk(candidate.child_chunk_id)
+        if record is None:
+            continue
+        document_name = str(record.get("document_name") or "")
+        page_number = int(record.get("page_start") or 1)
+        contributions = {item.source: item for item in candidate.contributions}
+        dense = contributions.get("lightrag")
+        sparse = contributions.get("sparse")
+        rerank = (rerank_scores or {}).get(candidate.child_chunk_id)
+        citation = Citation(document_name, page_number, candidate.child_chunk_id)
+        rows.append(
+            {
+                "child_chunk_id": candidate.child_chunk_id,
+                "chunk_id": candidate.child_chunk_id,
+                "document_id": str(record.get("document_id") or ""),
+                "document_name": document_name,
+                "page_start": page_number,
+                "section_path": tuple(str(item) for item in record.get("section_path", ()) or ()),
+                "content": str(record.get("content") or ""),
+                "file_path": encode_source_ref(citation),
+                "score": candidate.rrf_score,
+                "retrieval_source": "rrf",
+                "rrf_rank": candidate.rrf_rank,
+                "rrf_score": candidate.rrf_score,
+                "dense_rank": dense.original_rank if dense else None,
+                "dense_score": dense.original_score if dense else None,
+                "sparse_rank": sparse.original_rank if sparse else None,
+                "sparse_score": sparse.original_score if sparse else None,
+                "reranked_rank": rerank[0] if rerank else None,
+                "reranked_score": rerank[1] if rerank else None,
+            }
+        )
+    return {"data": {"chunks": rows, "references": []}}
 
 
 def _build_retrieval_trace(
@@ -462,6 +518,12 @@ def _build_retrieval_trace(
     structured_citation_fallback_mode: str | None = None,
     structured_citation_fallback_reason: str | None = None,
     backend_generate_call_count: int = 0,
+    rerank_enabled: bool = False,
+    rerank_provider: str | None = None,
+    rerank_latency_ms: float = 0.0,
+    rerank_candidate_count: int = 0,
+    rerank_final_count: int = 0,
+    rerank_fallback_reason: str | None = None,
 ) -> RetrievalExecutionTrace:
     selected_identities = {
         (item.citation.source_file, item.citation.page_number, item.citation.chunk_id)
@@ -491,6 +553,14 @@ def _build_retrieval_trace(
                 used_for_answer=identity in selected_identities,
                 cited_in_answer=identity in cited_identities,
                 content_excerpt=_bounded_content_excerpt(item.get("content") or ""),
+                sparse_rank=item.get("sparse_rank"),
+                sparse_score=item.get("sparse_score"),
+                rrf_rank=item.get("rrf_rank"),
+                rrf_score=item.get("rrf_score"),
+                reranked_rank=item.get("reranked_rank"),
+                reranked_score=item.get("reranked_score"),
+                selected=identity in selected_identities,
+                rejected_reason=None if identity in selected_identities else "evidence_not_selected",
             )
         )
     final_selected = tuple(
@@ -543,6 +613,12 @@ def _build_retrieval_trace(
         retrieval_ms=retrieval_ms,
         rerank_ms=0.0,
         evidence_selection_ms=evidence_selection_ms,
+        rerank_enabled=rerank_enabled,
+        rerank_provider=rerank_provider,
+        rerank_latency_ms=rerank_latency_ms,
+        rerank_candidate_count=rerank_candidate_count,
+        rerank_final_count=rerank_final_count,
+        rerank_fallback_reason=rerank_fallback_reason,
         feature_flags=tuple(feature_flags),
         detected_model=normalization.detected_model if normalization else None,
         detected_component=normalization.detected_component if normalization else None,
@@ -669,10 +745,16 @@ class LightRAGService:
         *,
         backend: LightRAGBackend | None = None,
         chunk_registry: ChunkRegistry | None = None,
+        reranker_provider: RerankProvider | None = None,
     ) -> None:
         self.settings = settings
         self._backend: LightRAGBackend | None = backend
         self._chunk_registry = chunk_registry
+        self._sparse_index: BM25Index | None = None
+        self._reranker = RerankerRuntime(
+            provider=reranker_provider,
+            timeout_seconds=self.settings.reranker_timeout_seconds,
+        )
         self._initialized = False
 
     def bind_chunk_registry(self, registry: ChunkRegistry) -> None:
@@ -690,6 +772,20 @@ class LightRAGService:
         if self._backend is None:
             self._backend = build_official_backend(self.settings)
         await self._backend.initialize_storages()
+        if self.settings.sparse_retrieval_enabled:
+            if self._chunk_registry is None or not self.settings.qdrant_generation:
+                raise RuntimeError("Sparse retrieval requires a generation chunk registry")
+            artifact = generation_artifact_evidence(
+                self.settings.working_dir,
+                expected_generation_id=self.settings.qdrant_generation,
+            )
+            lexical_payload = (
+                generation_retrieval_dir(self.settings.working_dir) / "lexical_index.json"
+            ).read_bytes()
+            lexical = load_lexical_index(lexical_payload)
+            if lexical.child_manifest_hash != artifact.manifest.child_manifest_hash:
+                raise RuntimeError("Sparse lexical index does not match generation snapshot")
+            self._sparse_index = BM25Index.from_artifact(lexical)
         write_storage_metadata(
             self.settings.working_dir,
             self.settings.embedding_model,
@@ -771,9 +867,52 @@ class LightRAGService:
             raise ValueError("问题不能为空")
         options = QueryOptions(mode=mode, top_k=top_k, chunk_top_k=chunk_top_k)
         retrieval_started = time.perf_counter()
-        evidence = await self._backend.aquery_data(normalized_question, options)
-        if self._chunk_registry is not None:
-            evidence = self._chunk_registry.hydrate_lightrag_evidence(evidence)
+        rerank_result = None
+        if self._sparse_index is None:
+            evidence = await self._backend.aquery_data(normalized_question, options)
+            if self._chunk_registry is not None:
+                evidence = self._chunk_registry.hydrate_lightrag_evidence(evidence)
+        else:
+            async def dense_retriever(_query: str) -> list[dict[str, Any]]:
+                dense_payload = await self._backend.aquery_data(normalized_question, options)
+                if self._chunk_registry is not None:
+                    dense_payload = self._chunk_registry.hydrate_lightrag_evidence(dense_payload)
+                return _extract_retrieved(dense_payload)
+
+            fused = await HybridRetriever(
+                dense_retriever=dense_retriever,
+                sparse_index=self._sparse_index,
+                rrf_k=self.settings.rrf_k,
+            ).retrieve(
+                normalized_question,
+                top_k=max(options.chunk_top_k, self.settings.sparse_top_k),
+            )
+            rerank_scores: dict[str, tuple[int, float]] = {}
+            if self.settings.reranker_enabled and fused:
+                rerank_candidates = []
+                for candidate in fused:
+                    record = self._chunk_registry.record_for_chunk(candidate.child_chunk_id) if self._chunk_registry else None
+                    rerank_candidates.append(
+                        {
+                            "child_chunk_id": candidate.child_chunk_id,
+                            "content": str((record or {}).get("content") or ""),
+                            "rrf_score": candidate.rrf_score,
+                        }
+                    )
+                rerank_result = await self._reranker.rerank(
+                    normalized_question, rerank_candidates, limit=options.top_k
+                )
+                fused_by_id = {candidate.child_chunk_id: candidate for candidate in fused}
+                ordered = [fused_by_id[item["child_chunk_id"]] for item in rerank_result.candidates if item["child_chunk_id"] in fused_by_id]
+                rerank_scores = {
+                    str(item["child_chunk_id"]): (rank, float(item["rerank_score"]))
+                    for rank, item in enumerate(rerank_result.candidates, 1)
+                    if "rerank_score" in item
+                }
+                fused = tuple(ordered)
+            evidence = _fused_evidence_payload(
+                fused, self._chunk_registry, rerank_scores=rerank_scores
+            )
         retrieval_ms = (time.perf_counter() - retrieval_started) * 1000
         retrieved = _extract_retrieved(evidence)
         retrieval_chunk_ids = tuple(item["chunk_id"] for item in retrieved)
@@ -1351,6 +1490,12 @@ class LightRAGService:
                 else None
             ),
             backend_generate_call_count=backend_generate_call_count,
+            rerank_enabled=bool(rerank_result and rerank_result.enabled),
+            rerank_provider=(rerank_result.provider if rerank_result else None),
+            rerank_latency_ms=(rerank_result.latency_ms if rerank_result else 0.0),
+            rerank_candidate_count=(rerank_result.candidate_count if rerank_result else 0),
+            rerank_final_count=(rerank_result.final_count if rerank_result else 0),
+            rerank_fallback_reason=(rerank_result.fallback_reason if rerank_result else None),
             coverage_after_parent_adjacent=coverage_after,
             selected_coverage=selected_coverage,
             generated_coverage=tuple(point.point_id for point in (grounded.answer_points if grounded else ())),

@@ -81,6 +81,11 @@ class Settings:
     phase10b_query_mode: str = "mix"
     phase10b_top_k: int = 12
     phase10b_chunk_top_k: int = 20
+    sparse_retrieval_enabled: bool = False
+    sparse_top_k: int = 20
+    rrf_k: int = 60
+    reranker_enabled: bool = False
+    reranker_timeout_seconds: float = 2.0
     validation_base_url: str | None = None
     validation_artifact_dir: Path = PROJECT_ROOT / "artifacts" / "validation-runs"
     validation_max_age_seconds: int = 3600
@@ -241,6 +246,12 @@ class Settings:
             .lower()
             == "true"
         )
+        sparse_retrieval_enabled = (
+            (values.get("QA_SPARSE_RETRIEVAL_ENABLED") or "false").strip().lower() == "true"
+        )
+        reranker_enabled = (
+            (values.get("QA_RERANKER_ENABLED") or "false").strip().lower() == "true"
+        )
         try:
             evidence_completion_max = int(values.get("QA_EVIDENCE_COMPLETION_MAX") or "2")
         except ValueError as error:
@@ -251,8 +262,15 @@ class Settings:
         try:
             phase10b_top_k = int(values.get("PHASE10B_TOP_K") or "12")
             phase10b_chunk_top_k = int(values.get("PHASE10B_CHUNK_TOP_K") or "20")
+            sparse_top_k = int(values.get("QA_SPARSE_TOP_K") or "20")
+            rrf_k = int(values.get("QA_RRF_K") or "60")
+            reranker_timeout_seconds = float(values.get("QA_RERANKER_TIMEOUT_SECONDS") or "2.0")
         except ValueError as error:
-            raise ValueError("PHASE10B_TOP_K 和 PHASE10B_CHUNK_TOP_K 必须是整数") from error
+            raise ValueError("检索 top-k、RRF k 和 reranker timeout 配置格式无效") from error
+        if phase10b_top_k <= 0 or phase10b_chunk_top_k < phase10b_top_k:
+            raise ValueError("PHASE10B_TOP_K 和 PHASE10B_CHUNK_TOP_K 配置无效")
+        if sparse_top_k <= 0 or rrf_k < 0 or reranker_timeout_seconds <= 0:
+            raise ValueError("Sparse/RRF/Reranker 配置必须为有效正数")
         validation_base_url = (
             values.get("VALIDATION_BASE_URL") or ""
         ).strip().rstrip("/") or None
@@ -354,6 +372,11 @@ class Settings:
             phase10b_query_mode=phase10b_query_mode,
             phase10b_top_k=phase10b_top_k,
             phase10b_chunk_top_k=phase10b_chunk_top_k,
+            sparse_retrieval_enabled=sparse_retrieval_enabled,
+            sparse_top_k=sparse_top_k,
+            rrf_k=rrf_k,
+            reranker_enabled=reranker_enabled,
+            reranker_timeout_seconds=reranker_timeout_seconds,
             validation_base_url=validation_base_url,
             validation_artifact_dir=validation_artifact_dir.resolve(),
             validation_max_age_seconds=validation_max_age_seconds,
@@ -381,6 +404,8 @@ class Settings:
         """Sanitized experimental flags suitable for traces and diagnostics."""
 
         return {
+            "QA_SPARSE_RETRIEVAL_ENABLED": self.sparse_retrieval_enabled,
+            "QA_RERANKER_ENABLED": self.reranker_enabled,
             "QA_SUPPORT_VALIDATOR_V2_ENABLED": self.support_validator_v2_enabled,
             "QA_STRUCTURED_GENERATION_ENABLED": self.structured_generation_enabled,
             "QA_SUPPLEMENTAL_RETRIEVAL_ENABLED": self.supplemental_retrieval_enabled,

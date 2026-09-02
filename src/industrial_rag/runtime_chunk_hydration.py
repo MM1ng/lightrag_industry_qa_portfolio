@@ -196,6 +196,11 @@ class ChunkRegistry:
     def available_chunk_ids(self) -> frozenset[str]:
         return frozenset(self._records)
 
+    def record_for_chunk(self, chunk_id: str) -> Mapping[str, Any] | None:
+        """Return immutable-snapshot metadata for one canonical child ID."""
+        record = self._records.get(str(chunk_id).strip())
+        return dict(record) if record is not None else None
+
     def hydrate(
         self,
         chunk_ids: Iterable[str],

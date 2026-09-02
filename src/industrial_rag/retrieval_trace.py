@@ -125,6 +125,12 @@ class RetrievalExecutionTrace:
     retrieval_ms: float
     rerank_ms: float
     evidence_selection_ms: float
+    rerank_enabled: bool = False
+    rerank_provider: str | None = None
+    rerank_latency_ms: float = 0.0
+    rerank_candidate_count: int = 0
+    rerank_final_count: int = 0
+    rerank_fallback_reason: str | None = None
     feature_flags: tuple[tuple[str, object], ...] = ()
     detected_model: str | None = None
     detected_component: str | None = None
@@ -285,6 +291,12 @@ class RetrievalExecutionTrace:
             "normalization_ms": self.normalization_ms,
             "retrieval_ms": self.retrieval_ms,
             "rerank_ms": self.rerank_ms,
+            "rerank_enabled": self.rerank_enabled,
+            "rerank_provider": self.rerank_provider,
+            "rerank_latency_ms": self.rerank_latency_ms,
+            "rerank_candidate_count": self.rerank_candidate_count,
+            "rerank_final_count": self.rerank_final_count,
+            "rerank_fallback_reason": self.rerank_fallback_reason,
             "evidence_selection_ms": self.evidence_selection_ms,
             "feature_flags": dict(self.feature_flags),
             "detected_model": self.detected_model,
