@@ -161,6 +161,15 @@ Source: [`phase8/acceptance/metrics.json`](evaluation/experiments/phase8/accepta
 
 Ragas `0.3.9` is available through the `evaluation` optional dependency. Conversation-aware Faithfulness and Response Relevancy runs are Development-only experiments. Their status and provider availability are kept independent, and Development results are not presented as Validation/Holdout acceptance. See [`evaluation/phase10/`](evaluation/phase10/) and [`docs/phase-10-conversation-e2e-ragas-development-report.md`](docs/phase-10-conversation-e2e-ragas-development-report.md).
 
+### Retrieval Foundation development evaluation
+
+The development-only ranking helper in `industrial_rag.services.retrieval_evaluation`
+reports Recall@5/10 and MRR@5/10 for baseline and candidate ranked child IDs.
+Use [`evaluation/retrieval_foundation/dev_cases.jsonl`](evaluation/retrieval_foundation/dev_cases.jsonl)
+as the labeled development dataset; it is intentionally separate from validation
+and holdout artifacts. Call `evaluate_rankings(cases, rankings_by_system)` from a
+development script to compare LightRAG, Sparse/RRF, and reranked outputs.
+
 ## Project Structure
 
 ```text
