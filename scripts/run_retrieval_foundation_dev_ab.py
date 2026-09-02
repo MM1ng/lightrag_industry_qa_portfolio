@@ -122,6 +122,8 @@ def _markdown(report: dict[str, object]) -> str:
         f"**Downstream QA allowed:** `{report['downstream_qa_allowed']}`  ",
         f"**Scope:** `{report['scope']}`  ",
         f"**Question count:** `{report['sample_size']}` (sample-size limitation: `{report['sample_size_limitation']}`)",
+        f"**Baseline mode:** `{report['baseline_mode']}`",
+        f"**Latency note:** {report['latency_measurement_note']}",
         "",
         "## Aggregate metrics",
         "",
@@ -181,7 +183,7 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
             raise EvaluationBlocked(f"LightRAG baseline is missing question: {question}")
         return baseline[question]
 
-    return await run_ab_evaluation(
+    report = await run_ab_evaluation(
         cases=cases,
         generation=generation,
         sparse_index=sparse_index,
@@ -190,6 +192,12 @@ async def _run(args: argparse.Namespace) -> dict[str, object]:
         reranker_provider_name=args.reranker_provider,
         reranker_model=args.reranker_model,
     )
+    report["baseline_mode"] = "original_lightrag_result_replay"
+    report["latency_measurement_note"] = (
+        "A0 latency is local replay overhead from the frozen original LightRAG result file; "
+        "it is not a live remote LightRAG service latency benchmark."
+    )
+    return report
 
 
 def main() -> int:

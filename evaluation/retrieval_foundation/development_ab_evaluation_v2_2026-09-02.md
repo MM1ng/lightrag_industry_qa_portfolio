@@ -4,14 +4,16 @@
 **Downstream QA allowed:** `False`  
 **Scope:** `development_only`  
 **Question count:** `6` (sample-size limitation: `True`)
+**Baseline mode:** `original_lightrag_result_replay`
+**Latency note:** A0 latency is local replay overhead from the frozen original LightRAG result file; it is not a live remote LightRAG service latency benchmark.
 
 ## Aggregate metrics
 
 | Variant | Recall@5 | Recall@10 | MRR@5 | MRR@10 | p50 ms | p95 ms |
 |---|---:|---:|---:|---:|---:|---:|
 | A0_lightrag | 0.238 | 0.258 | 0.597 | 0.597 | 0.0 | 0.0 |
-| A1_lightrag_bm25_rrf | 0.271 | 0.271 | 0.833 | 0.833 | 0.6 | 4.8 |
-| A2_lightrag_bm25_rrf_reranker | 0.271 | 0.271 | 0.833 | 0.833 | 0.6 | 4.8 |
+| A1_lightrag_bm25_rrf | 0.271 | 0.271 | 0.833 | 0.833 | 0.6 | 4.3 |
+| A2_lightrag_bm25_rrf_reranker | 0.271 | 0.271 | 0.833 | 0.833 | 0.6 | 4.3 |
 
 ## Reranker
 

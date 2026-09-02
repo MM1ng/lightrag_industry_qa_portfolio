@@ -172,16 +172,16 @@
   },
   "latency": {
     "A0_lightrag": {
-      "p50_ms": 0.0008499996511091013,
-      "p95_ms": 0.001374999783365638
+      "p50_ms": 0.0009000000318337698,
+      "p95_ms": 0.0013249998573883204
     },
     "A1_lightrag_bm25_rrf": {
-      "p50_ms": 0.5550999999286432,
-      "p95_ms": 4.821674999220704
+      "p50_ms": 0.5679999999301799,
+      "p95_ms": 4.294200000231285
     },
     "A2_lightrag_bm25_rrf_reranker": {
-      "p50_ms": 0.5685999999514024,
-      "p95_ms": 4.846349998615551
+      "p50_ms": 0.5840999992869911,
+      "p95_ms": 4.31567499981611
     }
   },
   "reranker": {
@@ -303,7 +303,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.000999999429041054,
+          "latency_ms": 0.001100000190490391,
           "fallback_reason": null
         },
         "A1_lightrag_bm25_rrf": {
@@ -491,7 +491,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 6.182899998748326,
+          "latency_ms": 5.515900000318652,
           "fallback_reason": null
         },
         "A2_lightrag_bm25_rrf_reranker": {
@@ -689,7 +689,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 6.20969999818044,
+          "latency_ms": 5.540399999517831,
           "fallback_reason": "provider_unavailable"
         }
       },
@@ -818,7 +818,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.001499999598308932,
+          "latency_ms": 0.0013999997463542968,
           "fallback_reason": null
         },
         "A1_lightrag_bm25_rrf": {
@@ -991,7 +991,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.5243999994490878,
+          "latency_ms": 0.5693000002793269,
           "fallback_reason": null
         },
         "A2_lightrag_bm25_rrf_reranker": {
@@ -1174,7 +1174,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.5391999993662466,
+          "latency_ms": 0.5894999994779937,
           "fallback_reason": "provider_unavailable"
         }
       },
@@ -1305,7 +1305,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.0006999998731771484,
+          "latency_ms": 0.001100000190490391,
           "fallback_reason": null
         },
         "A1_lightrag_bm25_rrf": {
@@ -1493,7 +1493,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.4957999999533058,
+          "latency_ms": 0.6290999999691849,
           "fallback_reason": null
         },
         "A2_lightrag_bm25_rrf_reranker": {
@@ -1691,7 +1691,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.5087999998067971,
+          "latency_ms": 0.6415000007109484,
           "fallback_reason": "provider_unavailable"
         }
       },
@@ -1990,7 +1990,7 @@
           ],
           "hit_at_5": false,
           "hit_at_10": false,
-          "latency_ms": 0.5858000004081987,
+          "latency_ms": 0.5666999995810329,
           "fallback_reason": null
         },
         "A2_lightrag_bm25_rrf_reranker": {
@@ -2168,7 +2168,7 @@
           ],
           "hit_at_5": false,
           "hit_at_10": false,
-          "latency_ms": 0.5980000005365582,
+          "latency_ms": 0.5786999990959885,
           "fallback_reason": "provider_unavailable"
         }
       },
@@ -2297,7 +2297,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.0006999998731771484,
+          "latency_ms": 0.0006000000212225132,
           "fallback_reason": null
         },
         "A1_lightrag_bm25_rrf": {
@@ -2460,7 +2460,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.7380000006378395,
+          "latency_ms": 0.509299999976065,
           "fallback_reason": null
         },
         "A2_lightrag_bm25_rrf_reranker": {
@@ -2633,7 +2633,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.7562999999208841,
+          "latency_ms": 0.5214000002524699,
           "fallback_reason": "provider_unavailable"
         }
       },
@@ -2766,7 +2766,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.0010000003385357559,
+          "latency_ms": 0.0006999998731771484,
           "fallback_reason": null
         },
         "A1_lightrag_bm25_rrf": {
@@ -2934,7 +2934,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.4451000004337402,
+          "latency_ms": 0.4314999996495317,
           "fallback_reason": null
         },
         "A2_lightrag_bm25_rrf_reranker": {
@@ -3112,7 +3112,7 @@
           ],
           "hit_at_5": true,
           "hit_at_10": true,
-          "latency_ms": 0.45760000011796365,
+          "latency_ms": 0.44379999962984584,
           "fallback_reason": "provider_unavailable"
         }
       },
@@ -3148,5 +3148,7 @@
     "NO_MATERIAL_CHANGE": 4
   },
   "tuning_applied": false,
-  "validation_or_holdout_accessed": false
+  "validation_or_holdout_accessed": false,
+  "baseline_mode": "original_lightrag_result_replay",
+  "latency_measurement_note": "A0 latency is local replay overhead from the frozen original LightRAG result file; it is not a live remote LightRAG service latency benchmark."
 }
