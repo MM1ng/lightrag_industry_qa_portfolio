@@ -34,7 +34,8 @@
     "actual_python_executable": "C:/Users/mming/AppData/Local/Programs/Python/Python311/python.exe (exists but process start denied)",
     "actual_python_version": null,
     "actual_pip_version": null,
-    "restore_result": "blocked: interpreter file exists but Windows denied process start; version smoke test could not execute"
+    "restore_result": "blocked: interpreter file exists but Windows denied process start; version smoke test could not execute",
+    "latest_gate_attempt": "2026-09-02: .venv\\Scripts\\python.exe --version and python -m pytest/ruff all failed before process start"
   },
   "commands": {
     "source_audit": "Get-ChildItem D:/基于Lightrag的工业手册问答系统/lightrag_industry_qa_portfolio/data/manuals -Filter *.pdf; Get-FileHash -Algorithm SHA256",
