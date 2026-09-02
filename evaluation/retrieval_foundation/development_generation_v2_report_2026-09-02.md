@@ -3,10 +3,10 @@
 ## Final status: `BLOCKED_ENVIRONMENT`
 
 The real source corpus is available and was audited read-only. Both PDFs are
-readable and correspond to historical document identities, but the repository
-`.venv` is bound to a Python 3.11 installation removed by the system reinstall.
-The builder therefore could not run; no generation, chunks, LightRAG workspace,
-or label-audit result was fabricated.
+readable and correspond to historical document identities. The repository
+`.venv` metadata reports Python 3.11.9, but starting its underlying interpreter
+is still denied by Windows. The builder therefore could not run; no generation,
+chunks, LightRAG workspace, or label-audit result was fabricated.
 
 | Source PDF | Size | SHA256 | Historical document ID |
 |---|---:|---|---|
@@ -24,7 +24,7 @@ Validation/Holdout data was accessed. A0/A1/A2 execution is not allowed until
 the builder succeeds and label audit returns `READY_FOR_AB`.
 
 Verification: `ruff check .` passed. Focused pytest and the builder were blocked
-by the missing interpreter at
+with `Access is denied` when starting
 `C:\Users\mming\AppData\Local\Programs\Python\Python311\python.exe`.
 
 ## Python environment audit
@@ -39,5 +39,4 @@ by the missing interpreter at
 - Planned restore: `py -3.11 -m venv .venv`, then
   `.venv\Scripts\python.exe -m pip install --upgrade pip` and
   `.venv\Scripts\python.exe -m pip install -e .[dev]`.
-- Actual Python executable/version/pip version: unavailable; no Python 3.11,
-  conda, or uv executable is discoverable on this machine.
+- Actual Python executable: `C:\Users\mming\AppData\Local\Programs\Python\Python311\python.exe` exists, but process start returns `Access is denied`; Python version and pip version remain unverified.

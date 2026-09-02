@@ -31,10 +31,10 @@
     "evaluation_dependency_source": "pyproject.toml [project.optional-dependencies].evaluation / requirements-evaluation.txt",
     "lock_file_audit": "requirements.lock.txt is a historical pip-freeze snapshot and includes packages outside the declared project dependencies; it was not used to expand installation",
     "planned_restore_commands": ["py -3.11 -m venv .venv", ".venv\\Scripts\\python.exe -m pip install --upgrade pip", ".venv\\Scripts\\python.exe -m pip install -e .[dev]"],
-    "actual_python_executable": null,
+    "actual_python_executable": "C:/Users/mming/AppData/Local/Programs/Python/Python311/python.exe (exists but process start denied)",
     "actual_python_version": null,
     "actual_pip_version": null,
-    "restore_result": "blocked: no Python 3.11 executable is installed or discoverable"
+    "restore_result": "blocked: interpreter file exists but Windows denied process start; version smoke test could not execute"
   },
   "commands": {
     "source_audit": "Get-ChildItem D:/基于Lightrag的工业手册问答系统/lightrag_industry_qa_portfolio/data/manuals -Filter *.pdf; Get-FileHash -Algorithm SHA256",
@@ -43,5 +43,5 @@
     "focused_tests": "\.venv\\Scripts\\pytest.exe -q tests/test_retrieval_ab_evaluation_contracts.py",
     "ruff": "\.venv\\Scripts\\ruff.exe check ."
   },
-  "verification": {"python_version": null, "ruff": "passed", "focused_tests": "blocked by missing interpreter", "builder": "not started; environment blocked"}
+  "verification": {"python_version": null, "python_executable_check": "blocked: Access is denied", "ruff": "passed", "focused_tests": "blocked: Access is denied while starting .venv\\Scripts\\pytest.exe", "builder": "not started; environment gate failed"}
 }
