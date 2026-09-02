@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import time
 from collections.abc import Awaitable, Callable, Sequence
@@ -53,6 +52,7 @@ from industrial_rag.retrieval_trace import (
     SelectedEvidenceTrace,
     feature_flag_retrieval_config,
 )
+from industrial_rag.runtime_chunk_hydration import ChunkRegistry
 from industrial_rag.structured_citation_output import (
     RequirementRegistry,
     SourceRegistry,
@@ -662,60 +662,24 @@ def _phase10b3i_trace_flags(settings: Settings) -> tuple[tuple[str, object], ...
     )
 
 
-def _load_context_registry(settings: Settings) -> dict[str, ContextRecord]:
-    """Load the immutable generation registry; never scan source PDFs at query time."""
-    candidates = (
-        settings.working_dir.parent / "context_registry" / "chunks.jsonl",
-        settings.working_dir / "context_registry" / "chunks.jsonl",
-    )
-    path = next((item for item in candidates if item.is_file()), None)
-    if path is None:
-        return {}
-    records: dict[str, ContextRecord] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        row = json.loads(line)
-        records[str(row["chunk_id"])] = ContextRecord(
-            knowledge_base_id=str(row.get("knowledge_base_id") or settings.qdrant_kb_id or ""),
-            generation_id=str(row.get("generation_id") or settings.qdrant_generation or ""),
-            document_id=str(row.get("document_id") or ""),
-            document_name=str(row.get("document_name") or ""),
-            chunk_id=str(row["chunk_id"]),
-            text=str(row.get("content") or ""),
-            page_start=int(row.get("page_start") or 1),
-            section_path=tuple(str(item) for item in row.get("section_path", ()) or ()),
-            parent_chunk_id=row.get("parent_chunk_id"),
-            previous_chunk_id=row.get("previous_chunk_id"),
-            next_chunk_id=row.get("next_chunk_id"),
-            table_id=row.get("table_id"),
-            table_header_chunk_id=row.get("table_header_chunk_id"),
-        )
-    parent_path = path.with_name("parents.jsonl")
-    if parent_path.is_file():
-        for line in parent_path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            row = json.loads(line)
-            parent_id = str(row["parent_chunk_id"])
-            records[parent_id] = ContextRecord(
-                knowledge_base_id=str(row.get("knowledge_base_id") or settings.qdrant_kb_id or ""),
-                generation_id=str(row.get("generation_id") or settings.qdrant_generation or ""),
-                document_id=str(row.get("document_id") or ""),
-                document_name=str(row.get("document_name") or ""),
-                chunk_id=parent_id,
-                text=str(row.get("content") or ""),
-                page_start=int(row.get("page_start") or 1),
-                section_path=tuple(str(item) for item in row.get("section_path", ()) or ()),
-            )
-    return records
-
-
 class LightRAGService:
-    def __init__(self, settings: Settings, *, backend: LightRAGBackend | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        backend: LightRAGBackend | None = None,
+        chunk_registry: ChunkRegistry | None = None,
+    ) -> None:
         self.settings = settings
         self._backend: LightRAGBackend | None = backend
+        self._chunk_registry = chunk_registry
         self._initialized = False
+
+    def bind_chunk_registry(self, registry: ChunkRegistry) -> None:
+        """Bind the verified generation snapshot before runtime initialization."""
+        if self._initialized:
+            raise RuntimeError("cannot replace a chunk registry on an initialized runtime")
+        self._chunk_registry = registry
 
     async def initialize(self) -> None:
         check_storage_compatibility(
@@ -808,6 +772,8 @@ class LightRAGService:
         options = QueryOptions(mode=mode, top_k=top_k, chunk_top_k=chunk_top_k)
         retrieval_started = time.perf_counter()
         evidence = await self._backend.aquery_data(normalized_question, options)
+        if self._chunk_registry is not None:
+            evidence = self._chunk_registry.hydrate_lightrag_evidence(evidence)
         retrieval_ms = (time.perf_counter() - retrieval_started) * 1000
         retrieved = _extract_retrieved(evidence)
         retrieval_chunk_ids = tuple(item["chunk_id"] for item in retrieved)
@@ -842,7 +808,14 @@ class LightRAGService:
         supplemental_raw: list[dict[str, Any]] = []
         supplemental_grounding: tuple[EvidenceCandidate, ...] = ()
         if decision.allowed and self.settings.evidence_completion_enabled:
-            registry = _load_context_registry(self.settings)
+            registry = (
+                self._chunk_registry.context_records(
+                    knowledge_base_id=str(self.settings.qdrant_kb_id or ""),
+                    generation_id=str(self.settings.qdrant_generation or ""),
+                )
+                if self._chunk_registry is not None
+                else {}
+            )
             selected_context_records = [
                 registry[item.citation.chunk_id]
                 for item in decision.selected
@@ -908,13 +881,17 @@ class LightRAGService:
                     supplemental_query.question,
                     QueryOptions(mode=options.mode, top_k=supplemental_query.top_k, chunk_top_k=supplemental_query.top_k),
                 )
+                if self._chunk_registry is not None:
+                    supplemental_payload = self._chunk_registry.hydrate_lightrag_evidence(
+                        supplemental_payload
+                    )
                 supplemental_raw = _extract_retrieved(supplemental_payload)
                 supplemental_raw = [
                     {
                         **item,
                         "knowledge_base_id": str(self.settings.qdrant_kb_id or ""),
                         "generation_id": str(self.settings.qdrant_generation or ""),
-                        "document_id": next((record.document_id for record in registry.values() if record.document_name == item["file"]), None),
+                        "document_id": item.get("document_id"),
                     }
                     for item in supplemental_raw
                 ]

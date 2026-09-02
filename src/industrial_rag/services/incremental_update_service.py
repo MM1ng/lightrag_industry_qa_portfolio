@@ -50,6 +50,7 @@ from industrial_rag.repositories.vector_index_generation_repository import (
 from industrial_rag.services.generation_artifacts import (
     freeze_generation_child_chunks,
     load_generation_child_chunks,
+    load_generation_parent_records,
 )
 from industrial_rag.services.generation_fingerprint_service import build_generation_fingerprint
 from industrial_rag.services.kb_lease_service import KBLeaseService
@@ -900,7 +901,7 @@ class IncrementalUpdateService:
                 await self._parse_document_pymupdf(kb, doc)
                 t_parse += time.perf_counter() - t0
 
-            snapshot_pairs, previous_children = await self._candidate_snapshot_pairs(
+            snapshot_pairs, previous_children, snapshot_parents = await self._candidate_snapshot_pairs(
                 kb_id=kb_id,
                 active=active,
                 job=job,
@@ -911,6 +912,7 @@ class IncrementalUpdateService:
                 candidate_workspace,
                 generation_id=token,
                 document_children=snapshot_pairs,
+                document_parents=snapshot_parents,
                 replace_existing=active is not None,
             )
             fingerprint = build_generation_fingerprint(kb, snapshot_pairs)
@@ -1089,13 +1091,13 @@ class IncrementalUpdateService:
         job: Any,
         changed_document: Any | None,
         old_document: Any | None,
-    ) -> tuple[list[tuple[Any, Any]], dict[str, list[Any]]]:
+    ) -> tuple[list[tuple[Any, Any]], dict[str, list[Any]], list[tuple[Any, Any]]]:
         """Build the candidate's complete ChildChunk input before LightRAG sees it.
 
         Unchanged documents come from the active generation's frozen snapshot;
         only a newly parsed candidate document may be sourced from ``current``.
         """
-        from industrial_rag.services.parse_service import load_child_chunks
+        from industrial_rag.services.parse_service import load_child_chunks, load_parent_chunks
 
         active_documents = await self._doc_repo.list_active_for_kb(kb_id)
         documents = [
@@ -1111,6 +1113,7 @@ class IncrementalUpdateService:
             documents.append(changed_document)
 
         previous_children: dict[str, list[Any]] = {}
+        previous_parents: dict[str, list[dict[str, object]]] = {}
         if active is not None:
             active_children = load_generation_child_chunks(
                 Path(active.workspace_path),
@@ -1119,21 +1122,34 @@ class IncrementalUpdateService:
             )
             for child in active_children:
                 previous_children.setdefault(child.document_id, []).append(child)
+            for parent in load_generation_parent_records(
+                Path(active.workspace_path),
+                expected_generation_id=active.generation,
+                expected_child_manifest_hash=active.child_chunks_manifest_hash,
+            ):
+                previous_parents.setdefault(str(parent["document_id"]), []).append(parent)
 
         pairs: list[tuple[Any, Any]] = []
+        parent_pairs: list[tuple[Any, Any]] = []
         for document in documents:
             if changed_document is not None and document.id == changed_document.id:
-                children = load_child_chunks(kb_parsed_documents_dir(kb_id) / document.id)
+                parsed_dir = kb_parsed_documents_dir(kb_id) / document.id
+                children = load_child_chunks(parsed_dir)
+                parents = load_parent_chunks(parsed_dir)
             elif active is not None:
                 children = previous_children.get(document.id, [])
+                parents = previous_parents.get(document.id, [])
             else:
-                children = load_child_chunks(kb_parsed_documents_dir(kb_id) / document.id)
+                parsed_dir = kb_parsed_documents_dir(kb_id) / document.id
+                children = load_child_chunks(parsed_dir)
+                parents = load_parent_chunks(parsed_dir)
             if not children:
                 raise RuntimeError(
                     f"No provable child snapshot available for candidate document {document.id}"
                 )
             pairs.extend((document, child) for child in children)
-        return pairs, previous_children
+            parent_pairs.extend((document, parent) for parent in parents)
+        return pairs, previous_children, parent_pairs
 
     async def _parse_document_pymupdf(self, kb: Any, doc: Any) -> dict[str, Any]:
         from industrial_rag.document_parser import parse_pdf

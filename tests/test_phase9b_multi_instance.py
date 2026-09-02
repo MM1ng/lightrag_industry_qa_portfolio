@@ -32,6 +32,10 @@ class _GenerationRuntime:
         self.initialized = False
         self.closed = False
         self.questions: list[str] = []
+        self.chunk_registry = None
+
+    def bind_chunk_registry(self, registry) -> None:
+        self.chunk_registry = registry
 
     async def initialize(self) -> None:
         self.initialized = True
@@ -175,6 +179,9 @@ async def test_candidate_query_does_not_change_active_pointer(multi_instance_sta
     assert result.result.answer == "candidate:g-new"
     assert kb is not None
     assert kb.active_vector_generation_id == old_id
+    runtime = next(iter(manager._runtimes.values()))  # type: ignore[attr-defined]
+    assert runtime.chunk_registry is not None
+    assert runtime.chunk_registry.available_chunk_ids == frozenset()
     await manager.close_all()
 
 

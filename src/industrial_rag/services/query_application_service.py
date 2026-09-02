@@ -118,7 +118,7 @@ class QueryApplicationService:
                 status_code=409,
             )
         try:
-            self._artifact_resolver.resolve_registry(
+            chunk_registry = self._artifact_resolver.resolve_registry(
                 Path(generation.workspace_path),
                 expected_generation_id=generation.generation,
                 expected_child_manifest_hash=generation.child_chunks_manifest_hash,
@@ -167,7 +167,11 @@ class QueryApplicationService:
         )
         if disable_llm_cache:
             settings = replace(settings, enable_llm_cache=False)
-        runtime = await self._runtime_manager.get_runtime(kb.id, settings)
+        runtime = await self._runtime_manager.get_runtime(
+            kb.id,
+            settings,
+            chunk_registry=chunk_registry,
+        )
         operational_metrics.set(f"active_generation.{kb.id}", generation.id)
         try:
             result = await runtime.query(

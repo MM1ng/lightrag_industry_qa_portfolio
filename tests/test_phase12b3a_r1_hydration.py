@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from industrial_rag.runtime_chunk_hydration import RuntimeChunkHydrator
+from industrial_rag.runtime_chunk_hydration import ChunkRegistry, RuntimeChunkHydrator
 
 
 def test_hydration_reads_exact_chunk_id_and_preserves_full_text(tmp_path) -> None:
@@ -88,4 +88,33 @@ def test_hydration_can_bound_text_and_records_truncation(tmp_path) -> None:
     assert item.original_text_length == 6
     assert item.hydrated_text_length == 4
     assert item.truncated is True
+
+
+def test_canonical_hydration_keeps_exact_document_id_when_filenames_collide() -> None:
+    """Filename matching would bind supplemental evidence to the first same-named document."""
+    registry = ChunkRegistry.from_records(
+        [
+            {
+                "chunk_id": "child-a",
+                "document_id": "doc-a",
+                "document_name": "manual.pdf",
+                "page_start": 1,
+                "content": "A",
+            },
+            {
+                "chunk_id": "child-b",
+                "document_id": "doc-b",
+                "document_name": "manual.pdf",
+                "page_start": 2,
+                "content": "B",
+            },
+        ],
+        source="frozen snapshot",
+    )
+
+    result = registry.hydrate_lightrag_evidence(
+        {"data": {"chunks": [{"child_chunk_id": "child-b", "content": "untrusted"}]}}
+    )
+
+    assert result["data"]["chunks"][0]["document_id"] == "doc-b"
 

@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from industrial_rag.evidence_completion import complete_evidence
 from industrial_rag.services.generation_artifacts import (
     GenerationArtifactError,
     GenerationArtifactResolver,
@@ -89,10 +90,24 @@ def test_rollback_generation_registry_uses_its_frozen_snapshot_after_current_cha
         expected_generation_id="g2",
         expected_child_manifest_hash=g2.child_manifest_hash,
     )
+    restored_again = resolver.resolve_registry(
+        tmp_path / "generations" / "g1" / "workspace",
+        expected_generation_id="g1",
+        expected_child_manifest_hash=g1.child_manifest_hash,
+    )
+    newest_again = resolver.resolve_registry(
+        tmp_path / "generations" / "g2" / "workspace",
+        expected_generation_id="g2",
+        expected_child_manifest_hash=g2.child_manifest_hash,
+    )
 
     assert restored.hydrate(["child-a"])["child-a"].text == "snapshot A"
     assert restored.hydrate(["child-b"])["child-b"].hydration_status == "missing"
     assert newest.hydrate(["child-b"])["child-b"].text == "snapshot B"
+    assert restored_again.hydrate_lightrag_evidence(
+        {"data": {"chunks": [{"child_chunk_id": "child-a", "content": "untrusted"}]}}
+    )["data"]["chunks"][0]["content"] == "snapshot A"
+    assert newest_again.hydrate(["child-a"])["child-a"].hydration_status == "missing"
 
 
 def test_manifest_binds_snapshot_hash_count_and_document_versions(tmp_path: Path) -> None:
@@ -162,6 +177,44 @@ def test_resolver_reloads_when_switching_generation_workspaces(tmp_path: Path) -
 
     assert second is not first
     assert second.hydrate(["child-b"])["child-b"].text == "B"
+
+
+def test_generation_registry_exposes_frozen_parent_context_without_legacy_registry(
+    tmp_path: Path,
+) -> None:
+    """Removing the parent snapshot would silently disable parent evidence completion."""
+    workspace = tmp_path / "workspace"
+    child = _child("doc-1", "child-a", "child evidence")
+    child["parent_chunk_id"] = "parent-a"
+    parent = {
+        "parent_chunk_id": "parent-a",
+        "document_id": "doc-1",
+        "document_name": "doc-1.pdf",
+        "page_start": 3,
+        "page_end": 4,
+        "section_path": ["maintenance"],
+        "section_title": "bearing",
+        "content": "frozen parent context",
+        "child_chunk_ids": ["child-a"],
+    }
+    manifest = freeze_generation_child_chunks(
+        workspace,
+        generation_id="g1",
+        document_children=[(_document("doc-1", 1), child)],
+        document_parents=[(_document("doc-1", 1), parent)],
+    )
+
+    registry = GenerationArtifactResolver().resolve_registry(
+        workspace,
+        expected_generation_id="g1",
+        expected_child_manifest_hash=manifest.child_manifest_hash,
+    )
+    records = registry.context_records(knowledge_base_id="kb-1", generation_id="g1")
+
+    assert records["child-a"].parent_chunk_id == "parent-a"
+    assert records["parent-a"].text == "frozen parent context"
+    assert records["parent-a"].document_id == "doc-1"
+    assert complete_evidence([records["child-a"]], records) == (records["parent-a"],)
 
 
 def test_freezing_accepts_a_one_pass_document_child_iterable(tmp_path: Path) -> None:

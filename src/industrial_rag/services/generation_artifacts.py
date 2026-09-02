@@ -18,12 +18,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from industrial_rag.runtime_chunk_hydration import RuntimeChunkHydrator
+from industrial_rag.runtime_chunk_hydration import ChunkRegistry
 
 CHUNK_MANIFEST_SCHEMA_VERSION = 2
 _LEGACY_CHUNK_MANIFEST_SCHEMA_VERSION = 1
 _RETRIEVAL_DIRNAME = "retrieval"
 _SNAPSHOT_FILENAME = "child_chunks.jsonl"
+_PARENT_SNAPSHOT_FILENAME = "parent_chunks.jsonl"
 _LEXICAL_INDEX_FILENAME = "lexical_index.json"
 _MANIFEST_FILENAME = "chunk_manifest.json"
 
@@ -42,6 +43,7 @@ class GenerationChunkManifest:
     created_at: str
     lexical_index_hash: str = ""
     lexical_index_bytes_sha256: str = ""
+    parent_snapshot_hash: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -51,6 +53,7 @@ class GenerationChunkManifest:
             "child_manifest_hash": self.child_manifest_hash,
             "lexical_index_hash": self.lexical_index_hash,
             "lexical_index_bytes_sha256": self.lexical_index_bytes_sha256,
+            "parent_snapshot_hash": self.parent_snapshot_hash,
             "documents": list(self.documents),
             "created_at": self.created_at,
         }
@@ -65,6 +68,7 @@ class GenerationArtifactEvidence:
     manifest_bytes_sha256: str
     snapshot_bytes_sha256: str
     lexical_index_bytes_sha256: str = ""
+    parent_records: tuple[dict[str, object], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +93,7 @@ def freeze_generation_child_chunks(
     *,
     generation_id: str,
     document_children: Iterable[tuple[Any, Any]],
+    document_parents: Iterable[tuple[Any, Any]] = (),
     replace_existing: bool = False,
 ) -> GenerationChunkManifest:
     """Atomically publish one generation's canonical ChildChunk snapshot.
@@ -99,7 +104,9 @@ def freeze_generation_child_chunks(
     if not generation_id:
         raise ValueError("generation_id is required")
     pairs = list(document_children)
+    parent_pairs = list(document_parents)
     records = _snapshot_records(pairs)
+    parent_records = _parent_snapshot_records(parent_pairs)
     child_hash = _hash_records(records)
     from industrial_rag.services.lexical_retrieval import build_lexical_index, lexical_index_bytes
 
@@ -116,11 +123,13 @@ def freeze_generation_child_chunks(
         child_manifest_hash=child_hash,
         lexical_index_hash=lexical_index.artifact_hash,
         lexical_index_bytes_sha256=hashlib.sha256(lexical_payload).hexdigest(),
+        parent_snapshot_hash=_hash_records(parent_records),
         documents=_document_bindings(pairs, records),
         created_at=datetime.now(UTC).isoformat(),
     )
     retrieval_dir = generation_retrieval_dir(workspace)
     snapshot_path = retrieval_dir / _SNAPSHOT_FILENAME
+    parent_snapshot_path = retrieval_dir / _PARENT_SNAPSHOT_FILENAME
     lexical_index_path = retrieval_dir / _LEXICAL_INDEX_FILENAME
     manifest_path = retrieval_dir / _MANIFEST_FILENAME
     if manifest_path.exists() and not replace_existing:
@@ -131,6 +140,13 @@ def freeze_generation_child_chunks(
         "".join(
             json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
             for record in records
+        ),
+    )
+    _atomic_write_text(
+        parent_snapshot_path,
+        "".join(
+            json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+            for record in parent_records
         ),
     )
     _atomic_write_text(lexical_index_path, lexical_payload.decode("utf-8"))
@@ -180,6 +196,7 @@ def _load_validated_generation_artifact(
     retrieval_dir = generation_retrieval_dir(workspace)
     manifest_path = retrieval_dir / _MANIFEST_FILENAME
     snapshot_path = retrieval_dir / _SNAPSHOT_FILENAME
+    parent_snapshot_path = retrieval_dir / _PARENT_SNAPSHOT_FILENAME
     lexical_index_path = retrieval_dir / _LEXICAL_INDEX_FILENAME
     if not manifest_path.is_file():
         raise GenerationArtifactError("generation retrieval chunk manifest is missing")
@@ -213,6 +230,16 @@ def _load_validated_generation_artifact(
     if _hash_records(records) != manifest.child_manifest_hash:
         raise GenerationArtifactError("generation snapshot hash does not match the chunk manifest")
     _validate_document_bindings(records, manifest.documents)
+    parent_records: list[dict[str, object]] = []
+    if manifest.parent_snapshot_hash:
+        if not parent_snapshot_path.is_file():
+            raise GenerationArtifactError("generation parent snapshot is missing")
+        try:
+            parent_records = _read_parent_snapshot_records(parent_snapshot_path)
+        except (OSError, UnicodeDecodeError) as error:
+            raise GenerationArtifactError("generation parent snapshot is unreadable") from error
+        if _hash_records(parent_records) != manifest.parent_snapshot_hash:
+            raise GenerationArtifactError("generation parent snapshot hash does not match the chunk manifest")
     try:
         lexical_index_bytes = lexical_index_path.read_bytes()
         from industrial_rag.services.lexical_retrieval import (
@@ -239,6 +266,7 @@ def _load_validated_generation_artifact(
         manifest_bytes_sha256=hashlib.sha256(manifest_bytes).hexdigest(),
         snapshot_bytes_sha256=hashlib.sha256(snapshot_bytes).hexdigest(),
         lexical_index_bytes_sha256=hashlib.sha256(lexical_index_bytes).hexdigest(),
+        parent_records=tuple(parent_records),
     )
 
 
@@ -259,11 +287,26 @@ def load_generation_child_chunks(
     return [ChildChunk.from_dict(record) for record in evidence.records]
 
 
+def load_generation_parent_records(
+    workspace: Path,
+    *,
+    expected_generation_id: str,
+    expected_child_manifest_hash: str,
+) -> list[dict[str, object]]:
+    """Load parent context only from the validated generation-local snapshot."""
+    evidence = _load_validated_generation_artifact(
+        workspace,
+        expected_generation_id=expected_generation_id,
+        expected_child_manifest_hash=expected_child_manifest_hash,
+    )
+    return [dict(record) for record in evidence.parent_records]
+
+
 class GenerationArtifactResolver:
     """Resolve generation-local registries with manifest-aware cache invalidation."""
 
     def __init__(self) -> None:
-        self._registries: dict[tuple[str, str], RuntimeChunkHydrator] = {}
+        self._registries: dict[tuple[str, str, str, str], ChunkRegistry] = {}
 
     def resolve_registry(
         self,
@@ -271,14 +314,19 @@ class GenerationArtifactResolver:
         *,
         expected_generation_id: str,
         expected_child_manifest_hash: str,
-    ) -> RuntimeChunkHydrator:
+    ) -> ChunkRegistry:
         evidence = _load_validated_generation_artifact(
             workspace,
             expected_generation_id=expected_generation_id,
             expected_child_manifest_hash=expected_child_manifest_hash,
         )
         workspace_key = str(Path(workspace).resolve())
-        key = (workspace_key, evidence.manifest.child_manifest_hash)
+        key = (
+            workspace_key,
+            evidence.manifest.generation_id,
+            evidence.manifest.child_manifest_hash,
+            evidence.manifest.parent_snapshot_hash,
+        )
         stale = [
             cached for cached in self._registries if cached[0] == workspace_key and cached != key
         ]
@@ -286,9 +334,10 @@ class GenerationArtifactResolver:
             self._registries.pop(cached, None)
         registry = self._registries.get(key)
         if registry is None:
-            registry = RuntimeChunkHydrator.from_records(
+            registry = ChunkRegistry.from_records(
                 evidence.records,
                 source=str(generation_retrieval_dir(workspace) / _SNAPSHOT_FILENAME),
+                parent_records=evidence.parent_records,
             )
             self._registries[key] = registry
         return registry
@@ -323,6 +372,32 @@ def _snapshot_records(document_children: Iterable[tuple[Any, Any]]) -> list[dict
     if duplicate_ids:
         raise GenerationArtifactError(
             f"duplicate child_chunk_id in generation snapshot: {duplicate_ids[0]}"
+        )
+    return records
+
+
+def _parent_snapshot_records(document_parents: Iterable[tuple[Any, Any]]) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
+    for document, parent in document_parents:
+        record = _child_to_dict(parent)
+        document_id = str(getattr(document, "id", record.get("document_id", ""))).strip()
+        parent_chunk_id = str(record.get("parent_chunk_id") or "").strip()
+        if not document_id or not parent_chunk_id:
+            raise GenerationArtifactError("parent snapshot record requires document_id and parent_chunk_id")
+        record["document_id"] = document_id
+        record["document_version"] = str(int(getattr(document, "version", 1)))
+        record["document_file_hash"] = str(getattr(document, "file_hash", ""))
+        record["document_name"] = str(getattr(document, "original_file_name", ""))
+        records.append(record)
+    records.sort(key=lambda item: (str(item["document_id"]), str(item["parent_chunk_id"])))
+    duplicate_ids = [
+        str(records[index]["parent_chunk_id"])
+        for index in range(1, len(records))
+        if records[index - 1]["parent_chunk_id"] == records[index]["parent_chunk_id"]
+    ]
+    if duplicate_ids:
+        raise GenerationArtifactError(
+            f"duplicate parent_chunk_id in generation snapshot: {duplicate_ids[0]}"
         )
     return records
 
@@ -425,6 +500,7 @@ def _manifest_from_dict(value: Any) -> GenerationChunkManifest:
             child_manifest_hash=str(value["child_manifest_hash"]),
             lexical_index_hash=str(value["lexical_index_hash"]),
             lexical_index_bytes_sha256=str(value["lexical_index_bytes_sha256"]),
+            parent_snapshot_hash=str(value.get("parent_snapshot_hash") or ""),
             documents=tuple(dict(item) for item in documents_raw),
             created_at=str(value["created_at"]),
         )
@@ -562,6 +638,15 @@ def _read_snapshot_records(path: Path, *, payload: str | None = None) -> list[di
     return records
 
 
+def _read_parent_snapshot_records(path: Path) -> list[dict[str, object]]:
+    records = _read_snapshot_records(path)
+    for record in records:
+        if not str(record.get("parent_chunk_id") or "").strip():
+            raise GenerationArtifactError("parent snapshot row requires parent_chunk_id")
+    records.sort(key=lambda item: (str(item.get("document_id", "")), str(item["parent_chunk_id"])))
+    return records
+
+
 def _validate_document_bindings(
     records: list[dict[str, object]], documents: tuple[dict[str, object], ...]
 ) -> None:
@@ -594,5 +679,6 @@ __all__ = [
     "generation_retrieval_dir",
     "load_generation_child_chunks",
     "load_generation_manifest",
+    "load_generation_parent_records",
     "migrate_legacy_lexical_artifact",
 ]

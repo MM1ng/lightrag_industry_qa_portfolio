@@ -741,6 +741,10 @@ def test_actual_build_activate_rollback_runtime_uses_g1_snapshot_after_current_m
     class Runtime:
         def __init__(self, _settings) -> None:
             self.initialized = False
+            self.chunk_registry = None
+
+        def bind_chunk_registry(self, registry) -> None:
+            self.chunk_registry = registry
 
         async def initialize(self) -> None:
             self.initialized = True

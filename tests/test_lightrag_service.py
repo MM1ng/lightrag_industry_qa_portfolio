@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from industrial_rag.citation_formatter import Citation, encode_source_ref
@@ -11,6 +12,7 @@ from industrial_rag.config import (
     Settings,
     StorageCompatibilityError,
     check_storage_compatibility,
+    write_storage_metadata,
 )
 from industrial_rag.document_parser import DocumentChunk
 from industrial_rag.lightrag_service import (
@@ -18,6 +20,10 @@ from industrial_rag.lightrag_service import (
     LightRAGService,
     _is_model_failover_error,
     build_official_backend,
+)
+from industrial_rag.services.generation_artifacts import (
+    GenerationArtifactResolver,
+    freeze_generation_child_chunks,
 )
 
 
@@ -475,6 +481,180 @@ def _payload(chunks: list[tuple[str, int, str, str]]) -> dict[str, object]:
         for source, page, chunk_id, text in chunks
     ]
     return {"status": "success", "data": {"entities": [], "relationships": [], "chunks": rendered}}
+
+
+@pytest.mark.asyncio
+async def test_query_hydrates_lightrag_child_id_from_the_frozen_generation_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Changing LightRAG hit metadata must not change canonical evidence or citations."""
+    workspace = tmp_path / "generations" / "g1" / "workspace"
+    child = {
+        "chunk_id": "child-a",
+        "parent_chunk_id": "parent-a",
+        "document_id": "doc-a",
+        "document_name": "snapshot-a.pdf",
+        "document_version": "1",
+        "page_start": 7,
+        "page_end": 7,
+        "section_path": ["维护"],
+        "section_title": "轴承",
+        "content_type": "normal_text",
+        "content": "快照 A：轴承温度过高时检查润滑。",
+        "embedding_content": "快照 A：轴承温度过高时检查润滑。",
+        "token_count": 1,
+        "source_hash": "source-a",
+        "parent_source_hash": "parent-source-a",
+        "parser": "test",
+        "chunking_strategy": "test",
+        "chunking_version": "1",
+        "metadata": {},
+    }
+    manifest = freeze_generation_child_chunks(
+        workspace,
+        generation_id="g1",
+        document_children=[
+            (
+                SimpleNamespace(
+                    id="doc-a",
+                    version=1,
+                    file_hash="hash-a",
+                    original_file_name="snapshot-a.pdf",
+                ),
+                child,
+            )
+        ],
+    )
+    registry = GenerationArtifactResolver().resolve_registry(
+        workspace,
+        expected_generation_id="g1",
+        expected_child_manifest_hash=manifest.child_manifest_hash,
+    )
+    legacy_registry = workspace / "context_registry" / "chunks.jsonl"
+    legacy_registry.parent.mkdir()
+    legacy_registry.write_text('{"chunk_id":"child-a","content":"legacy"}\n', encoding="utf-8")
+    original_read_text = Path.read_text
+
+    def reject_legacy_registry(path: Path, *args, **kwargs):
+        if path == legacy_registry:
+            raise AssertionError("canonical query read the legacy context registry")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", reject_legacy_registry)
+    backend = FakeLightRAGBackend(
+        evidence_payload={
+            "status": "success",
+            "data": {
+                "chunks": [
+                    {
+                        "child_chunk_id": "child-a",
+                        "content": "mutable and untrusted LightRAG content",
+                        "file_path": encode_source_ref(Citation("wrong.pdf", 99, "wrong-id")),
+                    }
+                ]
+            },
+        }
+    )
+    write_storage_metadata(workspace, "text-embedding-v4", 1024)
+    service = LightRAGService(
+        replace(
+            _settings(tmp_path),
+            working_dir=workspace,
+            qdrant_generation="g1",
+            evidence_completion_enabled=True,
+        ),
+        backend=backend,
+        chunk_registry=registry,
+    )
+    await service.initialize()
+
+    result = await service.query("轴承温度过高怎么办？")
+
+    assert result.citations == (Citation("snapshot-a.pdf", 7, "child-a"),)
+    assert result.retrieval_meta == (("snapshot-a.pdf", 7, "child-a"),)
+    assert "快照 A" in backend.generate_calls[0][1]
+    assert "mutable and untrusted" not in backend.generate_calls[0][1]
+
+
+@pytest.mark.asyncio
+async def test_query_rejects_lightrag_child_id_missing_from_the_generation_snapshot(
+    tmp_path: Path,
+) -> None:
+    """Removing exact-ID validation would silently turn a wrong hit into evidence."""
+    backend = FakeLightRAGBackend(
+        evidence_payload={
+            "status": "success",
+            "data": {"chunks": [{"child_chunk_id": "unknown-child", "content": "untrusted"}]},
+        }
+    )
+    from industrial_rag.runtime_chunk_hydration import ChunkRegistry
+
+    service = LightRAGService(
+        _settings(tmp_path),
+        backend=backend,
+        chunk_registry=ChunkRegistry.from_records(
+            [
+                {
+                    "chunk_id": "known-child",
+                    "document_id": "doc-a",
+                    "document_name": "snapshot-a.pdf",
+                    "page_start": 7,
+                    "content": "known evidence",
+                }
+            ],
+            source="frozen snapshot",
+        ),
+    )
+    await service.initialize()
+
+    with pytest.raises(RuntimeError, match="unresolved child_chunk_id: unknown-child"):
+        await service.query("轴承温度过高怎么办？")
+
+    assert backend.generate_calls == []
+
+
+@pytest.mark.asyncio
+async def test_query_rejects_citation_header_without_a_canonical_child_chunk_id(
+    tmp_path: Path,
+) -> None:
+    """A source header is provenance text, not a substitute for an exact retrieval ID."""
+    from industrial_rag.runtime_chunk_hydration import ChunkRegistry
+
+    backend = FakeLightRAGBackend(
+        evidence_payload={
+            "status": "success",
+            "data": {
+                "chunks": [
+                    {
+                        "content": "untrusted",
+                        "file_path": encode_source_ref(Citation("snapshot.pdf", 7, "known-child")),
+                    }
+                ]
+            },
+        }
+    )
+    service = LightRAGService(
+        _settings(tmp_path),
+        backend=backend,
+        chunk_registry=ChunkRegistry.from_records(
+            [
+                {
+                    "chunk_id": "known-child",
+                    "document_id": "doc-a",
+                    "document_name": "snapshot.pdf",
+                    "page_start": 7,
+                    "content": "known evidence",
+                }
+            ],
+            source="frozen snapshot",
+        ),
+    )
+    await service.initialize()
+
+    with pytest.raises(RuntimeError, match="unresolved child_chunk_id"):
+        await service.query("轴承温度过高怎么办？")
+
+    assert backend.generate_calls == []
 
 
 @pytest.mark.asyncio

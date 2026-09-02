@@ -560,3 +560,19 @@ def load_child_chunks(parsed_dir: Path) -> list[Any]:
         rec = json.loads(line)
         children.append(ChildChunk.from_dict(rec))
     return children
+
+
+def load_parent_chunks(parsed_dir: Path) -> list[dict[str, object]]:
+    """Load parsed parent records while a new generation snapshot is being built."""
+    parent_path = parsed_dir / "current" / "parent_chunks.jsonl"
+    if not parent_path.is_file():
+        return []
+    parents: list[dict[str, object]] = []
+    for line in parent_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if not isinstance(record, dict):
+            raise ValueError("parent chunk row must be an object")
+        parents.append(dict(record))
+    return parents

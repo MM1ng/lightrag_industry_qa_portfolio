@@ -26,7 +26,7 @@ from industrial_rag.services.generation_artifacts import (
     load_generation_child_chunks,
 )
 from industrial_rag.services.generation_fingerprint_service import build_generation_fingerprint
-from industrial_rag.services.parse_service import load_child_chunks
+from industrial_rag.services.parse_service import load_child_chunks, load_parent_chunks
 from industrial_rag.services.qdrant_collection_service import QdrantCollectionService
 from industrial_rag.storage_layout import (
     kb_nano_workspace,
@@ -74,11 +74,14 @@ class IndexService:
         selected_backend = target_backend or VectorBackend(kb.vector_backend)
 
         all_children: list[tuple[Any, Any]] = []
+        all_parents: list[tuple[Any, Any]] = []
         for doc in active_docs:
-            children = load_child_chunks(kb_parsed_dir(kb_id) / "documents" / doc.id)
+            parsed_dir = kb_parsed_dir(kb_id) / "documents" / doc.id
+            children = load_child_chunks(parsed_dir)
             if not children:
                 logger.warning("No child chunks for doc=%s, skipping", doc.id)
             all_children.extend((doc, child) for child in children)
+            all_parents.extend((doc, parent) for parent in load_parent_chunks(parsed_dir))
         if not all_children:
             raise RuntimeError("No child chunks found for any active document")
 
@@ -117,6 +120,7 @@ class IndexService:
             shadow_workspace,
             generation_id=generation_name,
             document_children=all_children,
+            document_parents=all_parents,
         )
         if snapshot.child_manifest_hash != fingerprint.child_chunks_manifest_hash:
             raise RuntimeError("generation snapshot hash does not match its persisted fingerprint")
