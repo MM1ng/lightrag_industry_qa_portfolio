@@ -1,0 +1,3152 @@
+{
+  "status": "INCONCLUSIVE",
+  "final_status": "INCONCLUSIVE",
+  "downstream_qa_allowed": false,
+  "scope": "development_only",
+  "sample_size": 6,
+  "sample_size_limitation": true,
+  "question_ids": [
+    "S014",
+    "S015",
+    "S006",
+    "S003",
+    "S016",
+    "S011"
+  ],
+  "generation": {
+    "generation_id": "dev-v2-20260902",
+    "child_manifest_hash": "b1a6334f6e725591e5d796f318e76d3eb77c46fa8c8cc3f6342dc850ad77d1e0",
+    "corpus_fingerprint": "ed7bf1da6aab63a7afcf88c21480c6e987d231b9de65de2dd0977ce4b4e60e68",
+    "chunk_count": 453
+  },
+  "variant_configs": {
+    "A0_lightrag": {
+      "sparse_enabled": false,
+      "rrf_enabled": false,
+      "reranker_enabled": false
+    },
+    "A1_lightrag_bm25_rrf": {
+      "sparse_enabled": true,
+      "rrf_enabled": true,
+      "reranker_enabled": false
+    },
+    "A2_lightrag_bm25_rrf_reranker": {
+      "sparse_enabled": true,
+      "rrf_enabled": true,
+      "reranker_enabled": true
+    }
+  },
+  "metrics": {
+    "A0_lightrag": {
+      "overall": {
+        "recall@5": 0.23750000000000002,
+        "recall@10": 0.25833333333333336,
+        "mrr@5": 0.5972222222222222,
+        "mrr@10": 0.5972222222222222
+      },
+      "model": {
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "mrr@5": 0.3333333333333333,
+        "mrr@10": 0.3333333333333333
+      },
+      "part_number": {
+        "recall@5": 0.2,
+        "recall@10": 0.2,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      },
+      "parameter": {
+        "recall@5": 0.4,
+        "recall@10": 0.4,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      },
+      "semantic": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr@5": 0.0,
+        "mrr@10": 0.0
+      },
+      "fault": {
+        "recall@5": 0.2,
+        "recall@10": 0.2,
+        "mrr@5": 0.25,
+        "mrr@10": 0.25
+      },
+      "procedure": {
+        "recall@5": 0.125,
+        "recall@10": 0.25,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      }
+    },
+    "A1_lightrag_bm25_rrf": {
+      "overall": {
+        "recall@5": 0.2708333333333333,
+        "recall@10": 0.2708333333333333,
+        "mrr@5": 0.8333333333333334,
+        "mrr@10": 0.8333333333333334
+      },
+      "model": {
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      },
+      "part_number": {
+        "recall@5": 0.2,
+        "recall@10": 0.2,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      },
+      "parameter": {
+        "recall@5": 0.4,
+        "recall@10": 0.4,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      },
+      "semantic": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr@5": 0.0,
+        "mrr@10": 0.0
+      },
+      "fault": {
+        "recall@5": 0.4,
+        "recall@10": 0.4,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      },
+      "procedure": {
+        "recall@5": 0.125,
+        "recall@10": 0.125,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      }
+    },
+    "A2_lightrag_bm25_rrf_reranker": {
+      "overall": {
+        "recall@5": 0.2708333333333333,
+        "recall@10": 0.2708333333333333,
+        "mrr@5": 0.8333333333333334,
+        "mrr@10": 0.8333333333333334
+      },
+      "model": {
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      },
+      "part_number": {
+        "recall@5": 0.2,
+        "recall@10": 0.2,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      },
+      "parameter": {
+        "recall@5": 0.4,
+        "recall@10": 0.4,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      },
+      "semantic": {
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr@5": 0.0,
+        "mrr@10": 0.0
+      },
+      "fault": {
+        "recall@5": 0.4,
+        "recall@10": 0.4,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      },
+      "procedure": {
+        "recall@5": 0.125,
+        "recall@10": 0.125,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0
+      }
+    }
+  },
+  "latency": {
+    "A0_lightrag": {
+      "p50_ms": 0.0008499996511091013,
+      "p95_ms": 0.001374999783365638
+    },
+    "A1_lightrag_bm25_rrf": {
+      "p50_ms": 0.5550999999286432,
+      "p95_ms": 4.821674999220704
+    },
+    "A2_lightrag_bm25_rrf_reranker": {
+      "p50_ms": 0.5685999999514024,
+      "p95_ms": 4.846349998615551
+    }
+  },
+  "reranker": {
+    "calls": 6,
+    "success_count": 0,
+    "provider": "external",
+    "model": "unavailable",
+    "timeout_seconds": 2.0,
+    "external_result_determinism": "not_guaranteed",
+    "fallback_count": 6,
+    "fallback_rate": 1.0
+  },
+  "retrieval_config": {
+    "candidate_top_n": 20,
+    "final_top_k": 10,
+    "rrf_k": 60
+  },
+  "per_question": [
+    {
+      "id": "S014",
+      "question": "用塞尺法设置 2196-R 型泵叶轮间隙时，最终塞尺厚度如何确定？",
+      "expected_evidence": [
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-93807a18f7b7345f-000"
+      ],
+      "variants": {
+        "A0_lightrag": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+              "score": null,
+              "rank": 1,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 19,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-ef0141aa033d-001-eaf26ba98522",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-80a3e97c382e29c8-000",
+              "score": null,
+              "rank": 2,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 39,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-1cc3c61d9b66-000-1cc3c61d9b66",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+              "score": null,
+              "rank": 3,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 20,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-902ad3be0171-000-902ad3be0171",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-ac2c48838803419d-000",
+              "score": null,
+              "rank": 4,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 17,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-dd11989cbb07-000-dd11989cbb07",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+              "score": null,
+              "rank": 5,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 21,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-2ecc4dee4a81-000-2ecc4dee4a81",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fe95f94d24968921-000",
+              "score": null,
+              "rank": 6,
+              "source_file": "t1739cn.pdf",
+              "page": 4,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1--目录-c493e2a39742-000-c493e2a39742",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-24b95119c8293288-000",
+              "score": null,
+              "rank": 7,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 5,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-27aa8c4f9db8-000-27aa8c4f9db8",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-4d849bb2dc02939f-000",
+              "score": null,
+              "rank": 8,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 52,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-c4869bff007e-000-c4869bff007e",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+              "score": null,
+              "rank": 9,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 17,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-9776f1f8dc59-000-9776f1f8dc59",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+              "score": null,
+              "rank": 10,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 1,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-UMP-23b1f25858d6-000-23b1f25858d6",
+              "source": "lightrag"
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.000999999429041054,
+          "fallback_reason": null
+        },
+        "A1_lightrag_bm25_rrf": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+              "score": 0.032266458495966696,
+              "rrf_score": 0.032266458495966696,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 79.986750189311
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+              "score": 0.032266458495966696,
+              "rrf_score": 0.032266458495966696,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 48.38565450638256
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-24b95119c8293288-000",
+              "score": 0.031054405392392875,
+              "rrf_score": 0.031054405392392875,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 7,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 69.63499198612303
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+              "score": 0.02964426877470356,
+              "rrf_score": 0.02964426877470356,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 9,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 6,
+                  "original_score": 30.92495369211965
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+              "score": 0.029273504273504274,
+              "rrf_score": 0.029273504273504274,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 5,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 12,
+                  "original_score": 13.603757326462265
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+              "score": 0.02871794871794872,
+              "rrf_score": 0.02871794871794872,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 15,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 5,
+                  "original_score": 35.575306196045226
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+              "score": 0.02819138376017471,
+              "rrf_score": 0.02819138376017471,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 13,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 9,
+                  "original_score": 23.91509677021433
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+              "score": 0.026742734890354787,
+              "rrf_score": 0.026742734890354787,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 11,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 19,
+                  "original_score": 4.809789346688249
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-80a3e97c382e29c8-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 4,
+                  "original_score": 39.61155847751593
+                }
+              ]
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 6.182899998748326,
+          "fallback_reason": null
+        },
+        "A2_lightrag_bm25_rrf_reranker": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+              "score": 0.032266458495966696,
+              "rrf_score": 0.032266458495966696,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 79.986750189311
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+              "score": 0.032266458495966696,
+              "rrf_score": 0.032266458495966696,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 48.38565450638256
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-24b95119c8293288-000",
+              "score": 0.031054405392392875,
+              "rrf_score": 0.031054405392392875,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 7,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 69.63499198612303
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+              "score": 0.02964426877470356,
+              "rrf_score": 0.02964426877470356,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 9,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 6,
+                  "original_score": 30.92495369211965
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+              "score": 0.029273504273504274,
+              "rrf_score": 0.029273504273504274,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 5,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 12,
+                  "original_score": 13.603757326462265
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+              "score": 0.02871794871794872,
+              "rrf_score": 0.02871794871794872,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 15,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 5,
+                  "original_score": 35.575306196045226
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+              "score": 0.02819138376017471,
+              "rrf_score": 0.02819138376017471,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 13,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 9,
+                  "original_score": 23.91509677021433
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+              "score": 0.026742734890354787,
+              "rrf_score": 0.026742734890354787,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 11,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 19,
+                  "original_score": 4.809789346688249
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-80a3e97c382e29c8-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 4,
+                  "original_score": 39.61155847751593
+                }
+              ],
+              "rerank_model": "unavailable"
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 6.20969999818044,
+          "fallback_reason": "provider_unavailable"
+        }
+      },
+      "sparse_only_contribution": [
+        "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+        "cchunk-pymupdf-v1-aea0380728d8dc1d-000"
+      ],
+      "rrf_improved": false,
+      "rrf_regressed": false,
+      "reranker_improved": false,
+      "reranker_regressed": false,
+      "delta_classifications": [
+        "RRF_IMPROVEMENT"
+      ],
+      "expected_evidence_ranks": {
+        "A0_lightrag": 3,
+        "A1_lightrag_bm25_rrf": 1,
+        "A2_lightrag_bm25_rrf_reranker": 1
+      }
+    },
+    {
+      "id": "S015",
+      "question": "SUMMIT 手册中，泵不输送液体的常见原因和对应处理方法有哪些？",
+      "expected_evidence": [
+        "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+        "cchunk-pymupdf-v1-5989850607a8046c-000",
+        "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+        "cchunk-pymupdf-v1-78a156ed97cebd53-000",
+        "cchunk-pymupdf-v1-f997c995a333b4ae-000"
+      ],
+      "variants": {
+        "A0_lightrag": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+              "score": null,
+              "rank": 1,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 23,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-05fa62ad30d3-000-05fa62ad30d3",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+              "score": null,
+              "rank": 2,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 47,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-9619443a1a8a-000-9619443a1a8a",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+              "score": null,
+              "rank": 3,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 24,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-f14509fdd142-000-f14509fdd142",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+              "score": null,
+              "rank": 4,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 14,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-f94cf5859772-000-f94cf5859772",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+              "score": null,
+              "rank": 5,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 3,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1--保证-dd1d1d77b0bf-000-dd1d1d77b0bf",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fa64c4920b551368-000",
+              "score": null,
+              "rank": 6,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 41,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-e8103950065a-000-e8103950065a",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+              "score": null,
+              "rank": 7,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 7,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-5d8e22b0294d-000-5d8e22b0294d",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-37e3cc68a5fb4276-000",
+              "score": null,
+              "rank": 8,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 10,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-b747273b0c68-000-b747273b0c68",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+              "score": null,
+              "rank": 9,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 18,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-1693c615d124-000-1693c615d124",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-58f5902fcdf80561-000",
+              "score": null,
+              "rank": 10,
+              "source_file": "t1739cn.pdf",
+              "page": 23,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1--安装-23fbf21e5cf5-000-23fbf21e5cf5",
+              "source": "lightrag"
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.001499999598308932,
+          "fallback_reason": null
+        },
+        "A1_lightrag_bm25_rrf": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+              "score": 0.030679156908665108,
+              "rrf_score": 0.030679156908665108,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 10,
+                  "original_score": 10.678662225851483
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+              "score": 0.028438886647841874,
+              "rrf_score": 0.028438886647841874,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 7,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 14,
+                  "original_score": 9.563363961370523
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+              "score": 0.027205882352941177,
+              "rrf_score": 0.027205882352941177,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 20,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 8,
+                  "original_score": 11.149451136944185
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-ee52fac828554e17-000",
+              "score": 0.026709401709401708,
+              "rrf_score": 0.026709401709401708,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 18,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 12,
+                  "original_score": 10.500297493608356
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+              "score": 0.025645240835114255,
+              "rrf_score": 0.025645240835114255,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 19,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 17,
+                  "original_score": 9.287257045723754
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a29c091c7ffaf7d0-000",
+              "score": 0.01639344262295082,
+              "rrf_score": 0.01639344262295082,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 27.26481931126104
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-23747aac05fbe151-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 16.266182496295613
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 13.823180437107215
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                }
+              ]
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.5243999994490878,
+          "fallback_reason": null
+        },
+        "A2_lightrag_bm25_rrf_reranker": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+              "score": 0.030679156908665108,
+              "rrf_score": 0.030679156908665108,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 10,
+                  "original_score": 10.678662225851483
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+              "score": 0.028438886647841874,
+              "rrf_score": 0.028438886647841874,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 7,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 14,
+                  "original_score": 9.563363961370523
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+              "score": 0.027205882352941177,
+              "rrf_score": 0.027205882352941177,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 20,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 8,
+                  "original_score": 11.149451136944185
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-ee52fac828554e17-000",
+              "score": 0.026709401709401708,
+              "rrf_score": 0.026709401709401708,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 18,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 12,
+                  "original_score": 10.500297493608356
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+              "score": 0.025645240835114255,
+              "rrf_score": 0.025645240835114255,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 19,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 17,
+                  "original_score": 9.287257045723754
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a29c091c7ffaf7d0-000",
+              "score": 0.01639344262295082,
+              "rrf_score": 0.01639344262295082,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 27.26481931126104
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-23747aac05fbe151-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 16.266182496295613
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 13.823180437107215
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.5391999993662466,
+          "fallback_reason": "provider_unavailable"
+        }
+      },
+      "sparse_only_contribution": [
+        "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+        "cchunk-pymupdf-v1-23747aac05fbe151-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-a29c091c7ffaf7d0-000",
+        "cchunk-pymupdf-v1-ee52fac828554e17-000",
+        "cchunk-pymupdf-v1-fc16e77b6450e35c-000"
+      ],
+      "rrf_improved": false,
+      "rrf_regressed": false,
+      "reranker_improved": false,
+      "reranker_regressed": false,
+      "delta_classifications": [
+        "NO_MATERIAL_CHANGE"
+      ],
+      "expected_evidence_ranks": {
+        "A0_lightrag": 1,
+        "A1_lightrag_bm25_rrf": 1,
+        "A2_lightrag_bm25_rrf_reranker": 1
+      }
+    },
+    {
+      "id": "S006",
+      "question": "SUMMIT 手册规定的最高轴承工作温度是多少？",
+      "expected_evidence": [
+        "cchunk-pymupdf-v1-5388c52812f37351-000",
+        "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+        "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+        "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000"
+      ],
+      "variants": {
+        "A0_lightrag": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+              "score": null,
+              "rank": 1,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 14,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-8a9134f69b7a-000-8a9134f69b7a",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+              "score": null,
+              "rank": 2,
+              "source_file": "t1739cn.pdf",
+              "page": 34,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-和关闭-abc00ad64f98-000-abc00ad64f98",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+              "score": null,
+              "rank": 3,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 14,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-8ac24fa36ba6-000-8ac24fa36ba6",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-11ee9e4a809ca21a-000",
+              "score": null,
+              "rank": 4,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 26,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-c2297e4fae34-000-c2297e4fae34",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+              "score": null,
+              "rank": 5,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 16,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-e39749fc478f-000-e39749fc478f",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-ee71decb3cedbdd5-000",
+              "score": null,
+              "rank": 6,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 39,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-c57e9bf2847a-000-c57e9bf2847a",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+              "score": null,
+              "rank": 7,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 11,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-114bea8f37bc-000-114bea8f37bc",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-2e91d7e64f3794b6-000",
+              "score": null,
+              "rank": 8,
+              "source_file": "t1739cn.pdf",
+              "page": 25,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1--安装-17ce9c469745-000-17ce9c469745",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-29247897fcf1016b-000",
+              "score": null,
+              "rank": 9,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 12,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-847dedb676cd-000-847dedb676cd",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-ac2c48838803419d-000",
+              "score": null,
+              "rank": 10,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 17,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-dd11989cbb07-000-dd11989cbb07",
+              "source": "lightrag"
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.0006999998731771484,
+          "fallback_reason": null
+        },
+        "A1_lightrag_bm25_rrf": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+              "score": 0.03252247488101534,
+              "rrf_score": 0.03252247488101534,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 20.411653784702537
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+              "score": 0.032266458495966696,
+              "rrf_score": 0.032266458495966696,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 146.66220402282357
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+              "score": 0.03021353930031804,
+              "rrf_score": 0.03021353930031804,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 11,
+                  "original_score": 8.159980783991488
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+              "score": 0.029631255487269532,
+              "rrf_score": 0.029631255487269532,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 7,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 8,
+                  "original_score": 12.125767710610972
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+              "score": 0.029236022193768675,
+              "rrf_score": 0.029236022193768675,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 11,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 6,
+                  "original_score": 12.254161897686778
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+              "score": 0.028006267136701922,
+              "rrf_score": 0.028006267136701922,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 14,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 9,
+                  "original_score": 10.512360265053452
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+              "score": 0.027984344422700584,
+              "rrf_score": 0.027984344422700584,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 13,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 10,
+                  "original_score": 8.672186986045755
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+              "score": 0.025807525807525808,
+              "rrf_score": 0.025807525807525808,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 18,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 17,
+                  "original_score": 6.092770975447601
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 19.88318875349449
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 4,
+                  "original_score": 18.600073710674117
+                }
+              ]
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.4957999999533058,
+          "fallback_reason": null
+        },
+        "A2_lightrag_bm25_rrf_reranker": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+              "score": 0.03252247488101534,
+              "rrf_score": 0.03252247488101534,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 20.411653784702537
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+              "score": 0.032266458495966696,
+              "rrf_score": 0.032266458495966696,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 146.66220402282357
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+              "score": 0.03021353930031804,
+              "rrf_score": 0.03021353930031804,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 11,
+                  "original_score": 8.159980783991488
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+              "score": 0.029631255487269532,
+              "rrf_score": 0.029631255487269532,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 7,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 8,
+                  "original_score": 12.125767710610972
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+              "score": 0.029236022193768675,
+              "rrf_score": 0.029236022193768675,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 11,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 6,
+                  "original_score": 12.254161897686778
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+              "score": 0.028006267136701922,
+              "rrf_score": 0.028006267136701922,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 14,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 9,
+                  "original_score": 10.512360265053452
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+              "score": 0.027984344422700584,
+              "rrf_score": 0.027984344422700584,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 13,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 10,
+                  "original_score": 8.672186986045755
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+              "score": 0.025807525807525808,
+              "rrf_score": 0.025807525807525808,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 18,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 17,
+                  "original_score": 6.092770975447601
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 19.88318875349449
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 4,
+                  "original_score": 18.600073710674117
+                }
+              ],
+              "rerank_model": "unavailable"
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.5087999998067971,
+          "fallback_reason": "provider_unavailable"
+        }
+      },
+      "sparse_only_contribution": [
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-7227e2460f83a192-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-8cb55fe1213f5d02-000"
+      ],
+      "rrf_improved": false,
+      "rrf_regressed": false,
+      "reranker_improved": false,
+      "reranker_regressed": false,
+      "delta_classifications": [
+        "NO_MATERIAL_CHANGE"
+      ],
+      "expected_evidence_ranks": {
+        "A0_lightrag": 1,
+        "A1_lightrag_bm25_rrf": 1,
+        "A2_lightrag_bm25_rrf_reranker": 1
+      }
+    },
+    {
+      "id": "S003",
+      "question": "SUMMIT 2196 系列泵出口管路中的止回阀、隔离阀和异径接头应怎样布置？",
+      "expected_evidence": [
+        "cchunk-pymupdf-v1-6590f00e21e280d0-000",
+        "cchunk-pymupdf-v1-663e640852497df6-000",
+        "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+        "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+        "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000"
+      ],
+      "variants": {
+        "A0_lightrag": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+              "score": null,
+              "rank": 1,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 10,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-c99ee01e2d93-000-c99ee01e2d93",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-00e544a08ac569cc-000",
+              "score": null,
+              "rank": 2,
+              "source_file": "t1739cn.pdf",
+              "page": 49,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-卸泵组-ed2f2f5bdd89-000-ed2f2f5bdd89",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+              "score": null,
+              "rank": 3,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 23,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-05fa62ad30d3-000-05fa62ad30d3",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-53618e43576473eb-000",
+              "score": null,
+              "rank": 4,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 12,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-430b5c04f373-000-430b5c04f373",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+              "score": null,
+              "rank": 5,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 18,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-1693c615d124-000-1693c615d124",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a154dec455da1896-000",
+              "score": null,
+              "rank": 6,
+              "source_file": "t1739cn.pdf",
+              "page": 21,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1--安装-c5f3b28fc752-000-c5f3b28fc752",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+              "score": null,
+              "rank": 7,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 11,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-114bea8f37bc-000-114bea8f37bc",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-468e5ab6ce14079c-000",
+              "score": null,
+              "rank": 8,
+              "source_file": "t1739cn.pdf",
+              "page": 22,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1--安装-5668caf19e57-000-5668caf19e57",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+              "score": null,
+              "rank": 9,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 7,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-5d8e22b0294d-000-5d8e22b0294d",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-4a279a34073ff623-000",
+              "score": null,
+              "rank": 10,
+              "source_file": "t1739cn.pdf",
+              "page": 23,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1--安装-b60720ed33c2-000-b60720ed33c2",
+              "source": "lightrag"
+            }
+          ],
+          "hit_at_5": false,
+          "hit_at_10": false,
+          "latency_ms": 0.0006999998731771484,
+          "fallback_reason": null
+        },
+        "A1_lightrag_bm25_rrf": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+              "score": 0.03278688524590164,
+              "rrf_score": 0.03278688524590164,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 71.03558693727345
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+              "score": 0.03125763125763126,
+              "rrf_score": 0.03125763125763126,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 5,
+                  "original_score": 19.704622131651483
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+              "score": 0.028309409888357256,
+              "rrf_score": 0.028309409888357256,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 16,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 6,
+                  "original_score": 18.503486848443156
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+              "score": 0.028205128205128206,
+              "rrf_score": 0.028205128205128206,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 5,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 18,
+                  "original_score": 7.4806908414822
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-00e544a08ac569cc-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 37.402282652562526
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 23.453955891636376
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 4,
+                  "original_score": 21.142033586501917
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-53618e43576473eb-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 4,
+                  "original_score": null
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a154dec455da1896-000",
+              "score": 0.015151515151515152,
+              "rrf_score": 0.015151515151515152,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 6,
+                  "original_score": null
+                }
+              ]
+            }
+          ],
+          "hit_at_5": false,
+          "hit_at_10": false,
+          "latency_ms": 0.5858000004081987,
+          "fallback_reason": null
+        },
+        "A2_lightrag_bm25_rrf_reranker": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+              "score": 0.03278688524590164,
+              "rrf_score": 0.03278688524590164,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 71.03558693727345
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+              "score": 0.03125763125763126,
+              "rrf_score": 0.03125763125763126,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 5,
+                  "original_score": 19.704622131651483
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+              "score": 0.028309409888357256,
+              "rrf_score": 0.028309409888357256,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 16,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 6,
+                  "original_score": 18.503486848443156
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+              "score": 0.028205128205128206,
+              "rrf_score": 0.028205128205128206,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 5,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 18,
+                  "original_score": 7.4806908414822
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-00e544a08ac569cc-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 37.402282652562526
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 23.453955891636376
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 4,
+                  "original_score": 21.142033586501917
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-53618e43576473eb-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 4,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a154dec455da1896-000",
+              "score": 0.015151515151515152,
+              "rrf_score": 0.015151515151515152,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 6,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            }
+          ],
+          "hit_at_5": false,
+          "hit_at_10": false,
+          "latency_ms": 0.5980000005365582,
+          "fallback_reason": "provider_unavailable"
+        }
+      },
+      "sparse_only_contribution": [
+        "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+        "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+        "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000"
+      ],
+      "rrf_improved": false,
+      "rrf_regressed": false,
+      "reranker_improved": false,
+      "reranker_regressed": false,
+      "delta_classifications": [
+        "NO_MATERIAL_CHANGE"
+      ],
+      "expected_evidence_ranks": {
+        "A0_lightrag": null,
+        "A1_lightrag_bm25_rrf": null,
+        "A2_lightrag_bm25_rrf_reranker": null
+      }
+    },
+    {
+      "id": "S016",
+      "question": "SUMMIT 手册中，轴承高温运行通常由什么原因造成，如何处理？",
+      "expected_evidence": [
+        "cchunk-pymupdf-v1-16686d3e3ddcc21b-000",
+        "cchunk-pymupdf-v1-317e33cc54ca5b18-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-99121c418e138c64-000",
+        "cchunk-pymupdf-v1-f997c995a333b4ae-000"
+      ],
+      "variants": {
+        "A0_lightrag": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+              "score": null,
+              "rank": 1,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 14,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-8a9134f69b7a-000-8a9134f69b7a",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+              "score": null,
+              "rank": 2,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 23,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-0f44c075b8e8-000-0f44c075b8e8",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+              "score": null,
+              "rank": 3,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 14,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-8ac24fa36ba6-000-8ac24fa36ba6",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+              "score": null,
+              "rank": 4,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 24,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-67b6e4b74633-000-67b6e4b74633",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+              "score": null,
+              "rank": 5,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 16,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-e39749fc478f-000-e39749fc478f",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+              "score": null,
+              "rank": 6,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 10,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-c99ee01e2d93-000-c99ee01e2d93",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+              "score": null,
+              "rank": 7,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 28,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-e112e31e2351-000-e112e31e2351",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+              "score": null,
+              "rank": 8,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 23,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-67b6e4b74633-000-67b6e4b74633",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-6f14788cb29e00e4-000",
+              "score": null,
+              "rank": 9,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 14,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-a667c5b9cb55-000-a667c5b9cb55",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-6031ad5e15a73119-000",
+              "score": null,
+              "rank": 10,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 5,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-bcf1ceba3dbf-000-bcf1ceba3dbf",
+              "source": "lightrag"
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.0006999998731771484,
+          "fallback_reason": null
+        },
+        "A1_lightrag_bm25_rrf": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+              "score": 0.03009207275993712,
+              "rrf_score": 0.03009207275993712,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 13,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 30.52619125287127
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+              "score": 0.028612012987012988,
+              "rrf_score": 0.028612012987012988,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 4,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 17,
+                  "original_score": 6.706593674893425
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+              "score": 0.02786377708978328,
+              "rrf_score": 0.02786377708978328,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 8,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 16,
+                  "original_score": 6.706593674893425
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+              "score": 0.01639344262295082,
+              "rrf_score": 0.01639344262295082,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 13.442194248580122
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 12.393134854259202
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-0d6e694179b30242-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 4,
+                  "original_score": 11.449035348933704
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+              "score": 0.015384615384615385,
+              "rrf_score": 0.015384615384615385,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 5,
+                  "original_score": 10.914442253392032
+                }
+              ]
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.7380000006378395,
+          "fallback_reason": null
+        },
+        "A2_lightrag_bm25_rrf_reranker": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+              "score": 0.03009207275993712,
+              "rrf_score": 0.03009207275993712,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 13,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 30.52619125287127
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+              "score": 0.028612012987012988,
+              "rrf_score": 0.028612012987012988,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 4,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 17,
+                  "original_score": 6.706593674893425
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+              "score": 0.02786377708978328,
+              "rrf_score": 0.02786377708978328,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 8,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 16,
+                  "original_score": 6.706593674893425
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+              "score": 0.01639344262295082,
+              "rrf_score": 0.01639344262295082,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 13.442194248580122
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 12.393134854259202
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-0d6e694179b30242-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 4,
+                  "original_score": 11.449035348933704
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+              "score": 0.015384615384615385,
+              "rrf_score": 0.015384615384615385,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 5,
+                  "original_score": 10.914442253392032
+                }
+              ],
+              "rerank_model": "unavailable"
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.7562999999208841,
+          "fallback_reason": "provider_unavailable"
+        }
+      },
+      "sparse_only_contribution": [
+        "cchunk-pymupdf-v1-0d6e694179b30242-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-7227e2460f83a192-000",
+        "cchunk-pymupdf-v1-d376dd44adad266c-000",
+        "cchunk-pymupdf-v1-eb3236bb50e802d1-000"
+      ],
+      "rrf_improved": false,
+      "rrf_regressed": false,
+      "reranker_improved": false,
+      "reranker_regressed": false,
+      "delta_classifications": [
+        "RRF_IMPROVEMENT"
+      ],
+      "expected_evidence_ranks": {
+        "A0_lightrag": 4,
+        "A1_lightrag_bm25_rrf": 1,
+        "A2_lightrag_bm25_rrf_reranker": 1
+      }
+    },
+    {
+      "id": "S011",
+      "question": "按 SUMMIT 手册，离心泵的标准启动步骤是什么？",
+      "expected_evidence": [
+        "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+        "cchunk-pymupdf-v1-91e5666cf6078fb9-000",
+        "cchunk-pymupdf-v1-93807a18f7b7345f-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-ac2c48838803419d-000",
+        "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+        "cchunk-pymupdf-v1-bf2be6315d2f187b-000",
+        "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000"
+      ],
+      "variants": {
+        "A0_lightrag": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+              "score": null,
+              "rank": 1,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 17,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-d1faf220e6f2-000-d1faf220e6f2",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7192fa1959afa851-000",
+              "score": null,
+              "rank": 2,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 15,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-38cc6dafdf6c-000-38cc6dafdf6c",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-285811f368cf8a64-000",
+              "score": null,
+              "rank": 3,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 49,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-70af961007ec-000-70af961007ec",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-88f1b86b5b05ce0e-000",
+              "score": null,
+              "rank": 4,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 42,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-c8c9aad986b9-000-c8c9aad986b9",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+              "score": null,
+              "rank": 5,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 53,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-c8188ff9d303-000-c8188ff9d303",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+              "score": null,
+              "rank": 6,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 18,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-1693c615d124-000-1693c615d124",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-870481699e77eb19-000",
+              "score": null,
+              "rank": 7,
+              "source_file": "t1739cn.pdf",
+              "page": 36,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-和关闭-27cbf0e90064-000-27cbf0e90064",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+              "score": null,
+              "rank": 8,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 23,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-05fa62ad30d3-000-05fa62ad30d3",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-79b799b246f5a9a6-000",
+              "score": null,
+              "rank": 9,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 12,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-b1f39a866e20-000-b1f39a866e20",
+              "source": "lightrag"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+              "score": null,
+              "rank": 10,
+              "source_file": "2196-ANSI-Manual-Chinese.pdf",
+              "page": 7,
+              "historical_child_chunk_id": "cchunk-pymupdf-v1-护手册-5d8e22b0294d-000-5d8e22b0294d",
+              "source": "lightrag"
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.0010000003385357559,
+          "fallback_reason": null
+        },
+        "A1_lightrag_bm25_rrf": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+              "score": 0.03047794966520434,
+              "rrf_score": 0.03047794966520434,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 11,
+                  "original_score": 10.402550690000236
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+              "score": 0.02854251012145749,
+              "rrf_score": 0.02854251012145749,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 5,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 16,
+                  "original_score": 7.319135011302031
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-285811f368cf8a64-000",
+              "score": 0.028373015873015873,
+              "rrf_score": 0.028373015873015873,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 20,
+                  "original_score": 7.011227807957599
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+              "score": 0.026992753623188405,
+              "rrf_score": 0.026992753623188405,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 20,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 9,
+                  "original_score": 12.572746679683172
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-3055533062112b3d-000",
+              "score": 0.01639344262295082,
+              "rrf_score": 0.01639344262295082,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 18.995357605866687
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-16686d3e3ddcc21b-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 17.156684789353655
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7192fa1959afa851-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-b3fcc507b8b40953-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 17.156684789353655
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 4,
+                  "original_score": 17.047449547683676
+                }
+              ]
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-88f1b86b5b05ce0e-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 4,
+                  "original_score": null
+                }
+              ]
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.4451000004337402,
+          "fallback_reason": null
+        },
+        "A2_lightrag_bm25_rrf_reranker": {
+          "top_results": [
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+              "score": 0.03047794966520434,
+              "rrf_score": 0.03047794966520434,
+              "rank": 1,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 1,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 11,
+                  "original_score": 10.402550690000236
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+              "score": 0.02854251012145749,
+              "rrf_score": 0.02854251012145749,
+              "rank": 2,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 5,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 16,
+                  "original_score": 7.319135011302031
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-285811f368cf8a64-000",
+              "score": 0.028373015873015873,
+              "rrf_score": 0.028373015873015873,
+              "rank": 3,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 3,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 20,
+                  "original_score": 7.011227807957599
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+              "score": 0.026992753623188405,
+              "rrf_score": 0.026992753623188405,
+              "rank": 4,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 20,
+                  "original_score": null
+                },
+                {
+                  "source": "sparse",
+                  "original_rank": 9,
+                  "original_score": 12.572746679683172
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-3055533062112b3d-000",
+              "score": 0.01639344262295082,
+              "rrf_score": 0.01639344262295082,
+              "rank": 5,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 1,
+                  "original_score": 18.995357605866687
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-16686d3e3ddcc21b-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 6,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 2,
+                  "original_score": 17.156684789353655
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-7192fa1959afa851-000",
+              "score": 0.016129032258064516,
+              "rrf_score": 0.016129032258064516,
+              "rank": 7,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 2,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-b3fcc507b8b40953-000",
+              "score": 0.015873015873015872,
+              "rrf_score": 0.015873015873015872,
+              "rank": 8,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 3,
+                  "original_score": 17.156684789353655
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 9,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "sparse",
+                  "original_rank": 4,
+                  "original_score": 17.047449547683676
+                }
+              ],
+              "rerank_model": "unavailable"
+            },
+            {
+              "child_chunk_id": "cchunk-pymupdf-v1-88f1b86b5b05ce0e-000",
+              "score": 0.015625,
+              "rrf_score": 0.015625,
+              "rank": 10,
+              "source": "rrf",
+              "contributions": [
+                {
+                  "source": "lightrag",
+                  "original_rank": 4,
+                  "original_score": null
+                }
+              ],
+              "rerank_model": "unavailable"
+            }
+          ],
+          "hit_at_5": true,
+          "hit_at_10": true,
+          "latency_ms": 0.45760000011796365,
+          "fallback_reason": "provider_unavailable"
+        }
+      },
+      "sparse_only_contribution": [
+        "cchunk-pymupdf-v1-16686d3e3ddcc21b-000",
+        "cchunk-pymupdf-v1-3055533062112b3d-000",
+        "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-b3fcc507b8b40953-000"
+      ],
+      "rrf_improved": false,
+      "rrf_regressed": false,
+      "reranker_improved": false,
+      "reranker_regressed": false,
+      "delta_classifications": [
+        "NO_MATERIAL_CHANGE"
+      ],
+      "expected_evidence_ranks": {
+        "A0_lightrag": 1,
+        "A1_lightrag_bm25_rrf": 1,
+        "A2_lightrag_bm25_rrf_reranker": 1
+      }
+    }
+  ],
+  "trace_integrity": {
+    "generation_id": "dev-v2-20260902",
+    "checked_candidates": true,
+    "invalid_chunk_ids": 0,
+    "invalid_ids": []
+  },
+  "delta_summary": {
+    "RRF_IMPROVEMENT": 2,
+    "NO_MATERIAL_CHANGE": 4
+  },
+  "tuning_applied": false,
+  "validation_or_holdout_accessed": false
+}

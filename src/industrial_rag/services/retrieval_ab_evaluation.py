@@ -67,8 +67,9 @@ class FrozenGeneration:
         chunk_ids = frozenset(str(row["chunk_id"]) for row in evidence.records)
         if len(chunk_ids) != len(evidence.records):
             raise EvaluationBlocked("frozen generation contains duplicate child identities")
+        source_fingerprints = "".join(str(item.get("file_hash", "")) for item in evidence.manifest.documents)
         corpus_fingerprint = hashlib.sha256(
-            (evidence.manifest_bytes_sha256 + evidence.snapshot_bytes_sha256).encode("ascii")
+            (source_fingerprints + evidence.manifest.child_manifest_hash + evidence.manifest.parent_snapshot_hash).encode("ascii")
         ).hexdigest()
         return cls(
             workspace=workspace,
@@ -377,9 +378,28 @@ def _build_report(
     rankings = {name: [run.ranked_ids for run in values] for name, values in runs.items()}
     metrics = evaluate_rankings(cases, rankings)
     per_question: list[dict[str, Any]] = []
+    invalid_trace_ids: set[str] = set()
     for index, case in enumerate(cases):
         relevant = set(str(item) for item in case.get("relevant_chunk_ids", ()))
         a0, a1, a2 = (runs[variant.value][index] for variant in Variant)
+        for run in (a0, a1, a2):
+            invalid_trace_ids.update(set(run.ranked_ids) - generation.chunk_ids)
+        a0_rank = _best_rank(a0, relevant)
+        a1_rank = _best_rank(a1, relevant)
+        a2_rank = _best_rank(a2, relevant)
+        classifications: list[str] = []
+        if not _hit(a0, relevant, 10) and _hit(a1, relevant, 10):
+            classifications.append("SPARSE_RECOVERY")
+        if a0_rank is not None and a1_rank is not None and a1_rank < a0_rank:
+            classifications.append("RRF_IMPROVEMENT")
+        elif a0_rank is not None and (a1_rank is None or a1_rank > a0_rank):
+            classifications.append("RRF_REGRESSION")
+        if a1_rank is not None and a2_rank is not None and a2_rank < a1_rank:
+            classifications.append("RERANK_IMPROVEMENT")
+        elif a1_rank is not None and (a2_rank is None or a2_rank > a1_rank):
+            classifications.append("RERANK_REGRESSION")
+        if not classifications:
+            classifications.append("NO_MATERIAL_CHANGE")
         per_question.append(
             {
                 "id": case["id"],
@@ -400,6 +420,12 @@ def _build_report(
                 "rrf_regressed": _hit(a0, relevant, 10) and not _hit(a1, relevant, 10),
                 "reranker_improved": _hit(a2, relevant, 10) and not _hit(a1, relevant, 10),
                 "reranker_regressed": _hit(a1, relevant, 10) and not _hit(a2, relevant, 10),
+                "delta_classifications": classifications,
+                "expected_evidence_ranks": {
+                    "A0_lightrag": a0_rank,
+                    "A1_lightrag_bm25_rrf": a1_rank,
+                    "A2_lightrag_bm25_rrf_reranker": a2_rank,
+                },
             }
         )
     latencies = {name: [run.latency_ms for run in values] for name, values in runs.items()}
@@ -407,8 +433,15 @@ def _build_report(
         name: {"p50_ms": _percentile(values, 0.50), "p95_ms": _percentile(values, 0.95)}
         for name, values in latencies.items()
     }
+    delta_summary: dict[str, int] = {}
+    for item in per_question:
+        for classification in item["delta_classifications"]:
+            delta_summary[classification] = delta_summary.get(classification, 0) + 1
+    final_status = "INCONCLUSIVE" if len(cases) < 30 or fallback_count == len(cases) else "PASS"
     return {
-        "status": "INCONCLUSIVE" if len(cases) < 30 else "PASS",
+        "status": final_status,
+        "final_status": final_status,
+        "downstream_qa_allowed": final_status == "PASS",
         "scope": "development_only",
         "sample_size": len(cases),
         "sample_size_limitation": len(cases) < 30,
@@ -419,9 +452,19 @@ def _build_report(
             "corpus_fingerprint": generation.corpus_fingerprint,
             "chunk_count": len(generation.chunk_ids),
         },
+        "variant_configs": {
+            variant.value: {
+                "sparse_enabled": config.sparse_enabled,
+                "rrf_enabled": config.rrf_enabled,
+                "reranker_enabled": config.reranker_enabled,
+            }
+            for variant, config in build_variant_plan().items()
+        },
         "metrics": metrics,
         "latency": latency_report,
         "reranker": {
+            "calls": len(cases),
+            "success_count": len(cases) - fallback_count,
             "provider": reranker_provider_name,
             "model": reranker_model,
             "timeout_seconds": reranker_timeout_seconds,
@@ -435,6 +478,14 @@ def _build_report(
             "rrf_k": rrf_k,
         },
         "per_question": per_question,
+        "trace_integrity": {
+            "generation_id": generation.generation_id,
+            "checked_candidates": True,
+            "invalid_chunk_ids": len(invalid_trace_ids),
+            "invalid_ids": sorted(invalid_trace_ids),
+        },
+        "delta_summary": delta_summary,
+        "tuning_applied": False,
         "validation_or_holdout_accessed": False,
     }
 
@@ -452,6 +503,13 @@ def _percentile(values: Sequence[float], quantile: float) -> float:
 
 def _hit(run: _VariantRun, relevant: set[str], k: int) -> bool:
     return bool(set(run.ranked_ids[:k]) & relevant)
+
+
+def _best_rank(run: _VariantRun, relevant: set[str]) -> int | None:
+    for rank, child_id in enumerate(run.ranked_ids, 1):
+        if child_id in relevant:
+            return rank
+    return None
 
 
 __all__ = [

@@ -111,3 +111,12 @@ async def test_runner_records_same_generation_and_reranker_fallback(tmp_path: Pa
     assert report["generation"]["child_manifest_hash"] == generation.child_manifest_hash
     assert report["question_ids"] == ["S001"]
     assert report["reranker"]["fallback_count"] == 1
+    assert report["variant_configs"]["A0_lightrag"] == {
+        "sparse_enabled": False,
+        "rrf_enabled": False,
+        "reranker_enabled": False,
+    }
+    assert report["per_question"][0]["delta_classifications"] == ["NO_MATERIAL_CHANGE"]
+    assert report["trace_integrity"]["invalid_chunk_ids"] == 0
+    assert report["final_status"] == "INCONCLUSIVE"
+    assert report["downstream_qa_allowed"] is False
