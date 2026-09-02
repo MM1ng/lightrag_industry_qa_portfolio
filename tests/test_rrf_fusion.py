@@ -1,3 +1,7 @@
+import asyncio
+
+from industrial_rag.services.lexical_retrieval import BM25Index
+from industrial_rag.services.retrieval_fusion import HybridRetriever
 from industrial_rag.services.rrf_fusion import reciprocal_rank_fusion
 
 
@@ -53,3 +57,26 @@ def test_rrf_limit_returns_top_unique_candidates():
 
     assert len(fused) == 2
     assert [item.rrf_rank for item in fused] == [1, 2]
+
+
+def test_hybrid_retriever_runs_dense_and_sparse_concurrently_and_fuses():
+    sparse = BM25Index.from_records(
+        [
+            {"chunk_id": "c1", "content": "2196-R pump"},
+            {"chunk_id": "c2", "content": "NPSH parameter"},
+        ]
+    )
+    events: list[str] = []
+
+    async def dense(_query: str):
+        events.append("dense")
+        await asyncio.sleep(0)
+        return [{"child_chunk_id": "c2", "score": 0.9}]
+
+    fused = asyncio.run(
+        HybridRetriever(dense_retriever=dense, sparse_index=sparse).retrieve("NPSH", top_k=2)
+    )
+
+    assert events == ["dense"]
+    assert fused[0].child_chunk_id == "c2"
+    assert {item.source for item in fused[0].contributions} == {"lightrag", "sparse"}
