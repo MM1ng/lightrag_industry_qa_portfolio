@@ -26,3 +26,18 @@ the builder succeeds and label audit returns `READY_FOR_AB`.
 Verification: `ruff check .` passed. Focused pytest and the builder were blocked
 by the missing interpreter at
 `C:\Users\mming\AppData\Local\Programs\Python\Python311\python.exe`.
+
+## Python environment audit
+
+- Required version: `>=3.11,<3.12`; historical environment: Python `3.11.15`.
+- Runtime dependencies: `pyproject.toml` / `requirements.txt`.
+- Development/test dependencies: `pyproject.toml` `[dev]` extra.
+- Evaluation-only dependency: `ragas==0.3.9` via the `[evaluation]` extra.
+- `requirements.lock.txt` is an old pip-freeze snapshot and contains packages
+  outside the declared project dependencies; it was not used to add frameworks
+  or upgrade versions.
+- Planned restore: `py -3.11 -m venv .venv`, then
+  `.venv\Scripts\python.exe -m pip install --upgrade pip` and
+  `.venv\Scripts\python.exe -m pip install -e .[dev]`.
+- Actual Python executable/version/pip version: unavailable; no Python 3.11,
+  conda, or uv executable is discoverable on this machine.

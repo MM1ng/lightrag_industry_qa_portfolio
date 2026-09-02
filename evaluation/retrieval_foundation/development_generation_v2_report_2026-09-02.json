@@ -23,6 +23,19 @@
     "The checked-in .venv points to C:/Users/mming/AppData/Local/Programs/Python/Python311/python.exe, which is missing.",
     "Generation V2 builder and label audit cannot execute until Python 3.11 is restored."
   ],
+  "environment_audit": {
+    "python_requirement": ">=3.11,<3.12",
+    "historical_python": "3.11.15",
+    "runtime_dependency_source": "pyproject.toml and requirements.txt",
+    "dev_dependency_source": "pyproject.toml [project.optional-dependencies].dev",
+    "evaluation_dependency_source": "pyproject.toml [project.optional-dependencies].evaluation / requirements-evaluation.txt",
+    "lock_file_audit": "requirements.lock.txt is a historical pip-freeze snapshot and includes packages outside the declared project dependencies; it was not used to expand installation",
+    "planned_restore_commands": ["py -3.11 -m venv .venv", ".venv\\Scripts\\python.exe -m pip install --upgrade pip", ".venv\\Scripts\\python.exe -m pip install -e .[dev]"],
+    "actual_python_executable": null,
+    "actual_python_version": null,
+    "actual_pip_version": null,
+    "restore_result": "blocked: no Python 3.11 executable is installed or discoverable"
+  },
   "commands": {
     "source_audit": "Get-ChildItem D:/基于Lightrag的工业手册问答系统/lightrag_industry_qa_portfolio/data/manuals -Filter *.pdf; Get-FileHash -Algorithm SHA256",
     "builder": "\.venv\\Scripts\\python.exe scripts/build_retrieval_foundation_dev_generation.py --source-dir D:/基于Lightrag的工业手册问答系统/lightrag_industry_qa_portfolio/data/manuals --output evaluation/retrieval_foundation/dev_generation_v2 --generation-id dev-v2-20260902 --env-file D:/基于Lightrag的工业手册问答系统/lightrag_industry_qa_portfolio/.env",
