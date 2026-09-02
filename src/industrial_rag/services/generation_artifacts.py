@@ -2,7 +2,8 @@
 
 Generation runtimes must resolve ChildChunks from their own workspace, never
 from the mutable parsed-document ``current`` directories.  The manifest is
-published last, which makes a partially written snapshot unobservable.
+published last, after the child snapshot and lexical index, which makes a
+partially written generation artifact unobservable.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from industrial_rag.runtime_chunk_hydration import RuntimeChunkHydrator
 CHUNK_MANIFEST_SCHEMA_VERSION = 1
 _RETRIEVAL_DIRNAME = "retrieval"
 _SNAPSHOT_FILENAME = "child_chunks.jsonl"
+_LEXICAL_INDEX_FILENAME = "lexical_index.json"
 _MANIFEST_FILENAME = "chunk_manifest.json"
 
 
@@ -37,6 +39,7 @@ class GenerationChunkManifest:
     child_manifest_hash: str
     documents: tuple[dict[str, object], ...]
     created_at: str
+    lexical_index_hash: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -44,6 +47,7 @@ class GenerationChunkManifest:
             "schema_version": self.schema_version,
             "count": self.count,
             "child_manifest_hash": self.child_manifest_hash,
+            "lexical_index_hash": self.lexical_index_hash,
             "documents": list(self.documents),
             "created_at": self.created_at,
         }
@@ -57,6 +61,7 @@ class GenerationArtifactEvidence:
     records: tuple[dict[str, object], ...]
     manifest_bytes_sha256: str
     snapshot_bytes_sha256: str
+    lexical_index_bytes_sha256: str = ""
 
 
 def generation_retrieval_dir(workspace: Path) -> Path:
@@ -84,16 +89,26 @@ def freeze_generation_child_chunks(
         raise ValueError("generation_id is required")
     pairs = list(document_children)
     records = _snapshot_records(pairs)
+    child_hash = _hash_records(records)
+    from industrial_rag.services.lexical_retrieval import build_lexical_index, lexical_index_bytes
+
+    lexical_index = build_lexical_index(
+        records,
+        generation_id=generation_id,
+        child_manifest_hash=child_hash,
+    )
     manifest = GenerationChunkManifest(
         generation_id=generation_id,
         schema_version=CHUNK_MANIFEST_SCHEMA_VERSION,
         count=len(records),
-        child_manifest_hash=_hash_records(records),
+        child_manifest_hash=child_hash,
+        lexical_index_hash=lexical_index.artifact_hash,
         documents=_document_bindings(pairs, records),
         created_at=datetime.now(UTC).isoformat(),
     )
     retrieval_dir = generation_retrieval_dir(workspace)
     snapshot_path = retrieval_dir / _SNAPSHOT_FILENAME
+    lexical_index_path = retrieval_dir / _LEXICAL_INDEX_FILENAME
     manifest_path = retrieval_dir / _MANIFEST_FILENAME
     if manifest_path.exists() and not replace_existing:
         raise GenerationArtifactError("generation snapshot already exists and is immutable")
@@ -105,10 +120,12 @@ def freeze_generation_child_chunks(
             for record in records
         ),
     )
-    # Publish the manifest only after the entire snapshot is durable.
+    _atomic_write_text(lexical_index_path, lexical_index_bytes(lexical_index).decode("utf-8"))
+    # Publish the manifest only after snapshot and lexical artifacts are durable.
     _atomic_write_text(
         manifest_path,
-        json.dumps(manifest.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+        json.dumps(manifest.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        + "\n",
     )
     return manifest
 
@@ -150,8 +167,15 @@ def _load_validated_generation_artifact(
     retrieval_dir = generation_retrieval_dir(workspace)
     manifest_path = retrieval_dir / _MANIFEST_FILENAME
     snapshot_path = retrieval_dir / _SNAPSHOT_FILENAME
-    if not manifest_path.is_file() or not snapshot_path.is_file():
-        raise GenerationArtifactError("generation retrieval snapshot or manifest is missing")
+    lexical_index_path = retrieval_dir / _LEXICAL_INDEX_FILENAME
+    if (
+        not manifest_path.is_file()
+        or not snapshot_path.is_file()
+        or not lexical_index_path.is_file()
+    ):
+        raise GenerationArtifactError(
+            "generation retrieval snapshot, lexical index, or manifest is missing"
+        )
     try:
         manifest_bytes = manifest_path.read_bytes()
         raw = json.loads(manifest_bytes.decode("utf-8"))
@@ -164,7 +188,9 @@ def _load_validated_generation_artifact(
         expected_child_manifest_hash is not None
         and manifest.child_manifest_hash != expected_child_manifest_hash
     ):
-        raise GenerationArtifactError("expected child manifest hash does not match the chunk manifest")
+        raise GenerationArtifactError(
+            "expected child manifest hash does not match the chunk manifest"
+        )
     try:
         snapshot_bytes = snapshot_path.read_bytes()
     except OSError as error:
@@ -178,11 +204,30 @@ def _load_validated_generation_artifact(
     if _hash_records(records) != manifest.child_manifest_hash:
         raise GenerationArtifactError("generation snapshot hash does not match the chunk manifest")
     _validate_document_bindings(records, manifest.documents)
+    try:
+        lexical_index_bytes = lexical_index_path.read_bytes()
+        from industrial_rag.services.lexical_retrieval import (
+            load_lexical_index,
+            validate_lexical_index,
+        )
+
+        lexical_index = load_lexical_index(lexical_index_bytes)
+        if lexical_index.artifact_hash != manifest.lexical_index_hash:
+            raise ValueError("lexical index hash does not match the chunk manifest")
+        validate_lexical_index(
+            lexical_index,
+            records,
+            generation_id=manifest.generation_id,
+            child_manifest_hash=manifest.child_manifest_hash,
+        )
+    except (OSError, ValueError) as error:
+        raise GenerationArtifactError(f"generation lexical index is invalid: {error}") from error
     return GenerationArtifactEvidence(
         manifest=manifest,
         records=tuple(records),
         manifest_bytes_sha256=hashlib.sha256(manifest_bytes).hexdigest(),
         snapshot_bytes_sha256=hashlib.sha256(snapshot_bytes).hexdigest(),
+        lexical_index_bytes_sha256=hashlib.sha256(lexical_index_bytes).hexdigest(),
     )
 
 
@@ -200,10 +245,7 @@ def load_generation_child_chunks(
     )
     from industrial_rag.parser_models import ChildChunk
 
-    return [
-        ChildChunk.from_dict(record)
-        for record in evidence.records
-    ]
+    return [ChildChunk.from_dict(record) for record in evidence.records]
 
 
 class GenerationArtifactResolver:
@@ -226,7 +268,9 @@ class GenerationArtifactResolver:
         )
         workspace_key = str(Path(workspace).resolve())
         key = (workspace_key, evidence.manifest.child_manifest_hash)
-        stale = [cached for cached in self._registries if cached[0] == workspace_key and cached != key]
+        stale = [
+            cached for cached in self._registries if cached[0] == workspace_key and cached != key
+        ]
         for cached in stale:
             self._registries.pop(cached, None)
         registry = self._registries.get(key)
@@ -266,7 +310,9 @@ def _snapshot_records(document_children: Iterable[tuple[Any, Any]]) -> list[dict
         if records[index - 1]["chunk_id"] == records[index]["chunk_id"]
     ]
     if duplicate_ids:
-        raise GenerationArtifactError(f"duplicate child_chunk_id in generation snapshot: {duplicate_ids[0]}")
+        raise GenerationArtifactError(
+            f"duplicate child_chunk_id in generation snapshot: {duplicate_ids[0]}"
+        )
     return records
 
 
@@ -299,11 +345,7 @@ def _child_to_dict(child: Any) -> dict[str, object]:
     elif hasattr(child, "to_dict"):
         raw = dict(child.to_dict())
     else:
-        raw = {
-            key: value
-            for key, value in vars(child).items()
-            if not key.startswith("_")
-        }
+        raw = {key: value for key, value in vars(child).items() if not key.startswith("_")}
     return _json_value(raw)
 
 
@@ -349,7 +391,9 @@ def _manifest_from_dict(value: Any) -> GenerationChunkManifest:
         documents_raw = value["documents"]
         if schema_version != CHUNK_MANIFEST_SCHEMA_VERSION or count < 0:
             raise ValueError
-        if not isinstance(documents_raw, list) or not all(isinstance(item, Mapping) for item in documents_raw):
+        if not isinstance(documents_raw, list) or not all(
+            isinstance(item, Mapping) for item in documents_raw
+        ):
             raise ValueError
         required_document_fields = {
             "document_id",
@@ -364,6 +408,7 @@ def _manifest_from_dict(value: Any) -> GenerationChunkManifest:
             schema_version=schema_version,
             count=count,
             child_manifest_hash=str(value["child_manifest_hash"]),
+            lexical_index_hash=str(value["lexical_index_hash"]),
             documents=tuple(dict(item) for item in documents_raw),
             created_at=str(value["created_at"]),
         )
@@ -402,7 +447,9 @@ def _validate_document_bindings(
             or str(record.get("document_file_hash") or "") != str(binding["file_hash"])
             or str(record.get("document_name") or "") != str(binding["document_name"])
         ):
-            raise GenerationArtifactError("generation snapshot document binding does not match manifest")
+            raise GenerationArtifactError(
+                "generation snapshot document binding does not match manifest"
+            )
 
 
 __all__ = [

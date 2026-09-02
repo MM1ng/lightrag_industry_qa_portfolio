@@ -88,6 +88,9 @@ class GenerationContentFingerprintService:
                 "frozen_snapshot_bytes": (
                     artifact_evidence.snapshot_bytes_sha256 if artifact_evidence else None
                 ),
+                "frozen_lexical_index_bytes": (
+                    artifact_evidence.lexical_index_bytes_sha256 if artifact_evidence else None
+                ),
             }
         )
         strategy_hash = stable_hash(

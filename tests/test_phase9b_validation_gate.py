@@ -172,9 +172,7 @@ async def test_canonical_http_record_contains_required_trace_and_safety_fields(
                 "id": "T001",
                 "question": "test",
                 "expects_evidence": True,
-                "expected_citations": [
-                    {"source_file": "source.pdf", "page_number": 1}
-                ],
+                "expected_citations": [{"source_file": "source.pdf", "page_number": 1}],
             },
         ),
         source_sha256="1" * 64,
@@ -295,6 +293,27 @@ async def test_qdrant_change_after_validation_blocks_promote(validation_state) -
     factory, settings, qdrant, kb_id, generation_id, _ = validation_state
     await _record_valid_run(validation_state)
     qdrant.points[0].payload["content"] = "changed after validation"
+    async with factory() as session:
+        generation = await session.get(VectorIndexGeneration, generation_id)
+        with pytest.raises(AppError) as caught:
+            await ValidationGateService(
+                session,
+                settings=settings,
+                qdrant_client_factory=lambda: qdrant,
+            ).require_eligible(kb_id, generation)
+    assert caught.value.code == AppErrorCode.generation_validation_stale
+
+
+@pytest.mark.asyncio
+async def test_lexical_artifact_byte_change_after_validation_blocks_promote(
+    validation_state,
+) -> None:
+    """Validation evidence must bind the exact lexical artifact that was approved."""
+    factory, settings, qdrant, kb_id, generation_id, tmp_path = validation_state
+    await _record_valid_run(validation_state)
+    lexical = tmp_path / "workspace" / "retrieval" / "lexical_index.json"
+    lexical.write_text("\n" + lexical.read_text(encoding="utf-8"), encoding="utf-8")
+
     async with factory() as session:
         generation = await session.get(VectorIndexGeneration, generation_id)
         with pytest.raises(AppError) as caught:
