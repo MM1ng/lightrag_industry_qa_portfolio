@@ -30,5 +30,5 @@
     "focused_tests": "\.venv\\Scripts\\pytest.exe -q tests/test_retrieval_ab_evaluation_contracts.py",
     "ruff": "\.venv\\Scripts\\ruff.exe check ."
   },
-  "verification": {"ruff": "passed", "focused_tests": "blocked by missing interpreter", "builder": "not started; environment blocked"}
+  "verification": {"python_version": null, "ruff": "passed", "focused_tests": "blocked by missing interpreter", "builder": "not started; environment blocked"}
 }
