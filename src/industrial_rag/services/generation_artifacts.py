@@ -20,7 +20,8 @@ from typing import Any
 
 from industrial_rag.runtime_chunk_hydration import RuntimeChunkHydrator
 
-CHUNK_MANIFEST_SCHEMA_VERSION = 1
+CHUNK_MANIFEST_SCHEMA_VERSION = 2
+_LEGACY_CHUNK_MANIFEST_SCHEMA_VERSION = 1
 _RETRIEVAL_DIRNAME = "retrieval"
 _SNAPSHOT_FILENAME = "child_chunks.jsonl"
 _LEXICAL_INDEX_FILENAME = "lexical_index.json"
@@ -40,6 +41,7 @@ class GenerationChunkManifest:
     documents: tuple[dict[str, object], ...]
     created_at: str
     lexical_index_hash: str = ""
+    lexical_index_bytes_sha256: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -48,6 +50,7 @@ class GenerationChunkManifest:
             "count": self.count,
             "child_manifest_hash": self.child_manifest_hash,
             "lexical_index_hash": self.lexical_index_hash,
+            "lexical_index_bytes_sha256": self.lexical_index_bytes_sha256,
             "documents": list(self.documents),
             "created_at": self.created_at,
         }
@@ -62,6 +65,14 @@ class GenerationArtifactEvidence:
     manifest_bytes_sha256: str
     snapshot_bytes_sha256: str
     lexical_index_bytes_sha256: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyLexicalBackfillResult:
+    """Outcome of an explicit, snapshot-only legacy lexical artifact migration."""
+
+    status: str
+    detail: str
 
 
 def generation_retrieval_dir(workspace: Path) -> Path:
@@ -97,12 +108,14 @@ def freeze_generation_child_chunks(
         generation_id=generation_id,
         child_manifest_hash=child_hash,
     )
+    lexical_payload = lexical_index_bytes(lexical_index)
     manifest = GenerationChunkManifest(
         generation_id=generation_id,
         schema_version=CHUNK_MANIFEST_SCHEMA_VERSION,
         count=len(records),
         child_manifest_hash=child_hash,
         lexical_index_hash=lexical_index.artifact_hash,
+        lexical_index_bytes_sha256=hashlib.sha256(lexical_payload).hexdigest(),
         documents=_document_bindings(pairs, records),
         created_at=datetime.now(UTC).isoformat(),
     )
@@ -120,7 +133,7 @@ def freeze_generation_child_chunks(
             for record in records
         ),
     )
-    _atomic_write_text(lexical_index_path, lexical_index_bytes(lexical_index).decode("utf-8"))
+    _atomic_write_text(lexical_index_path, lexical_payload.decode("utf-8"))
     # Publish the manifest only after snapshot and lexical artifacts are durable.
     _atomic_write_text(
         manifest_path,
@@ -168,14 +181,8 @@ def _load_validated_generation_artifact(
     manifest_path = retrieval_dir / _MANIFEST_FILENAME
     snapshot_path = retrieval_dir / _SNAPSHOT_FILENAME
     lexical_index_path = retrieval_dir / _LEXICAL_INDEX_FILENAME
-    if (
-        not manifest_path.is_file()
-        or not snapshot_path.is_file()
-        or not lexical_index_path.is_file()
-    ):
-        raise GenerationArtifactError(
-            "generation retrieval snapshot, lexical index, or manifest is missing"
-        )
+    if not manifest_path.is_file():
+        raise GenerationArtifactError("generation retrieval chunk manifest is missing")
     try:
         manifest_bytes = manifest_path.read_bytes()
         raw = json.loads(manifest_bytes.decode("utf-8"))
@@ -191,6 +198,8 @@ def _load_validated_generation_artifact(
         raise GenerationArtifactError(
             "expected child manifest hash does not match the chunk manifest"
         )
+    if not snapshot_path.is_file() or not lexical_index_path.is_file():
+        raise GenerationArtifactError("generation retrieval snapshot or lexical index is missing")
     try:
         snapshot_bytes = snapshot_path.read_bytes()
     except OSError as error:
@@ -212,6 +221,8 @@ def _load_validated_generation_artifact(
         )
 
         lexical_index = load_lexical_index(lexical_index_bytes)
+        if hashlib.sha256(lexical_index_bytes).hexdigest() != manifest.lexical_index_bytes_sha256:
+            raise ValueError("lexical index bytes hash does not match the chunk manifest")
         if lexical_index.artifact_hash != manifest.lexical_index_hash:
             raise ValueError("lexical index hash does not match the chunk manifest")
         validate_lexical_index(
@@ -389,6 +400,10 @@ def _manifest_from_dict(value: Any) -> GenerationChunkManifest:
         schema_version = int(value["schema_version"])
         count = int(value["count"])
         documents_raw = value["documents"]
+        if schema_version == _LEGACY_CHUNK_MANIFEST_SCHEMA_VERSION:
+            raise GenerationArtifactError(
+                "legacy generation manifest requires explicit lexical artifact migration"
+            )
         if schema_version != CHUNK_MANIFEST_SCHEMA_VERSION or count < 0:
             raise ValueError
         if not isinstance(documents_raw, list) or not all(
@@ -409,11 +424,125 @@ def _manifest_from_dict(value: Any) -> GenerationChunkManifest:
             count=count,
             child_manifest_hash=str(value["child_manifest_hash"]),
             lexical_index_hash=str(value["lexical_index_hash"]),
+            lexical_index_bytes_sha256=str(value["lexical_index_bytes_sha256"]),
             documents=tuple(dict(item) for item in documents_raw),
             created_at=str(value["created_at"]),
         )
     except (KeyError, TypeError, ValueError) as error:
         raise GenerationArtifactError("generation chunk manifest is invalid") from error
+
+
+def migrate_legacy_lexical_artifact(
+    workspace: Path, *, apply: bool = False
+) -> LegacyLexicalBackfillResult:
+    """Plan or safely upgrade one schema-v1 snapshot without reading mutable inputs.
+
+    Only an absent lexical file may be created. Existing artifacts, including
+    corrupt partially migrated workspaces, are reported as incompatible rather
+    than overwritten.
+    """
+    retrieval_dir = generation_retrieval_dir(workspace)
+    manifest_path = retrieval_dir / _MANIFEST_FILENAME
+    snapshot_path = retrieval_dir / _SNAPSHOT_FILENAME
+    lexical_index_path = retrieval_dir / _LEXICAL_INDEX_FILENAME
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        return LegacyLexicalBackfillResult("incompatible", f"manifest unreadable: {error}")
+    if not isinstance(raw, Mapping):
+        return LegacyLexicalBackfillResult("incompatible", "manifest is not an object")
+    schema_version = raw.get("schema_version")
+    if schema_version == CHUNK_MANIFEST_SCHEMA_VERSION:
+        try:
+            _load_validated_generation_artifact(
+                workspace,
+                expected_generation_id=None,
+                expected_child_manifest_hash=None,
+            )
+        except GenerationArtifactError as error:
+            return LegacyLexicalBackfillResult("incompatible", str(error))
+        return LegacyLexicalBackfillResult("already_current", "schema-v2 artifacts are valid")
+    if schema_version != _LEGACY_CHUNK_MANIFEST_SCHEMA_VERSION:
+        return LegacyLexicalBackfillResult("incompatible", "unsupported manifest schema version")
+    if lexical_index_path.exists():
+        return LegacyLexicalBackfillResult(
+            "incompatible", "legacy workspace already has a lexical artifact; refusing overwrite"
+        )
+    try:
+        legacy_manifest = _legacy_manifest_from_dict(raw)
+        snapshot_bytes = snapshot_path.read_bytes()
+        records = _read_snapshot_records(snapshot_path, payload=snapshot_bytes.decode("utf-8"))
+        if len(records) != legacy_manifest.count:
+            raise GenerationArtifactError(
+                "generation snapshot count does not match the chunk manifest"
+            )
+        if _hash_records(records) != legacy_manifest.child_manifest_hash:
+            raise GenerationArtifactError(
+                "generation snapshot hash does not match the chunk manifest"
+            )
+        _validate_document_bindings(records, legacy_manifest.documents)
+    except (OSError, UnicodeDecodeError, GenerationArtifactError) as error:
+        return LegacyLexicalBackfillResult("incompatible", str(error))
+    if not apply:
+        return LegacyLexicalBackfillResult(
+            "would_migrate", "validated frozen snapshot can be upgraded"
+        )
+    from industrial_rag.services.lexical_retrieval import build_lexical_index, lexical_index_bytes
+
+    lexical_index = build_lexical_index(
+        records,
+        generation_id=legacy_manifest.generation_id,
+        child_manifest_hash=legacy_manifest.child_manifest_hash,
+    )
+    lexical_payload = lexical_index_bytes(lexical_index)
+    upgraded = GenerationChunkManifest(
+        generation_id=legacy_manifest.generation_id,
+        schema_version=CHUNK_MANIFEST_SCHEMA_VERSION,
+        count=legacy_manifest.count,
+        child_manifest_hash=legacy_manifest.child_manifest_hash,
+        documents=legacy_manifest.documents,
+        created_at=legacy_manifest.created_at,
+        lexical_index_hash=lexical_index.artifact_hash,
+        lexical_index_bytes_sha256=hashlib.sha256(lexical_payload).hexdigest(),
+    )
+    try:
+        _atomic_write_text(lexical_index_path, lexical_payload.decode("utf-8"))
+        _atomic_write_text(
+            manifest_path,
+            json.dumps(
+                upgraded.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":")
+            )
+            + "\n",
+        )
+    except OSError as error:
+        return LegacyLexicalBackfillResult("incompatible", f"migration write failed: {error}")
+    return LegacyLexicalBackfillResult("migrated", "schema-v1 snapshot upgraded without reparsing")
+
+
+def _legacy_manifest_from_dict(value: Mapping[str, object]) -> GenerationChunkManifest:
+    """Parse only the frozen snapshot fields needed for an explicit v1 upgrade."""
+    try:
+        count = int(value["count"])
+        documents_raw = value["documents"]
+        if (
+            count < 0
+            or not isinstance(documents_raw, list)
+            or not all(isinstance(item, Mapping) for item in documents_raw)
+        ):
+            raise ValueError
+        required_document_fields = {"document_id", "document_version", "file_hash", "document_name"}
+        if any(not required_document_fields <= set(item) for item in documents_raw):
+            raise ValueError
+        return GenerationChunkManifest(
+            generation_id=str(value["generation_id"]),
+            schema_version=_LEGACY_CHUNK_MANIFEST_SCHEMA_VERSION,
+            count=count,
+            child_manifest_hash=str(value["child_manifest_hash"]),
+            documents=tuple(dict(item) for item in documents_raw),
+            created_at=str(value["created_at"]),
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise GenerationArtifactError("legacy generation chunk manifest is invalid") from error
 
 
 def _read_snapshot_records(path: Path, *, payload: str | None = None) -> list[dict[str, object]]:
@@ -458,10 +587,12 @@ __all__ = [
     "GenerationArtifactEvidence",
     "GenerationArtifactResolver",
     "GenerationChunkManifest",
+    "LegacyLexicalBackfillResult",
     "child_manifest_hash",
     "freeze_generation_child_chunks",
     "generation_artifact_evidence",
     "generation_retrieval_dir",
     "load_generation_child_chunks",
     "load_generation_manifest",
+    "migrate_legacy_lexical_artifact",
 ]

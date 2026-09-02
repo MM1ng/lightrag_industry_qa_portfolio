@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -368,13 +370,16 @@ def test_generation_validation_rejects_missing_or_forged_lexical_artifacts(tmp_p
             "utf-8"
         )
     ).hexdigest()
-    lexical_path.write_text(
-        json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
-        encoding="utf-8",
+    lexical_payload = (
+        json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
     )
+    lexical_path.write_bytes(lexical_payload.encode("utf-8"))
     manifest_path = workspace / "retrieval" / "chunk_manifest.json"
     manifest_raw = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest_raw["lexical_index_hash"] = raw["artifact_hash"]
+    manifest_raw["lexical_index_bytes_sha256"] = hashlib.sha256(
+        lexical_payload.encode("utf-8")
+    ).hexdigest()
     manifest_path.write_text(
         json.dumps(manifest_raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
         encoding="utf-8",
@@ -407,13 +412,16 @@ def test_generation_validation_rejects_wrong_lexical_generation_or_manifest_hash
             "utf-8"
         )
     ).hexdigest()
-    lexical_path.write_text(
-        json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
-        encoding="utf-8",
+    lexical_payload = (
+        json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
     )
+    lexical_path.write_bytes(lexical_payload.encode("utf-8"))
     manifest_path = workspace / "retrieval" / "chunk_manifest.json"
     manifest_raw = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest_raw["lexical_index_hash"] = raw["artifact_hash"]
+    manifest_raw["lexical_index_bytes_sha256"] = hashlib.sha256(
+        lexical_payload.encode("utf-8")
+    ).hexdigest()
     manifest_path.write_text(
         json.dumps(manifest_raw, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
         encoding="utf-8",
@@ -445,3 +453,111 @@ def test_generation_validation_rejects_wrong_lexical_generation_or_manifest_hash
             expected_generation_id="g1",
             expected_child_manifest_hash=manifest.child_manifest_hash,
         )
+
+
+def test_loader_rejects_whitespace_only_lexical_artifact_tampering(tmp_path: Path) -> None:
+    """The direct frozen-artifact loader must bind exact lexical bytes, not only JSON meaning."""
+    workspace = tmp_path / "workspace"
+    manifest = freeze_generation_child_chunks(
+        workspace,
+        generation_id="g1",
+        document_children=[(_document("doc-1", 1), _child("doc-1", "child-a", "NPSH"))],
+    )
+    lexical_path = workspace / "retrieval" / "lexical_index.json"
+    lexical_path.write_text("\n" + lexical_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+    with pytest.raises(GenerationArtifactError, match=r"lexical.*bytes"):
+        load_generation_child_chunks(
+            workspace,
+            expected_generation_id="g1",
+            expected_child_manifest_hash=manifest.child_manifest_hash,
+        )
+
+
+def test_legacy_manifest_requires_explicit_snapshot_only_lexical_backfill(tmp_path: Path) -> None:
+    """Old Task 1 generations stay rejected until a dry-run/apply migration proves them safe."""
+    workspace = tmp_path / "workspace"
+    manifest = freeze_generation_child_chunks(
+        workspace,
+        generation_id="g1",
+        document_children=[(_document("doc-1", 1), _child("doc-1", "child-a", "2196-R"))],
+    )
+    retrieval = workspace / "retrieval"
+    manifest_path = retrieval / "chunk_manifest.json"
+    legacy = json.loads(manifest_path.read_text(encoding="utf-8"))
+    legacy["schema_version"] = 1
+    legacy.pop("lexical_index_hash", None)
+    legacy.pop("lexical_index_bytes_sha256", None)
+    manifest_path.write_text(
+        json.dumps(legacy, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n",
+        encoding="utf-8",
+    )
+    (retrieval / "lexical_index.json").unlink()
+    before = {path.name: path.read_bytes() for path in retrieval.iterdir()}
+
+    with pytest.raises(GenerationArtifactError, match=r"legacy.*migration"):
+        load_generation_child_chunks(
+            workspace,
+            expected_generation_id="g1",
+            expected_child_manifest_hash=manifest.child_manifest_hash,
+        )
+
+    from scripts.backfill_frozen_lexical_artifacts import backfill_legacy_lexical_artifact
+
+    dry_run = backfill_legacy_lexical_artifact(workspace, apply=False)
+    assert dry_run.status == "would_migrate"
+    assert {path.name: path.read_bytes() for path in retrieval.iterdir()} == before
+
+    applied = backfill_legacy_lexical_artifact(workspace, apply=True)
+    assert applied.status == "migrated"
+    assert (
+        load_generation_child_chunks(
+            workspace,
+            expected_generation_id="g1",
+            expected_child_manifest_hash=manifest.child_manifest_hash,
+        )[0].chunk_id
+        == "child-a"
+    )
+    assert backfill_legacy_lexical_artifact(workspace, apply=True).status == "already_current"
+
+
+def test_legacy_backfill_marks_unverifiable_snapshot_incompatible(tmp_path: Path) -> None:
+    """The migration never guesses, reparses, or overwrites an unsafe old generation."""
+    workspace = tmp_path / "workspace"
+    freeze_generation_child_chunks(
+        workspace,
+        generation_id="g1",
+        document_children=[(_document("doc-1", 1), _child("doc-1", "child-a", "NPSH"))],
+    )
+    retrieval = workspace / "retrieval"
+    manifest_path = retrieval / "chunk_manifest.json"
+    legacy = json.loads(manifest_path.read_text(encoding="utf-8"))
+    legacy["schema_version"] = 1
+    legacy.pop("lexical_index_hash", None)
+    legacy.pop("lexical_index_bytes_sha256", None)
+    manifest_path.write_text(json.dumps(legacy), encoding="utf-8")
+    (retrieval / "lexical_index.json").unlink()
+    (retrieval / "child_chunks.jsonl").write_text('{"chunk_id":"tampered"}\n', encoding="utf-8")
+
+    from scripts.backfill_frozen_lexical_artifacts import backfill_legacy_lexical_artifact
+
+    result = backfill_legacy_lexical_artifact(workspace, apply=True)
+
+    assert result.status == "incompatible"
+    assert not (retrieval / "lexical_index.json").exists()
+
+
+def test_legacy_lexical_backfill_cli_is_invokable_from_the_project_root() -> None:
+    """Operators can run the dry-run/apply migration without pre-setting PYTHONPATH."""
+    project_root = Path(__file__).resolve().parents[1]
+
+    result = subprocess.run(
+        [sys.executable, "scripts/backfill_frozen_lexical_artifacts.py", "--help"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--apply" in result.stdout
