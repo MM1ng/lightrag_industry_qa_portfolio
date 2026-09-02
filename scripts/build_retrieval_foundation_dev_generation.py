@@ -8,10 +8,13 @@ import hashlib
 import json
 import os
 import sqlite3
+import sys
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from dotenv import load_dotenv
 from industrial_rag.citation_formatter import Citation, encode_chunk_header
@@ -155,10 +158,15 @@ def build_generation(output: Path, generation_id: str, source_dir: Path, env_fil
         "corpus_fingerprint": corpus_fingerprint,
         "child_manifest_hash": manifest.child_manifest_hash,
         "parent_snapshot_hash": manifest.parent_snapshot_hash,
+        "lexical_index_fingerprint": manifest.lexical_index_hash,
         "child_count": manifest.count,
         "parent_count": len(parents),
+        "lightrag_workspace_populated": True,
         "retrieval_config": retrieval_config,
         "retrieval_config_fingerprint": retrieval_config_fingerprint,
+        "python_version": sys.version.split()[0],
+        "python_executable": sys.executable,
+        "python_base_prefix": sys.base_prefix,
         "isolated_database": str(isolated_db.resolve()),
         "mutable_current_used": False,
     }

@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 from industrial_rag.evidence_completion import complete_evidence
+from industrial_rag.parser_models import ParentChunk
 from industrial_rag.services.generation_artifacts import (
     GenerationArtifactError,
     GenerationArtifactResolver,
@@ -147,6 +148,28 @@ def test_manifest_binds_snapshot_hash_count_and_document_versions(tmp_path: Path
             expected_child_manifest_hash=manifest.child_manifest_hash,
         )
 
+
+def test_freeze_generation_serializes_slots_parent_chunks(tmp_path: Path) -> None:
+    """The production ParentChunk dataclass uses slots and must be snapshotted."""
+    child = _child("doc-1", "child-a", "A")
+    parent = ParentChunk(
+        parent_chunk_id="parent-child-a",
+        document_id="doc-1",
+        document_name="doc-1.pdf",
+        content="Parent A",
+        child_chunk_ids=("child-a",),
+    )
+
+    manifest = freeze_generation_child_chunks(
+        tmp_path / "generation" / "workspace",
+        generation_id="g1",
+        document_children=[(_document("doc-1", 1), child)],
+        document_parents=[(_document("doc-1", 1), parent)],
+    )
+
+    evidence = generation_artifact_evidence(tmp_path / "generation" / "workspace")
+    assert manifest.parent_snapshot_hash
+    assert evidence.parent_records[0]["parent_chunk_id"] == "parent-child-a"
 
 def test_resolver_reloads_when_switching_generation_workspaces(tmp_path: Path) -> None:
     """A runtime cache entry from G1 cannot satisfy a later G2 activation."""

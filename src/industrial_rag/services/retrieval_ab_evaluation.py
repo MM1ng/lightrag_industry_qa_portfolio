@@ -152,7 +152,7 @@ def audit_label_compatibility(
         for historical_id in historical_ids:
             old = historical_chunks.get(historical_id)
             if old is None:
-                statuses.append("missing")
+                statuses.append("MISSING")
                 reasons.append(f"historical chunk {historical_id} not found")
                 continue
             old_doc = str(old.get("document_name") or "")
@@ -166,23 +166,23 @@ def audit_label_compatibility(
             exact = [record for record in pool if str(record.get("chunk_id")) == historical_id]
             equivalent = [record for record in pool if old_content and old_content == _normal_text(record.get("content"))]
             if exact:
-                matched, status, reason = exact, "exact", "chunk identity is unchanged"
+                matched, status, reason = exact, "EXACT", "chunk identity is unchanged"
             elif equivalent:
-                matched, status, reason = equivalent, "equivalent", "same document/page and identical evidence text"
+                matched, status, reason = equivalent, "EQUIVALENT", "same document/page and identical evidence text"
             elif len(pool) == 1:
-                matched, status, reason = pool, "equivalent", "single document/page candidate"
+                matched, status, reason = pool, "EQUIVALENT", "single document/page candidate"
             elif not pool:
-                matched, status, reason = [], "missing", "no candidate in same document/page"
+                matched, status, reason = [], "MISSING", "no candidate in same document/page"
             else:
-                matched, status, reason = pool, "ambiguous", "multiple candidates in same document/page"
+                matched, status, reason = pool, "AMBIGUOUS", "multiple candidates in same document/page"
             statuses.append(status)
             reasons.append(reason)
             candidates.extend(
                 {"historical_chunk_id": historical_id, "v2_chunk_id": str(item.get("chunk_id")), "status": status}
                 for item in matched
             )
-        overall = "missing" if "missing" in statuses else "ambiguous" if "ambiguous" in statuses else "exact" if statuses and all(item == "exact" for item in statuses) else "equivalent"
-        audits.append({"question_id": str(case.get("id") or case.get("question_id") or ""), "historical_evidence_identity": historical_ids, "v2_candidate_evidence": candidates, "status": overall, "confidence": 1.0 if overall == "exact" else 0.85 if overall == "equivalent" else 0.0, "reason": "; ".join(reasons)})
+        overall = "MISSING" if "MISSING" in statuses else "AMBIGUOUS" if "AMBIGUOUS" in statuses else "EXACT" if statuses and all(item == "EXACT" for item in statuses) else "EQUIVALENT"
+        audits.append({"question_id": str(case.get("id") or case.get("question_id") or ""), "historical_evidence_identity": historical_ids, "v2_candidate_evidence": candidates, "status": overall, "confidence": 1.0 if overall == "EXACT" else 0.85 if overall == "EQUIVALENT" else 0.0, "reason": "; ".join(reasons)})
     return tuple(audits)
 
 

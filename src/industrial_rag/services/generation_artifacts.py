@@ -13,7 +13,7 @@ import json
 import os
 import uuid
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -430,6 +430,8 @@ def _child_to_dict(child: Any) -> dict[str, object]:
         raw = dict(child)
     elif hasattr(child, "to_dict"):
         raw = dict(child.to_dict())
+    elif is_dataclass(child):
+        raw = asdict(child)
     else:
         raw = {key: value for key, value in vars(child).items() if not key.startswith("_")}
     return _json_value(raw)

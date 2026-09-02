@@ -54,7 +54,7 @@ def test_label_audit_uses_source_location_not_retrieval_results() -> None:
         {"old-1": {"document_name": "manual.pdf", "page_start": 2, "content": "evidence"}},
         [{"chunk_id": "new-1", "document_name": "manual.pdf", "page_start": 2, "page_end": 2, "content": "evidence"}],
     )
-    assert result[0]["status"] == "equivalent"
+    assert result[0]["status"] == "EQUIVALENT"
 
 
 def test_generation_contract_requires_light_rag_workspace(tmp_path: Path) -> None:

@@ -1,10 +1,16 @@
 """Audit Development labels against a newly built Frozen Generation V2."""
 
+# ruff: noqa: E402, I001
+
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
 
 from industrial_rag.services.generation_artifacts import generation_artifact_evidence
 from industrial_rag.services.retrieval_ab_evaluation import (
@@ -13,9 +19,6 @@ from industrial_rag.services.retrieval_ab_evaluation import (
     audit_label_compatibility,
     load_development_cases,
 )
-
-ROOT = Path(__file__).resolve().parents[1]
-
 
 def _mapping(path: Path) -> dict[str, list[str]]:
     raw = json.loads(path.read_text(encoding="utf-8"))
@@ -55,7 +58,7 @@ def audit(generation_path: Path, dataset: Path, dataset_manifest: Path, mapping_
     audits = audit_label_compatibility(expanded, mapping, _historical_chunks(), evidence.records)
     statuses = {str(item["status"]) for item in audits}
     return {
-        "status": "READY_FOR_AB" if statuses <= {"exact", "equivalent"} else "BLOCKED_LABEL_MAPPING",
+        "status": "READY_FOR_AB" if statuses <= {"EXACT", "EQUIVALENT"} else "BLOCKED_LABEL_MAPPING",
         "generation_id": generation.generation_id,
         "child_manifest_hash": generation.child_manifest_hash,
         "question_ids": [str(case["id"]) for case in cases],
