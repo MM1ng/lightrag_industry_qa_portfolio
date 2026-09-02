@@ -1,0 +1,40 @@
+{
+  "status": "INCONCLUSIVE",
+  "decision": "STOPPED_DATA_GAP",
+  "scope": "development_only",
+  "variants": ["A0_lightrag", "A1_lightrag_bm25_rrf", "A2_lightrag_bm25_rrf_reranker"],
+  "dataset": {
+    "path": "evaluation/retrieval_foundation/dev_cases.jsonl",
+    "case_count": 6,
+    "labeled_case_count": 6,
+    "question_types": ["model", "part_number", "parameter", "semantic", "fault", "procedure"]
+  },
+  "fixed_generation": null,
+  "fixed_evidence_corpus": null,
+  "metrics": null,
+  "per_question_delta": null,
+  "reranker": {"fallback_count": null, "fallback_rate": null},
+  "data_quality_findings": [
+    {
+      "severity": "critical",
+      "finding": "No generation-scoped evidence corpus is available in this worktree",
+      "evidence": "recursive search found no runtime generation retrieval snapshot; .run/industrial_rag.db has zero knowledge_bases rows",
+      "impact": "A0/A1/A2 cannot be evaluated against the same ChildChunk snapshot"
+    },
+    {
+      "severity": "high",
+      "finding": "No executable A/B runner currently binds the dev cases to live retrieval outputs",
+      "evidence": "retrieval_evaluation.py provides ranking metrics only; it does not invoke three variants or collect latency/fallback events",
+      "impact": "latency p50/p95 and per-question delta categories cannot be measured"
+    }
+  ],
+  "validation_or_holdout_accessed": false,
+  "commands": [
+    "Get-ChildItem evaluation -Recurse -File",
+    "Get-ChildItem -Path . -Recurse -Filter child_chunks.jsonl",
+    "sqlite3 .run/industrial_rag.db: select ... from knowledge_bases",
+    ".\\.venv\\Scripts\\pytest.exe -q tests/test_hybrid_query_integration.py tests/test_retrieval_evaluation.py tests/test_lightrag_service.py tests/test_rrf_fusion.py tests/test_reranker_runtime.py tests/test_retrieval_trace_v2.py tests/test_runtime_manager_generations.py",
+    ".\\.venv\\Scripts\\ruff.exe check ."
+  ],
+  "test_results": {"focused_pytest": "45 passed", "ruff": "passed"}
+}
