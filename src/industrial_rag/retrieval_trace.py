@@ -53,6 +53,12 @@ class RetrievalTraceItem:
     # intentionally omitted from to_payload() so the persisted diagnostic
     # trace does not retain document content.
     content_excerpt: str = ""
+    sparse_rank: int | None = None
+    sparse_score: float | None = None
+    rrf_rank: int | None = None
+    rrf_score: float | None = None
+    selected: bool | None = None
+    rejected_reason: str | None = None
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -69,6 +75,12 @@ class RetrievalTraceItem:
             "reranked_score": self.reranked_score,
             "used_for_answer": self.used_for_answer,
             "cited_in_answer": self.cited_in_answer,
+            "sparse_rank": self.sparse_rank,
+            "sparse_score": self.sparse_score,
+            "rrf_rank": self.rrf_rank,
+            "rrf_score": self.rrf_score,
+            "selected": self.selected,
+            "rejected_reason": self.rejected_reason,
         }
 
 
