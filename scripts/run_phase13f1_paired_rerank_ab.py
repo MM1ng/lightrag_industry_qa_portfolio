@@ -21,7 +21,7 @@ from industrial_rag.lightrag_service import QueryOptions, _extract_retrieved  # 
 from industrial_rag.vector_collections import VectorBackend  # noqa: E402
 from evaluation.experiments.phase4.rerank.dashscope_reranker import DashScopeQwen3Reranker  # noqa: E402
 from industrial_rag.services.lexical_retrieval import BM25Index, load_lexical_index  # noqa: E402
-from industrial_rag.services.paired_rerank_ab import candidate_fingerprint, validate_paired_inputs  # noqa: E402
+from industrial_rag.services.paired_rerank_ab import candidate_fingerprint, multi_evidence_cases, validate_paired_inputs  # noqa: E402
 from industrial_rag.services.reranker_runtime import RerankerRuntime  # noqa: E402
 from industrial_rag.services.reranker_runtime_adapter import DashScopeRuntimeAdapter  # noqa: E402
 from industrial_rag.services.retrieval_evaluation import evaluate_rankings  # noqa: E402
@@ -56,10 +56,11 @@ def _metadata(cases: list[dict]) -> list[dict]:
 
 
 def _multi_metrics(cases: list[dict], rankings: list[list[str]]) -> dict[str, float | int]:
+    multi_ids = {str(case["question_id"]) for case in multi_evidence_cases(cases)}
     rows = [
         (case, ranking)
         for case, ranking in zip(cases, rankings, strict=True)
-        if case.get("evidence_pattern") == "multi_evidence"
+        if str(case["question_id"]) in multi_ids
     ]
     return {
         "n": len(rows),
@@ -195,7 +196,8 @@ async def _run() -> dict:
             "old_complete@5": gold <= set(arms["qwen3-rerank"]["rankings"][index][:5]), "new_complete@5": gold <= set(arms["qwen3.7-text-rerank"]["rankings"][index][:5]),
             "old_hit@5": bool(gold & set(arms["qwen3-rerank"]["rankings"][index][:5])), "new_hit@5": bool(gold & set(arms["qwen3.7-text-rerank"]["rankings"][index][:5])),
         })
-    multi = [item for item in details if item["evidence_pattern"] == "multi_evidence"]
+    multi_ids = {str(case["question_id"]) for case in multi_evidence_cases(cases)}
+    multi = [item for item in details if str(item["question_id"]) in multi_ids]
     return {
         "final_status": "PAIRED_AB_COMPLETE",
         "dataset_identity": {"fingerprint": preflight_report["dataset_fingerprint"], "question_count": len(cases), "split": "development", "question_ids": [case["question_id"] for case in cases]},

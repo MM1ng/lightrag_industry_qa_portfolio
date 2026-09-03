@@ -32,4 +32,13 @@ def validate_paired_inputs(
         raise ValueError("candidate order mismatch between reranker arms")
 
 
-__all__ = ["candidate_fingerprint", "validate_paired_inputs"]
+def multi_evidence_cases(cases: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Return the fixed multi-evidence denominator from gold, never retrieval."""
+    return [
+        case
+        for case in cases
+        if len({str(item).strip() for item in case.get("expected_child_chunk_ids", ()) if str(item).strip()}) > 1
+    ]
+
+
+__all__ = ["candidate_fingerprint", "multi_evidence_cases", "validate_paired_inputs"]
