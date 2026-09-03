@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from industrial_rag.citation_formatter import Citation, encode_source_ref
+from industrial_rag.citation_formatter import Citation, collect_citations, encode_source_ref
 from industrial_rag.evidence_completion import ContextRecord
 
 _FORBIDDEN_KEYS = frozenset(
@@ -330,7 +330,16 @@ def _optional_text(value: object) -> str | None:
 
 def _lightrag_child_chunk_id(value: Mapping[str, Any]) -> str | None:
     chunk_id = str(value.get("child_chunk_id") or "").strip()
-    return chunk_id or None
+    if chunk_id:
+        return chunk_id
+    # Frozen LightRAG workspaces may preserve the parser-owned source header
+    # in content while exposing only the internal LightRAG `_id`.  Recover the
+    # canonical child ID from that signed provenance header before failing.
+    content = value.get("content")
+    if not isinstance(content, str):
+        return None
+    citations = collect_citations({"data": {"chunks": [{"content": content}]}})
+    return citations[0].chunk_id if citations else None
 
 
 def _is_evidence_identifiable(value: Mapping[str, Any]) -> bool:

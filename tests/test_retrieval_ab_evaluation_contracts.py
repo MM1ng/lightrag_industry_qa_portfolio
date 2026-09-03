@@ -120,3 +120,66 @@ async def test_runner_records_same_generation_and_reranker_fallback(tmp_path: Pa
     assert report["trace_integrity"]["invalid_chunk_ids"] == 0
     assert report["final_status"] == "INCONCLUSIVE"
     assert report["downstream_qa_allowed"] is False
+
+
+@pytest.mark.asyncio
+async def test_dashscope_adapter_translates_frozen_candidates_to_runtime_contract() -> None:
+    from industrial_rag.services.reranker_runtime_adapter import (
+        DashScopeRuntimeAdapter,
+    )
+
+    class FakeProvider:
+        model = "qwen3-rerank"
+
+        async def rerank(self, query, candidates, top_n):
+            assert query == "型号查询"
+            assert [item["chunk_id"] for item in candidates] == ["child-1", "child-2"]
+            assert [item["text"] for item in candidates] == ["2196-R", "2796"]
+            return [
+                type("Result", (), {"chunk_id": "child-2", "rerank_score": 0.9})(),
+                type("Result", (), {"chunk_id": "child-1", "rerank_score": 0.2})(),
+            ]
+
+    adapter = DashScopeRuntimeAdapter(
+        provider=FakeProvider(),
+        chunk_records={
+            "child-1": {"content": "2196-R"},
+            "child-2": {"content": "2796"},
+        },
+    )
+    result = await adapter(
+        "型号查询",
+        [
+            {"child_chunk_id": "child-1", "rrf_score": 0.1},
+            {"child_chunk_id": "child-2", "rrf_score": 0.2},
+        ],
+    )
+    assert result == [
+        ({"child_chunk_id": "child-2"}, 0.9),
+        ({"child_chunk_id": "child-1"}, 0.2),
+    ]
+
+
+def test_ab_runner_direct_script_imports_evaluation_provider() -> None:
+    import subprocess
+    import sys
+
+    script = Path(__file__).resolve().parents[1] / "scripts" / "run_retrieval_foundation_dev_ab.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "--help"],
+        cwd=Path(__file__).resolve().parents[1] / "tests",
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--reranker-model" in result.stdout
+
+
+def test_rerank_delta_classifies_recovery_and_regression() -> None:
+    from industrial_rag.services.retrieval_ab_evaluation import classify_rerank_delta
+
+    assert classify_rerank_delta(None, 5) == "RERANK_IMPROVEMENT"
+    assert classify_rerank_delta(3, 1) == "RERANK_IMPROVEMENT"
+    assert classify_rerank_delta(1, None) == "RERANK_REGRESSION"
+    assert classify_rerank_delta(1, 4) == "RERANK_REGRESSION"
+    assert classify_rerank_delta(2, 2) is None

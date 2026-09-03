@@ -376,7 +376,16 @@ def _build_report(
     from industrial_rag.services.retrieval_evaluation import evaluate_rankings
 
     rankings = {name: [run.ranked_ids for run in values] for name, values in runs.items()}
-    metrics = evaluate_rankings(cases, rankings)
+    case_metadata = [
+        {
+            "difficulty": case.get("difficulty"),
+            "source_document": case.get("source_document") or case.get("source_document_id"),
+            "evidence_pattern": case.get("evidence_pattern"),
+            "question_type": case.get("question_type"),
+        }
+        for case in cases
+    ]
+    metrics = evaluate_rankings(cases, rankings, case_metadata=case_metadata)
     per_question: list[dict[str, Any]] = []
     invalid_trace_ids: set[str] = set()
     for index, case in enumerate(cases):
@@ -388,16 +397,24 @@ def _build_report(
         a1_rank = _best_rank(a1, relevant)
         a2_rank = _best_rank(a2, relevant)
         classifications: list[str] = []
-        if not _hit(a0, relevant, 10) and _hit(a1, relevant, 10):
+        sparse_contribution_ids = {
+            row["child_chunk_id"]
+            for row in a1.rows
+            if any(item.get("source") == "sparse" for item in row.get("contributions", []))
+        }
+        if (
+            not _hit(a0, relevant, 10)
+            and _hit(a1, relevant, 10)
+            and bool(sparse_contribution_ids & relevant)
+        ):
             classifications.append("SPARSE_RECOVERY")
         if a0_rank is not None and a1_rank is not None and a1_rank < a0_rank:
             classifications.append("RRF_IMPROVEMENT")
         elif a0_rank is not None and (a1_rank is None or a1_rank > a0_rank):
             classifications.append("RRF_REGRESSION")
-        if a1_rank is not None and a2_rank is not None and a2_rank < a1_rank:
-            classifications.append("RERANK_IMPROVEMENT")
-        elif a1_rank is not None and (a2_rank is None or a2_rank > a1_rank):
-            classifications.append("RERANK_REGRESSION")
+        rerank_classification = classify_rerank_delta(a1_rank, a2_rank)
+        if rerank_classification is not None:
+            classifications.append(rerank_classification)
         if not classifications:
             classifications.append("NO_MATERIAL_CHANGE")
         per_question.append(
@@ -410,6 +427,8 @@ def _build_report(
                         "top_results": list(run.rows),
                         "hit_at_5": _hit(run, relevant, 5),
                         "hit_at_10": _hit(run, relevant, 10),
+                        "complete_coverage_at_5": relevant <= set(run.ranked_ids[:5]),
+                        "complete_coverage_at_10": relevant <= set(run.ranked_ids[:10]),
                         "latency_ms": run.latency_ms,
                         "fallback_reason": run.fallback_reason,
                     }
@@ -512,6 +531,16 @@ def _best_rank(run: _VariantRun, relevant: set[str]) -> int | None:
     return None
 
 
+def classify_rerank_delta(before: int | None, after: int | None) -> str | None:
+    """Classify evidence rank movement, including a miss-to-hit recovery."""
+
+    if after is not None and (before is None or after < before):
+        return "RERANK_IMPROVEMENT"
+    if before is not None and (after is None or after > before):
+        return "RERANK_REGRESSION"
+    return None
+
+
 __all__ = [
     "EvaluationBlocked",
     "FrozenGeneration",
@@ -520,6 +549,7 @@ __all__ = [
     "assert_development_only",
     "audit_label_compatibility",
     "build_variant_plan",
+    "classify_rerank_delta",
     "load_development_cases",
     "map_expected_evidence",
     "run_ab_evaluation",

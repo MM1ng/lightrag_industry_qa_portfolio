@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from industrial_rag.citation_formatter import Citation, encode_chunk_header
 from industrial_rag.runtime_chunk_hydration import ChunkRegistry, RuntimeChunkHydrator
 
 
@@ -117,4 +118,15 @@ def test_canonical_hydration_keeps_exact_document_id_when_filenames_collide() ->
     )
 
     assert result["data"]["chunks"][0]["document_id"] == "doc-b"
+
+
+def test_canonical_hydration_recovers_child_id_from_parser_source_header() -> None:
+    registry = ChunkRegistry.from_records(
+        [{"chunk_id": "child-a", "document_id": "doc-a", "document_name": "manual.pdf", "page_start": 1, "content": "事实"}],
+        source="frozen snapshot",
+    )
+    result = registry.hydrate_lightrag_evidence(
+        {"data": {"chunks": [{"_id": "internal-id", "content": f"{encode_chunk_header(Citation('manual.pdf', 1, 'child-a'))}\n事实"}]}}
+    )
+    assert result["data"]["chunks"][0]["child_chunk_id"] == "child-a"
 

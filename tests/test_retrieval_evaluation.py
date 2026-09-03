@@ -1,4 +1,7 @@
-from industrial_rag.services.retrieval_evaluation import evaluate_rankings, reciprocal_rank
+from industrial_rag.services.retrieval_evaluation import (
+    evaluate_rankings,
+    reciprocal_rank,
+)
 
 
 def test_reciprocal_rank_uses_first_relevant_result_and_cutoff():
@@ -34,3 +37,23 @@ def test_evaluate_rankings_rejects_mismatched_case_count():
         assert "case count" in str(error)
     else:
         raise AssertionError("expected case count validation")
+
+
+def test_evaluate_rankings_reports_question_hit_and_complete_evidence_coverage():
+    cases = [
+        {"question_type": "procedure", "relevant_chunk_ids": ["a", "b"]},
+        {"question_type": "parameter", "relevant_chunk_ids": ["c"]},
+    ]
+    result = evaluate_rankings(
+        cases,
+        {"A0": [["x", "a", "z", "y", "w", "b"], ["c"]]},
+        case_metadata=[
+            {"difficulty": "HARD", "source_document": "manual-a", "evidence_pattern": "multi_evidence"},
+            {"difficulty": "EASY", "source_document": "manual-b", "evidence_pattern": "single_evidence"},
+        ],
+    )
+    assert result["A0"]["overall"]["question_hit@5"] == 1.0
+    assert result["A0"]["overall"]["complete_evidence_coverage@5"] == 0.5
+    assert result["A0"]["evidence_pattern=multi_evidence"]["question_hit@5"] == 1.0
+    assert result["A0"]["evidence_pattern=multi_evidence"]["complete_evidence_coverage@5"] == 0.0
+    assert result["A0"]["difficulty=HARD"]["n"] == 1
