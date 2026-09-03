@@ -1,0 +1,40 @@
+{
+  "final_status": "TRACE_CONTRACT_READY",
+  "dataset_identity": {
+    "fingerprint": "deac5832de37a95f933267aba10e40215582f1136cd6a60dfabf2d9784385060",
+    "question_count": 24,
+    "split": "Development"
+  },
+  "generation_identity": {
+    "generation_id": "dev-v2-20260902",
+    "corpus_fingerprint": "ed7bf1da6aab63a7afcf88c21480c6e987d231b9de65de2dd0977ce4b4e60e68",
+    "child_manifest_hash": "b1a6334f6e725591e5d796f318e76d3eb77c46fa8c8cc3f6342dc850ad77d1e0"
+  },
+  "validation_or_holdout_accessed": false,
+  "trace_version": "phase13d2-evaluation-trace-v1",
+  "trace_fields": [
+    "query_variants",
+    "retrieval_candidates",
+    "fusion_candidates",
+    "rerank_candidates",
+    "final",
+    "gold_lineage"
+  ],
+  "arms": {
+    "A3.1_original_1_5": {
+      "trace_errors": [],
+      "trace_metrics_match": true,
+      "fusion_ranking_unchanged": true,
+      "final_ranking_unchanged": true
+    },
+    "A3.1_original_2_0": {
+      "trace_errors": [],
+      "trace_metrics_match": true,
+      "fusion_ranking_unchanged": true,
+      "final_ranking_unchanged": true
+    }
+  },
+  "rerun_type": "trace_capture_only; same algorithm/configuration; original artifact preserved",
+  "algorithm_output_unchanged": true,
+  "independent_metric_recompute": true
+}

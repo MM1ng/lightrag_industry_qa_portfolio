@@ -19,6 +19,11 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from dotenv import load_dotenv  # noqa: E402
 from industrial_rag.config import Settings  # noqa: E402
 from industrial_rag.lightrag_service import QueryOptions, _extract_retrieved  # noqa: E402
+from industrial_rag.services.evaluation_trace_contract import (  # noqa: E402
+    build_evaluation_trace,
+    recompute_trace_metrics,
+    validate_trace_contract,
+)
 from industrial_rag.services.lexical_retrieval import BM25Index, load_lexical_index  # noqa: E402
 from industrial_rag.services.multi_query_ablation import (  # noqa: E402
     QueryVariant,
@@ -129,6 +134,52 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             ranking = [row["child_chunk_id"] for row in final]
             rankings.append(ranking)
             expected = list(case["expected_child_chunk_ids"])
+            retrieval_candidates = []
+            for variant, dense_rows, sparse_rows in rows:
+                for retriever_source, source_rows in (("lightrag", dense_rows), ("sparse", sparse_rows)):
+                    for local_rank, item in enumerate(source_rows, 1):
+                        evidence_id = _child_id(item)
+                        if evidence_id:
+                            retrieval_candidates.append({
+                                "query_id": variant.variant_id,
+                                "query_text": variant.query,
+                                "retriever_source": retriever_source,
+                                "evidence_id": evidence_id,
+                                "local_rank": local_rank,
+                                "raw_score": item.get("score"),
+                            })
+            fusion_candidates = [
+                {
+                    "evidence_id": item["child_chunk_id"],
+                    "contributing_queries": sorted({part["variant_id"] for part in item.get("query_contributions", [])}),
+                    "contributing_retrievers": sorted({
+                        source
+                        for variant_id in {part["variant_id"] for part in item.get("query_contributions", [])}
+                        for source, source_rows in (("lightrag", next((r[1] for r in rows if r[0].variant_id == variant_id), [])), ("sparse", next((r[2] for r in rows if r[0].variant_id == variant_id), [])))
+                        if any(_child_id(candidate) == item["child_chunk_id"] for candidate in source_rows)
+                    }),
+                    "fusion_score": item["weighted_rrf_score"],
+                    "fusion_rank": item["rank"],
+                }
+                for item in fused
+            ]
+            final_by_id = {item["child_chunk_id"]: item for item in final}
+            rerank_candidates = [
+                {
+                    "evidence_id": item["child_chunk_id"],
+                    "rerank_input_rank": item["rank"],
+                    "rerank_score": final_by_id.get(item["child_chunk_id"], {}).get("rerank_score"),
+                    "rerank_rank": final_by_id.get(item["child_chunk_id"], {}).get("rank"),
+                }
+                for item in fused
+            ]
+            evaluation_trace = build_evaluation_trace(
+                question_id=case["question_id"], question=case["question"],
+                variants=[{"query_id": variant.variant_id, "query_text": variant.query, "source": "original" if variant.variant_id == "original" else variant.variant_id} for variant, _, _ in rows],
+                retrieval_candidates=retrieval_candidates, fusion_candidates=fusion_candidates,
+                rerank_candidates=rerank_candidates, final_top5=ranking[:5], final_top10=ranking[:10], gold_evidence_ids=expected,
+            )
+            validate_trace_contract(evaluation_trace, raise_on_error=True)
             per_question.append({
                 "question_id": case["question_id"],
                 "expected_evidence": expected,
@@ -146,14 +197,17 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
                     }
                     for child in expected
                 ],
+                "evaluation_trace": evaluation_trace,
             })
         calls = reranker_provider.calls[arm_calls_before:]
         metrics = evaluate_rankings(metrics_cases, {arm_name: rankings}, case_metadata=[{key: case.get(key) for key in ("difficulty", "source_document", "evidence_pattern", "question_type")} for case in metrics_cases])[arm_name]
+        trace_metrics = recompute_trace_metrics([{"expected_evidence": row["expected_evidence"], "final_top5": row["evaluation_trace"]["final"]["top5_evidence_ids"], "final_top10": row["evaluation_trace"]["final"]["top10_evidence_ids"]} for row in per_question])
         a3_rankings = [[item["child_chunk_id"] for item in row["final_top10"]] for row in per_question]
         arms[arm_name] = {
             "original_weight": original_weight,
             "variant_weight": 1.0,
             "metrics": metrics,
+            "trace_metrics": trace_metrics,
             "multi_evidence": {"at5": _multi_complete(a3_rankings, cases, 5), "at10": _multi_complete(a3_rankings, cases, 10)},
             "regression_count_at10_vs_a2": sum(
                 bool(set(a2r[:10]) & set(case["expected_child_chunk_ids"]))
