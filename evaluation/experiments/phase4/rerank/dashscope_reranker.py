@@ -67,6 +67,7 @@ class DashScopeQwen3Reranker:
         self,
         *,
         api_key: str,
+        model: str = "qwen3-rerank",
         workspace_id: str | None = None,
         endpoint: str | None = None,
         timeout: float = 60.0,
@@ -74,8 +75,9 @@ class DashScopeQwen3Reranker:
         config_hash: str = "",
         commit: str = "unknown",
     ) -> None:
-        if self.model not in ALLOWED_RERANK_MODELS:
-            raise RerankConfigurationError(f"model {self.model!r} not allowed")
+        if model not in ALLOWED_RERANK_MODELS:
+            raise RerankConfigurationError(f"model {model!r} not allowed")
+        self.model = model
         self._api_key = api_key
         self._workspace_id = workspace_id
         if endpoint:
@@ -133,6 +135,18 @@ class DashScopeQwen3Reranker:
             ]
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def candidate_fingerprint(self, query: str, candidates: list[dict[str, Any]]) -> str:
+        """Stable identity for one ordered query/candidate input."""
+        payload = {
+            "query_hash": _sha256_text(query),
+            "candidate_ids": [str(c.get("chunk_id")) for c in candidates],
+            "candidate_text_hashes": [
+                str(c.get("child_text_hash") or c.get("text_hash") or "")
+                for c in candidates
+            ],
+        }
+        return _sha256_text(json.dumps(payload, ensure_ascii=False, sort_keys=True))
 
     def _legacy_cache_key(
         self, query: str, candidates: list[dict[str, Any]], top_n: int
@@ -221,6 +235,19 @@ class DashScopeQwen3Reranker:
                     "latency": cached.get("latency"),
                     "status": "ok",
                     "error": None,
+                    "candidate_fingerprint": self.candidate_fingerprint(query, candidates),
+                    "input_candidate_ids": [str(c.get("chunk_id")) for c in candidates],
+                    "input_order": list(range(1, len(candidates) + 1)),
+                    "output_candidate_ids": [
+                        str(candidates[index].get("chunk_id"))
+                        for index in cached.get("rerank_order", [])
+                    ],
+                    "output_order": list(range(1, len(cached.get("rerank_order", [])) + 1)),
+                    "scores": cached.get("scores", []),
+                    "latency_ms": cached.get("latency", 0.0) * 1000,
+                    "request_status": "ok",
+                    "fallback_used": False,
+                    "error_type": None,
                 }
             )
             return self._map_results(cached["rerank_order"], cached["scores"], candidates, query)
@@ -313,6 +340,15 @@ class DashScopeQwen3Reranker:
             "created_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
             "commit": self._commit,
             "config_hash": self._config_hash,
+            "candidate_fingerprint": self.candidate_fingerprint(query, candidates),
+            "input_candidate_ids": [str(c.get("chunk_id")) for c in candidates],
+            "input_order": list(range(1, len(candidates) + 1)),
+            "output_candidate_ids": [str(candidates[index].get("chunk_id")) for index in rerank_order],
+            "output_order": list(range(1, len(rerank_order) + 1)),
+            "latency_ms": round(time.monotonic() - started, 3) * 1000,
+            "request_status": "ok",
+            "fallback_used": False,
+            "error_type": None,
         }
         self._cache[payload_hash] = entry
         if self._cache_path is not None:
@@ -331,6 +367,16 @@ class DashScopeQwen3Reranker:
                 "latency": entry["latency"],
                 "status": "ok",
                 "error": None,
+                "candidate_fingerprint": entry["candidate_fingerprint"],
+                "input_candidate_ids": entry["input_candidate_ids"],
+                "input_order": entry["input_order"],
+                "output_candidate_ids": entry["output_candidate_ids"],
+                "output_order": entry["output_order"],
+                "scores": entry["scores"],
+                "latency_ms": entry["latency_ms"],
+                "request_status": "ok",
+                "fallback_used": False,
+                "error_type": None,
             }
         )
         return self._map_results(rerank_order, rerank_scores, candidates, query)

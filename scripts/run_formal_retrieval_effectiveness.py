@@ -135,6 +135,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             reranker_provider=reranker_adapter,
             reranker_provider_name="aliyun_model_studio",
             reranker_model="qwen3-rerank",
+            allow_reranker_fallback=False,
         )
     finally:
         await service.close()

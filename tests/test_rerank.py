@@ -117,6 +117,7 @@ def test_rerank_payload_matches_official_schema() -> None:
 
 def test_exact_model_required_and_latest_rejected() -> None:
     assert resolve_rerank_model({"RERANK_MODEL": "qwen3-rerank"}) == "qwen3-rerank"
+    assert resolve_rerank_model({"RERANK_MODEL": "qwen3.7-text-rerank"}) == "qwen3.7-text-rerank"
     with pytest.raises(RerankConfigurationError):
         resolve_rerank_model({"RERANK_MODEL": "latest"})
     with pytest.raises(RerankConfigurationError):
@@ -126,6 +127,36 @@ def test_exact_model_required_and_latest_rejected() -> None:
     with pytest.raises(RerankConfigurationError):
         resolve_rerank_model({"RERANK_MODEL": "qwen3-vl-rerank"})
     assert resolve_rerank_model({"RERANK_MODEL": ""}) is None
+
+
+def test_qwen37_payload_preserves_official_text_rerank_schema() -> None:
+    assert build_rerank_payload(
+        model="qwen3.7-text-rerank",
+        query="问题",
+        documents=["文档1", "文档2"],
+        top_n=2,
+    ) == {
+        "model": "qwen3.7-text-rerank",
+        "input": {"query": "问题", "documents": ["文档1", "文档2"]},
+        "parameters": {"top_n": 2, "return_documents": False},
+    }
+
+
+def test_qwen37_provider_keeps_model_identity_in_results() -> None:
+    reranker = DashScopeQwen3Reranker(
+        api_key="dummy-not-a-secret", model="qwen3.7-text-rerank"
+    )
+    assert reranker.model == "qwen3.7-text-rerank"
+    assert reranker.summary()["model"] == "qwen3.7-text-rerank"
+
+
+def test_provider_artifact_identity_covers_query_and_ordered_candidates() -> None:
+    reranker = _reranker()
+    candidates = _candidates(2)
+    fingerprint = reranker.candidate_fingerprint("问题", candidates)
+    assert fingerprint == reranker.candidate_fingerprint("问题", candidates)
+    assert fingerprint != reranker.candidate_fingerprint("另一个问题", candidates)
+    assert fingerprint != reranker.candidate_fingerprint("问题", list(reversed(candidates)))
 
 
 def test_gate_blocks_when_model_missing() -> None:

@@ -13,6 +13,10 @@ RerankProvider = Callable[
 ]
 
 
+class RerankRuntimeBlocked(RuntimeError):
+    """Raised when strict evaluation cannot produce a valid rerank result."""
+
+
 @dataclass(frozen=True, slots=True)
 class RerankerResult:
     candidates: tuple[dict[str, Any], ...]
@@ -31,12 +35,14 @@ class RerankerRuntime:
         provider: RerankProvider | None,
         timeout_seconds: float = 2.0,
         provider_name: str = "custom",
+        allow_fallback: bool = True,
     ) -> None:
         if timeout_seconds <= 0:
             raise ValueError("reranker timeout must be positive")
         self._provider = provider
         self._timeout_seconds = timeout_seconds
         self._provider_name = provider_name
+        self._allow_fallback = allow_fallback
 
     async def rerank(
         self,
@@ -50,6 +56,8 @@ class RerankerRuntime:
         started = time.perf_counter()
         baseline = tuple(dict(candidate) for candidate in candidates)
         if self._provider is None:
+            if not self._allow_fallback:
+                raise RerankRuntimeBlocked("provider_unavailable")
             return self._fallback(baseline[:limit], started, "provider_unavailable")
         try:
             ranked = await asyncio.wait_for(
@@ -73,6 +81,8 @@ class RerankerRuntime:
                 enriched["rerank_score"] = float(score)
                 scored.append((index, enriched, float(score)))
             if not scored:
+                if not self._allow_fallback:
+                    raise RerankRuntimeBlocked("invalid_provider_result")
                 return self._fallback(baseline[:limit], started, "invalid_provider_result")
             scored.sort(key=lambda item: (-item[2], item[0]))
             final = tuple(item[1] for item in scored[:limit])
@@ -85,9 +95,15 @@ class RerankerRuntime:
                 final_count=len(final),
                 fallback_reason=None,
             )
+        except RerankRuntimeBlocked:
+            raise
         except TimeoutError:
+            if not self._allow_fallback:
+                raise RerankRuntimeBlocked("timeout")
             return self._fallback(baseline[:limit], started, "timeout")
         except Exception:
+            if not self._allow_fallback:
+                raise RerankRuntimeBlocked("provider_failure")
             return self._fallback(baseline[:limit], started, "provider_failure")
 
     def _fallback(
@@ -104,4 +120,4 @@ class RerankerRuntime:
         )
 
 
-__all__ = ["RerankProvider", "RerankerResult", "RerankerRuntime"]
+__all__ = ["RerankProvider", "RerankRuntimeBlocked", "RerankerResult", "RerankerRuntime"]

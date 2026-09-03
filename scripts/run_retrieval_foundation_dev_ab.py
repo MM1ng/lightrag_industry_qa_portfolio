@@ -80,6 +80,7 @@ def _build_dashscope_runtime_provider(
         )
     provider = DashScopeQwen3Reranker(
         api_key=api_key,
+        model=resolved_model,
         timeout=timeout_seconds,
         config_hash="development-ab-runtime",
         commit="unknown",

@@ -252,6 +252,7 @@ async def run_ab_evaluation(
     reranker_provider_name: str = "external",
     reranker_model: str | None = None,
     reranker_timeout_seconds: float = 2.0,
+    allow_reranker_fallback: bool = True,
     candidate_top_n: int = 20,
     final_top_k: int = 10,
     rrf_k: int = 60,
@@ -314,6 +315,7 @@ async def run_ab_evaluation(
             provider=reranker_provider,
             timeout_seconds=reranker_timeout_seconds,
             provider_name=reranker_provider_name,
+            allow_fallback=allow_reranker_fallback,
         ).rerank(question, fused_rows, limit=final_top_k)
         rerank_fallback_count += int(rerank_result.fallback_reason is not None)
         a2_rows = [dict(row) for row in rerank_result.candidates]

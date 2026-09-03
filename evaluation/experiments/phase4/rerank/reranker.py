@@ -20,7 +20,7 @@ class RerankConfigurationError(RuntimeError):
     pass
 
 
-ALLOWED_RERANK_MODELS = frozenset({"qwen3-rerank"})
+ALLOWED_RERANK_MODELS = frozenset({"qwen3-rerank", "qwen3.7-text-rerank"})
 _ALIAS_WORDS = frozenset({"latest", "auto", "default"})
 
 

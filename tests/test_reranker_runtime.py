@@ -1,7 +1,11 @@
 import asyncio
 
 import pytest
-from industrial_rag.services.reranker_runtime import RerankerResult, RerankerRuntime
+from industrial_rag.services.reranker_runtime import (
+    RerankerResult,
+    RerankerRuntime,
+    RerankRuntimeBlocked,
+)
 
 
 def test_reranker_provider_success_returns_final_order_and_metadata():
@@ -50,6 +54,43 @@ def test_reranker_timeout_falls_back_without_raising():
     assert [item["child_chunk_id"] for item in result.candidates] == ["a"]
     assert result.enabled is False
     assert result.fallback_reason == "timeout"
+
+
+def test_strict_runtime_blocks_provider_failure_without_fallback():
+    async def provider(_query, _candidates):
+        raise RuntimeError("provider unavailable")
+
+    with pytest.raises(RerankRuntimeBlocked, match="provider_failure"):
+        asyncio.run(
+            RerankerRuntime(provider=provider, allow_fallback=False).rerank(
+                "q", [{"child_chunk_id": "a"}], limit=1
+            )
+        )
+
+
+def test_strict_runtime_blocks_invalid_provider_result_without_fallback():
+    async def provider(_query, _candidates):
+        return []
+
+    with pytest.raises(RerankRuntimeBlocked, match="invalid_provider_result"):
+        asyncio.run(
+            RerankerRuntime(provider=provider, allow_fallback=False).rerank(
+                "q", [{"child_chunk_id": "a"}], limit=1
+            )
+        )
+
+
+def test_strict_runtime_blocks_timeout_without_fallback():
+    async def provider(_query, _candidates):
+        await asyncio.sleep(0.05)
+        return []
+
+    with pytest.raises(RerankRuntimeBlocked, match="timeout"):
+        asyncio.run(
+            RerankerRuntime(
+                provider=provider, timeout_seconds=0.001, allow_fallback=False
+            ).rerank("q", [{"child_chunk_id": "a"}], limit=1)
+        )
 
 
 def test_reranker_rejects_non_positive_limit():
