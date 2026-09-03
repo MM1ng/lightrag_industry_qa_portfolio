@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import asyncio
 
-from industrial_rag.services.multi_query_ablation import QueryVariant, run_a3_candidates
+from industrial_rag.services.multi_query_ablation import (
+    QueryVariant,
+    run_a3_candidates,
+    weighted_query_level_rrf,
+)
 
 
 def test_a3_unions_deduplicates_and_reranks_once() -> None:
@@ -55,3 +59,27 @@ def test_a3_unions_deduplicates_and_reranks_once() -> None:
     assert result.first_seen_by_child["gold-b"]["variant_id"] == "parameter"
     assert result.first_seen_by_child["gold-b"]["first_rank"] == 1
     assert set(result.union_child_ids) == {"gold-a", "gold-b", "other"}
+
+
+def test_weighted_query_level_rrf_uses_each_query_local_rank() -> None:
+    rows = (
+        (
+            QueryVariant("original", "原始"),
+            [{"child_chunk_id": "gold", "rank": 1}],
+            [],
+        ),
+        (
+            QueryVariant("variant_1", "变体"),
+            [{"child_chunk_id": "noise", "rank": 1}, {"child_chunk_id": "gold", "rank": 2}],
+            [],
+        ),
+    )
+    ranked = weighted_query_level_rrf(
+        rows,
+        query_weights={"original": 2.0, "variant_1": 1.0},
+        rrf_k=60,
+        limit=2,
+        generation_chunk_ids={"gold", "noise"},
+    )
+    assert [item["child_chunk_id"] for item in ranked] == ["gold", "noise"]
+    assert ranked[0]["weighted_rrf_score"] > ranked[1]["weighted_rrf_score"]

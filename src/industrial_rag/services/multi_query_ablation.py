@@ -89,6 +89,56 @@ def _union_by_source(
     return dense_union, sparse_union, tuple(dict.fromkeys([row["child_chunk_id"] for row in dense_union + sparse_union])), first_seen
 
 
+def weighted_query_level_rrf(
+    rows_by_variant: Sequence[
+        tuple[QueryVariant, Sequence[Mapping[str, Any]], Sequence[Mapping[str, Any]]]
+    ],
+    *,
+    query_weights: Mapping[str, float],
+    rrf_k: int,
+    limit: int,
+    generation_chunk_ids: set[str] | frozenset[str],
+) -> list[dict[str, Any]]:
+    """Fuse per-query local RRF lists with a weight before final reranking."""
+
+    if limit <= 0:
+        return []
+    scores: dict[str, float] = {}
+    provenance: dict[str, list[dict[str, Any]]] = {}
+    for variant, dense_raw, sparse_raw in rows_by_variant:
+        weight = float(query_weights.get(variant.variant_id, 1.0))
+        if weight <= 0:
+            raise ValueError("query weights must be positive")
+        dense_rows = _normalize_rows(dense_raw, set(generation_chunk_ids), source="lightrag", variant=variant)
+        sparse_rows = _normalize_rows(sparse_raw, set(generation_chunk_ids), source="sparse", variant=variant)
+        local = reciprocal_rank_fusion(
+            {"lightrag": dense_rows, "sparse": sparse_rows}, k=rrf_k, limit=None
+        )
+        for local_rank, candidate in enumerate(local, 1):
+            child_id = candidate.child_chunk_id
+            contribution = weight / (rrf_k + local_rank)
+            scores[child_id] = scores.get(child_id, 0.0) + contribution
+            provenance.setdefault(child_id, []).append(
+                {
+                    "variant_id": variant.variant_id,
+                    "variant_query": variant.query,
+                    "local_rank": local_rank,
+                    "weight": weight,
+                    "contribution": contribution,
+                }
+            )
+    ordered = sorted(scores, key=lambda child_id: (-scores[child_id], child_id))[:limit]
+    return [
+        {
+            "child_chunk_id": child_id,
+            "weighted_rrf_score": scores[child_id],
+            "rank": rank,
+            "query_contributions": provenance[child_id],
+        }
+        for rank, child_id in enumerate(ordered, 1)
+    ]
+
+
 async def run_a3_candidates(
     *,
     query_variants: Sequence[QueryVariant],
@@ -170,4 +220,9 @@ async def run_a3_candidates(
     )
 
 
-__all__ = ["A3CandidateRun", "QueryVariant", "run_a3_candidates"]
+__all__ = [
+    "A3CandidateRun",
+    "QueryVariant",
+    "run_a3_candidates",
+    "weighted_query_level_rrf",
+]

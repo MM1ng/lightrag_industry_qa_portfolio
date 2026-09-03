@@ -9,6 +9,7 @@ from scripts.run_phase13b_multi_query_ablation import (
     select_phase13a_multi_misses,
     validate_experiment_identity,
 )
+from scripts.run_phase13c1_weighted_rrf_ablation import _child_id
 
 
 def test_parse_variant_response_accepts_bounded_variant_list() -> None:
@@ -40,3 +41,8 @@ def test_validate_identity_rejects_mismatch() -> None:
             expected_fingerprint="expected",
             expected_count=24,
         )
+
+
+def test_child_id_accepts_lightrag_chunk_id() -> None:
+    assert _child_id({"chunk_id": "child-1"}) == "child-1"
+    assert _child_id({"child_chunk_id": "child-2"}) == "child-2"
