@@ -1,0 +1,32 @@
+{
+  "contract_version": "phase13e0r-a2-identity-v1",
+  "authority": "formal_development_effectiveness_2026-09-03.json",
+  "authority_sha256": "9d4839a4c5fe8717877c7d92c206149a137997e20f1f3c957c5f4ffdc08c3bb3",
+  "dataset_fingerprint": "deac5832de37a95f933267aba10e40215582f1136cd6a60dfabf2d9784385060",
+  "generation_id": "dev-v2-20260902",
+  "generation_identity": {
+    "generation_id": "dev-v2-20260902",
+    "corpus_fingerprint": "ed7bf1da6aab63a7afcf88c21480c6e987d231b9de65de2dd0977ce4b4e60e68",
+    "child_manifest_hash": "b1a6334f6e725591e5d796f318e76d3eb77c46fa8c8cc3f6342dc850ad77d1e0",
+    "child_count": 453,
+    "lexical_index_fingerprint": "6a1fd370918362422d7539f60265cf3992e06f1f9ddd5c69d9e8545c3d7f1c13"
+  },
+  "retrieval_config": {
+    "candidate_top_n": 20,
+    "final_top_k": 10,
+    "rrf_k": 60
+  },
+  "reranker": {
+    "calls": 24,
+    "success_count": 23,
+    "provider": "aliyun_model_studio",
+    "model": "qwen3-rerank",
+    "timeout_seconds": 2.0,
+    "external_result_determinism": "not_guaranteed",
+    "fallback_count": 1,
+    "fallback_rate": 0.041666666666666664
+  },
+  "evaluator": "industrial_rag.services.retrieval_evaluation.evaluate_rankings",
+  "live_capture_may_not_replace_authority": true,
+  "replay_required_when_external_reranker_differs": true
+}

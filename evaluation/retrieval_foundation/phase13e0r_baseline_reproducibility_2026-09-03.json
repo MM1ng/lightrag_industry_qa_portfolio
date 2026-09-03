@@ -1,0 +1,1172 @@
+{
+  "final_status": "BASELINE_REPRODUCIBILITY_BLOCKED",
+  "primary_cause": "NONDETERMINISTIC_RUNTIME",
+  "secondary_causes": [
+    "RERANK_CONFIG_DRIFT"
+  ],
+  "identity_flags": {
+    "identity_match": true,
+    "config_match": true,
+    "evaluator_match": true,
+    "ranking_match": false
+  },
+  "dataset_identity": {
+    "path": "D:\\基于Lightrag的工业手册问答系统\\lightrag_industry_qa_portfolio-retrieval-foundation-upgrade\\evaluation\\retrieval_foundation\\retrieval_foundation_dev_v2.jsonl",
+    "fingerprint": "deac5832de37a95f933267aba10e40215582f1136cd6a60dfabf2d9784385060",
+    "question_count": 24
+  },
+  "generation_identity": {
+    "generation_id": "dev-v2-20260902",
+    "corpus_fingerprint": "ed7bf1da6aab63a7afcf88c21480c6e987d231b9de65de2dd0977ce4b4e60e68",
+    "child_manifest_hash": "b1a6334f6e725591e5d796f318e76d3eb77c46fa8c8cc3f6342dc850ad77d1e0",
+    "child_count": 453,
+    "lexical_index_fingerprint": "6a1fd370918362422d7539f60265cf3992e06f1f9ddd5c69d9e8545c3d7f1c13"
+  },
+  "artifact_hashes": {
+    "baseline": "9d4839a4c5fe8717877c7d92c206149a137997e20f1f3c957c5f4ffdc08c3bb3",
+    "capture": "d73e6e38bb1376cf8bdb4c45f05d18c6a15bd1705324db666f3cec6f26c6e936"
+  },
+  "canonical_metrics": {
+    "n": 24,
+    "recall@5": 0.8177083333333334,
+    "recall@10": 0.8312499999999999,
+    "mrr@5": 0.8937499999999999,
+    "mrr@10": 0.8937499999999999,
+    "question_hit@5": 1.0,
+    "question_hit@10": 1.0,
+    "complete_evidence_coverage@5": 0.75,
+    "complete_evidence_coverage@10": 0.75
+  },
+  "capture_metrics": {
+    "n": 24,
+    "recall@5": 0.8260416666666667,
+    "recall@10": 0.834375,
+    "mrr@5": 0.8833333333333333,
+    "mrr@10": 0.8902777777777778,
+    "question_hit@5": 0.9583333333333334,
+    "question_hit@10": 1.0,
+    "complete_evidence_coverage@5": 0.75,
+    "complete_evidence_coverage@10": 0.75
+  },
+  "metrics_match": false,
+  "ranking_match": false,
+  "question_differences": [
+    {
+      "question_id": "S014",
+      "old_top5": [
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+        "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+        "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+        "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-24b95119c8293288-000",
+        "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+        "cchunk-pymupdf-v1-83d62dcdb9835c1f-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+        "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-24b95119c8293288-000",
+        "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+        "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000"
+      ],
+      "top5_match": true,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "S015",
+      "old_top5": [
+        "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+        "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+        "cchunk-pymupdf-v1-78b62811ac79e6c1-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+        "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+        "cchunk-pymupdf-v1-f997c995a333b4ae-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+        "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+        "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+        "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+        "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+        "cchunk-pymupdf-v1-e538966686c111ea-000",
+        "cchunk-pymupdf-v1-fe809800f501116a-000",
+        "cchunk-pymupdf-v1-eb3236bb50e802d1-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+        "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+        "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+        "cchunk-pymupdf-v1-18c85b3ecf9f1f7f-000",
+        "cchunk-pymupdf-v1-fe809800f501116a-000",
+        "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+        "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "S006",
+      "old_top5": [
+        "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-e538966686c111ea-000",
+        "cchunk-pymupdf-v1-cf44582c25e3be91-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-cf44582c25e3be91-000",
+        "cchunk-pymupdf-v1-90a6de4f7ec8d47b-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-e538966686c111ea-000",
+        "cchunk-pymupdf-v1-cf44582c25e3be91-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-72dc92e40727047d-000",
+        "cchunk-pymupdf-v1-6f14788cb29e00e4-000",
+        "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+        "cchunk-pymupdf-v1-f13e5d0f9df649e2-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-cf44582c25e3be91-000",
+        "cchunk-pymupdf-v1-90a6de4f7ec8d47b-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-6f14788cb29e00e4-000",
+        "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-8cb55fe1213f5d02-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "S003",
+      "old_top5": [
+        "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-43c97208361c8b22-000",
+        "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+        "cchunk-pymupdf-v1-4c1e5e920eabd4ca-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-43c97208361c8b22-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-43c97208361c8b22-000",
+        "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+        "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+        "cchunk-pymupdf-v1-ee489855cc2e58b6-000",
+        "cchunk-pymupdf-v1-fe809800f501116a-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+        "cchunk-pymupdf-v1-4c1e5e920eabd4ca-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-43c97208361c8b22-000",
+        "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+        "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+        "cchunk-pymupdf-v1-485805a0b0552b8d-000",
+        "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+        "cchunk-pymupdf-v1-5ea5c41790ab805a-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": false
+    },
+    {
+      "question_id": "S016",
+      "old_top5": [
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+        "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+        "cchunk-pymupdf-v1-e538966686c111ea-000",
+        "cchunk-pymupdf-v1-f13e5d0f9df649e2-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+        "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+        "cchunk-pymupdf-v1-3e1fbcf5e77b731f-000",
+        "cchunk-pymupdf-v1-6ce95ff8b1af08af-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+        "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+        "cchunk-pymupdf-v1-e538966686c111ea-000",
+        "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+        "cchunk-pymupdf-v1-fe809800f501116a-000",
+        "cchunk-pymupdf-v1-d2d1bfc9260c23a0-000",
+        "cchunk-pymupdf-v1-72dc92e40727047d-000",
+        "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+        "cchunk-pymupdf-v1-3de8aa9caa68e922-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+        "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+        "cchunk-pymupdf-v1-3e1fbcf5e77b731f-000",
+        "cchunk-pymupdf-v1-6ce95ff8b1af08af-000",
+        "cchunk-pymupdf-v1-0746dbb63847a62a-000",
+        "cchunk-pymupdf-v1-ce93a6a3ed3b805d-000",
+        "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+        "cchunk-pymupdf-v1-fe809800f501116a-000",
+        "cchunk-pymupdf-v1-075079781e245894-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "S011",
+      "old_top5": [
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-285811f368cf8a64-000",
+        "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+        "cchunk-pymupdf-v1-3c48ca477586c617-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-285811f368cf8a64-000",
+        "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+        "cchunk-pymupdf-v1-ca26b2e71ba99abe-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-285811f368cf8a64-000",
+        "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+        "cchunk-pymupdf-v1-887daf03f3e72f8c-000",
+        "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+        "cchunk-pymupdf-v1-fe809800f501116a-000",
+        "cchunk-pymupdf-v1-5204df83f2867fee-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-285811f368cf8a64-000",
+        "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+        "cchunk-pymupdf-v1-ca26b2e71ba99abe-000",
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+        "cchunk-pymupdf-v1-ec37ee06eaf56b40-000",
+        "cchunk-pymupdf-v1-387e3de8ee9b066f-000",
+        "cchunk-pymupdf-v1-887daf03f3e72f8c-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-001",
+      "old_top5": [
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+        "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+        "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+        "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-24b95119c8293288-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+        "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+        "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+        "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-24b95119c8293288-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+        "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+        "cchunk-pymupdf-v1-46817ac8a36f3301-000"
+      ],
+      "top5_match": true,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-002",
+      "old_top5": [
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+        "cchunk-pymupdf-v1-b8d299b0f9bed299-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+        "cchunk-pymupdf-v1-b8d299b0f9bed299-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+        "cchunk-pymupdf-v1-b8d299b0f9bed299-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-29247897fcf1016b-000",
+        "cchunk-pymupdf-v1-d304378193e1a750-000",
+        "cchunk-pymupdf-v1-226728a01042056b-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+        "cchunk-pymupdf-v1-b8d299b0f9bed299-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-dbc7a03b76048b03-000",
+        "cchunk-pymupdf-v1-8198e38bb184b987-000",
+        "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+        "cchunk-pymupdf-v1-29247897fcf1016b-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-003",
+      "old_top5": [
+        "cchunk-pymupdf-v1-e538966686c111ea-000",
+        "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+        "cchunk-pymupdf-v1-cbe7e23b0ba4f07d-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-e538966686c111ea-000",
+        "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+        "cchunk-pymupdf-v1-cbe7e23b0ba4f07d-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-e538966686c111ea-000",
+        "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+        "cchunk-pymupdf-v1-cbe7e23b0ba4f07d-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-7192fa1959afa851-000",
+        "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+        "cchunk-pymupdf-v1-c869dede284f9e15-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-7733ed3c6f455ef6-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-e538966686c111ea-000",
+        "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+        "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+        "cchunk-pymupdf-v1-cbe7e23b0ba4f07d-000",
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-7192fa1959afa851-000",
+        "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+        "cchunk-pymupdf-v1-c869dede284f9e15-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-7733ed3c6f455ef6-000"
+      ],
+      "top5_match": true,
+      "top10_match": true,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-004",
+      "old_top5": [
+        "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+        "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+        "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+        "cchunk-pymupdf-v1-5ea5c41790ab805a-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+        "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+        "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+        "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-43c97208361c8b22-000",
+        "cchunk-pymupdf-v1-ee489855cc2e58b6-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+        "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+        "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+        "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-43c97208361c8b22-000",
+        "cchunk-pymupdf-v1-485805a0b0552b8d-000",
+        "cchunk-pymupdf-v1-cc6c857df70a4a09-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-005",
+      "old_top5": [
+        "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+        "cchunk-pymupdf-v1-285811f368cf8a64-000",
+        "cchunk-pymupdf-v1-8248fd274f74a545-000",
+        "cchunk-pymupdf-v1-82b1cd3c8562d093-000",
+        "cchunk-pymupdf-v1-b67105f478c0549e-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+        "cchunk-pymupdf-v1-285811f368cf8a64-000",
+        "cchunk-pymupdf-v1-8248fd274f74a545-000",
+        "cchunk-pymupdf-v1-82b1cd3c8562d093-000",
+        "cchunk-pymupdf-v1-b67105f478c0549e-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+        "cchunk-pymupdf-v1-285811f368cf8a64-000",
+        "cchunk-pymupdf-v1-8248fd274f74a545-000",
+        "cchunk-pymupdf-v1-82b1cd3c8562d093-000",
+        "cchunk-pymupdf-v1-b67105f478c0549e-000",
+        "cchunk-pymupdf-v1-4cd24e8fdc8ae1a5-000",
+        "cchunk-pymupdf-v1-0f88a9f22f7ca117-000",
+        "cchunk-pymupdf-v1-d358c2a60824cb3a-000",
+        "cchunk-pymupdf-v1-e116eb96bcdf7847-000",
+        "cchunk-pymupdf-v1-5492c43ea549477a-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+        "cchunk-pymupdf-v1-285811f368cf8a64-000",
+        "cchunk-pymupdf-v1-8248fd274f74a545-000",
+        "cchunk-pymupdf-v1-82b1cd3c8562d093-000",
+        "cchunk-pymupdf-v1-b67105f478c0549e-000",
+        "cchunk-pymupdf-v1-4cd24e8fdc8ae1a5-000",
+        "cchunk-pymupdf-v1-0f88a9f22f7ca117-000",
+        "cchunk-pymupdf-v1-d358c2a60824cb3a-000",
+        "cchunk-pymupdf-v1-ec37ee06eaf56b40-000",
+        "cchunk-pymupdf-v1-e116eb96bcdf7847-000"
+      ],
+      "top5_match": true,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-006",
+      "old_top5": [
+        "cchunk-pymupdf-v1-7192fa1959afa851-000",
+        "cchunk-pymupdf-v1-6c84270736d64bea-000",
+        "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+        "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+        "cchunk-pymupdf-v1-d523dd950c22c321-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-7192fa1959afa851-000",
+        "cchunk-pymupdf-v1-6c84270736d64bea-000",
+        "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+        "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+        "cchunk-pymupdf-v1-d523dd950c22c321-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-7192fa1959afa851-000",
+        "cchunk-pymupdf-v1-6c84270736d64bea-000",
+        "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+        "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+        "cchunk-pymupdf-v1-d523dd950c22c321-000",
+        "cchunk-pymupdf-v1-8198e38bb184b987-000",
+        "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+        "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+        "cchunk-pymupdf-v1-241bca917a4f2625-000",
+        "cchunk-pymupdf-v1-dbc7a03b76048b03-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-7192fa1959afa851-000",
+        "cchunk-pymupdf-v1-6c84270736d64bea-000",
+        "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+        "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+        "cchunk-pymupdf-v1-d523dd950c22c321-000",
+        "cchunk-pymupdf-v1-8198e38bb184b987-000",
+        "cchunk-pymupdf-v1-c1781e27571b5878-000",
+        "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+        "cchunk-pymupdf-v1-241bca917a4f2625-000",
+        "cchunk-pymupdf-v1-dbc7a03b76048b03-000"
+      ],
+      "top5_match": true,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-007",
+      "old_top5": [
+        "cchunk-pymupdf-v1-241bca917a4f2625-000",
+        "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+        "cchunk-pymupdf-v1-8198e38bb184b987-000",
+        "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+        "cchunk-pymupdf-v1-988dcff223bf0cfc-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-241bca917a4f2625-000",
+        "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+        "cchunk-pymupdf-v1-8198e38bb184b987-000",
+        "cchunk-pymupdf-v1-dbc7a03b76048b03-000",
+        "cchunk-pymupdf-v1-0993bee22239dfa9-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-241bca917a4f2625-000",
+        "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+        "cchunk-pymupdf-v1-8198e38bb184b987-000",
+        "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+        "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+        "cchunk-pymupdf-v1-d523dd950c22c321-000",
+        "cchunk-pymupdf-v1-6031ad5e15a73119-000",
+        "cchunk-pymupdf-v1-226728a01042056b-000",
+        "cchunk-pymupdf-v1-20b5442f699e315c-000",
+        "cchunk-pymupdf-v1-b16dfe0a30592b02-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-241bca917a4f2625-000",
+        "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+        "cchunk-pymupdf-v1-8198e38bb184b987-000",
+        "cchunk-pymupdf-v1-dbc7a03b76048b03-000",
+        "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+        "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+        "cchunk-pymupdf-v1-d523dd950c22c321-000",
+        "cchunk-pymupdf-v1-6031ad5e15a73119-000",
+        "cchunk-pymupdf-v1-226728a01042056b-000",
+        "cchunk-pymupdf-v1-20b5442f699e315c-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-008",
+      "old_top5": [
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+        "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+        "cchunk-pymupdf-v1-5492c43ea549477a-000",
+        "cchunk-pymupdf-v1-485805a0b0552b8d-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+        "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-5492c43ea549477a-000",
+        "cchunk-pymupdf-v1-485805a0b0552b8d-000",
+        "cchunk-pymupdf-v1-f340ff3c046586a6-000",
+        "cchunk-pymupdf-v1-ec37ee06eaf56b40-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+        "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+        "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+        "cchunk-pymupdf-v1-5492c43ea549477a-000",
+        "cchunk-pymupdf-v1-485805a0b0552b8d-000",
+        "cchunk-pymupdf-v1-f340ff3c046586a6-000",
+        "cchunk-pymupdf-v1-ec37ee06eaf56b40-000",
+        "cchunk-pymupdf-v1-8248fd274f74a545-000",
+        "cchunk-pymupdf-v1-387e3de8ee9b066f-000",
+        "cchunk-pymupdf-v1-b67105f478c0549e-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-009",
+      "old_top5": [
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-6573fac2b717a23e-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-6573fac2b717a23e-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+        "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+        "cchunk-pymupdf-v1-6d168c23d348a954-000",
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-24b95119c8293288-000",
+        "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+        "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+        "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+        "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+        "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+        "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+        "cchunk-pymupdf-v1-6d168c23d348a954-000",
+        "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+        "cchunk-pymupdf-v1-24b95119c8293288-000",
+        "cchunk-pymupdf-v1-2fa7e4d15d2fbc04-000"
+      ],
+      "top5_match": true,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-010",
+      "old_top5": [
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "cchunk-pymupdf-v1-7227e2460f83a192-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "cchunk-pymupdf-v1-7227e2460f83a192-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "cchunk-pymupdf-v1-7227e2460f83a192-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "cchunk-pymupdf-v1-4e096a6fd9a0af8e-001",
+        "cchunk-pymupdf-v1-340b63862adc52b0-000",
+        "cchunk-pymupdf-v1-d376dd44adad266c-000",
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "cchunk-pymupdf-v1-7227e2460f83a192-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "cchunk-pymupdf-v1-4e096a6fd9a0af8e-001",
+        "cchunk-pymupdf-v1-340b63862adc52b0-000",
+        "cchunk-pymupdf-v1-d376dd44adad266c-000",
+        "cchunk-pymupdf-v1-fe95f94d24968921-000",
+        "cchunk-pymupdf-v1-00e544a08ac569cc-000"
+      ],
+      "top5_match": true,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-011",
+      "old_top5": [
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+        "cchunk-pymupdf-v1-f86158424224442d-000",
+        "cchunk-pymupdf-v1-40b4f739da3cec6e-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+        "cchunk-pymupdf-v1-fe95f94d24968921-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+        "cchunk-pymupdf-v1-f1d515087d6f1eee-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-012",
+      "old_top5": [
+        "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+        "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-37e3cc68a5fb4276-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+        "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-37e3cc68a5fb4276-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+        "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-37e3cc68a5fb4276-000",
+        "cchunk-pymupdf-v1-ac2c48838803419d-000",
+        "cchunk-pymupdf-v1-5deeaa90569ccec4-000",
+        "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+        "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+        "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-37e3cc68a5fb4276-000",
+        "cchunk-pymupdf-v1-ac2c48838803419d-000",
+        "cchunk-pymupdf-v1-5deeaa90569ccec4-000",
+        "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+        "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000"
+      ],
+      "top5_match": true,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-013",
+      "old_top5": [
+        "cchunk-pymupdf-v1-7ed93679bb25416b-000",
+        "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-075079781e245894-000",
+        "cchunk-pymupdf-v1-18c85b3ecf9f1f7f-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-7ed93679bb25416b-000",
+        "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-f7bbb8547420f197-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-7ed93679bb25416b-000",
+        "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-075079781e245894-000",
+        "cchunk-pymupdf-v1-18c85b3ecf9f1f7f-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+        "cchunk-pymupdf-v1-2e91d7e64f3794b6-000",
+        "cchunk-pymupdf-v1-0746dbb63847a62a-000",
+        "cchunk-pymupdf-v1-8cb55fe1213f5d02-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-7ed93679bb25416b-000",
+        "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+        "cchunk-pymupdf-v1-01297340a9870120-000",
+        "cchunk-pymupdf-v1-0288a775fc87613d-000",
+        "cchunk-pymupdf-v1-08deb6eec29a86bf-000",
+        "cchunk-pymupdf-v1-0746dbb63847a62a-000",
+        "cchunk-pymupdf-v1-8cb55fe1213f5d02-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-014",
+      "old_top5": [
+        "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+        "cchunk-pymupdf-v1-f1d515087d6f1eee-000",
+        "cchunk-pymupdf-v1-c6c9af0f75f5ce08-000",
+        "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+        "cchunk-pymupdf-v1-81ae918d833d4dd5-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+        "cchunk-pymupdf-v1-e4b0189663f03dcf-000",
+        "cchunk-pymupdf-v1-f1d515087d6f1eee-000",
+        "cchunk-pymupdf-v1-c6c9af0f75f5ce08-000",
+        "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+        "cchunk-pymupdf-v1-f1d515087d6f1eee-000",
+        "cchunk-pymupdf-v1-c6c9af0f75f5ce08-000",
+        "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+        "cchunk-pymupdf-v1-81ae918d833d4dd5-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-031107a3c2337259-000",
+        "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+        "cchunk-pymupdf-v1-f86158424224442d-000",
+        "cchunk-pymupdf-v1-b5a8f25cefe47aef-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+        "cchunk-pymupdf-v1-e4b0189663f03dcf-000",
+        "cchunk-pymupdf-v1-f1d515087d6f1eee-000",
+        "cchunk-pymupdf-v1-c6c9af0f75f5ce08-000",
+        "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-031107a3c2337259-000",
+        "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+        "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+        "cchunk-pymupdf-v1-f86158424224442d-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-015",
+      "old_top5": [
+        "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-d376dd44adad266c-000",
+        "cchunk-pymupdf-v1-3c48ca477586c617-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-d376dd44adad266c-000",
+        "cchunk-pymupdf-v1-92120ce2e7ee0096-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-d376dd44adad266c-000",
+        "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "cchunk-pymupdf-v1-075079781e245894-000",
+        "cchunk-pymupdf-v1-468e65ee12f9fcd7-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-d376dd44adad266c-000",
+        "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-819bbea0402b4ad0-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "cchunk-pymupdf-v1-fe95f94d24968921-000",
+        "cchunk-pymupdf-v1-1f4215593f0cb976-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-016",
+      "old_top5": [
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+        "cchunk-pymupdf-v1-7a7a1d9527900134-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+        "cchunk-pymupdf-v1-f91f795e526170e8-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+        "cchunk-pymupdf-v1-7a7a1d9527900134-000",
+        "cchunk-pymupdf-v1-7227e2460f83a192-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "cchunk-pymupdf-v1-cfb8e6e6bca5f996-000",
+        "cchunk-pymupdf-v1-ac2c48838803419d-000",
+        "cchunk-pymupdf-v1-5178c456afbf1e5a-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+        "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+        "cchunk-pymupdf-v1-f91f795e526170e8-000",
+        "cchunk-pymupdf-v1-ad551ee4f6540e70-000",
+        "cchunk-pymupdf-v1-7a7a1d9527900134-000",
+        "cchunk-pymupdf-v1-340b63862adc52b0-000",
+        "cchunk-pymupdf-v1-7227e2460f83a192-000",
+        "cchunk-pymupdf-v1-08ad51d60ec4d01b-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-017",
+      "old_top5": [
+        "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "cchunk-pymupdf-v1-340b63862adc52b0-000",
+        "cchunk-pymupdf-v1-819bbea0402b4ad0-000",
+        "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+        "cchunk-pymupdf-v1-340b63862adc52b0-000",
+        "cchunk-pymupdf-v1-819bbea0402b4ad0-000",
+        "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+        "cchunk-pymupdf-v1-f86158424224442d-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+        "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "cchunk-pymupdf-v1-340b63862adc52b0-000",
+        "cchunk-pymupdf-v1-819bbea0402b4ad0-000",
+        "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+        "cchunk-pymupdf-v1-f86158424224442d-000",
+        "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+        "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+        "cchunk-pymupdf-v1-075079781e245894-000",
+        "cchunk-pymupdf-v1-0a30c7b1dea2f085-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+        "cchunk-pymupdf-v1-340b63862adc52b0-000",
+        "cchunk-pymupdf-v1-819bbea0402b4ad0-000",
+        "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+        "cchunk-pymupdf-v1-f86158424224442d-000",
+        "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+        "cchunk-pymupdf-v1-0a30c7b1dea2f085-000",
+        "cchunk-pymupdf-v1-fe95f94d24968921-000",
+        "cchunk-pymupdf-v1-392aebff4bbbec9f-000",
+        "cchunk-pymupdf-v1-29247897fcf1016b-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    },
+    {
+      "question_id": "D-V2-018",
+      "old_top5": [
+        "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+        "cchunk-pymupdf-v1-e7a688c7518528a7-000",
+        "cchunk-pymupdf-v1-4e096a6fd9a0af8e-001",
+        "cchunk-pymupdf-v1-fe95f94d24968921-000",
+        "cchunk-pymupdf-v1-00e544a08ac569cc-000"
+      ],
+      "new_top5": [
+        "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+        "cchunk-pymupdf-v1-e7a688c7518528a7-000",
+        "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+        "cchunk-pymupdf-v1-fe95f94d24968921-000",
+        "cchunk-pymupdf-v1-7733ed3c6f455ef6-000"
+      ],
+      "old_top10": [
+        "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+        "cchunk-pymupdf-v1-e7a688c7518528a7-000",
+        "cchunk-pymupdf-v1-4e096a6fd9a0af8e-001",
+        "cchunk-pymupdf-v1-fe95f94d24968921-000",
+        "cchunk-pymupdf-v1-00e544a08ac569cc-000",
+        "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+        "cchunk-pymupdf-v1-5cb922ccf2388a71-000",
+        "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+        "cchunk-pymupdf-v1-06b6dedf7872d290-000",
+        "cchunk-pymupdf-v1-38d6610960704fc6-000"
+      ],
+      "new_top10": [
+        "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+        "cchunk-pymupdf-v1-e7a688c7518528a7-000",
+        "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+        "cchunk-pymupdf-v1-fe95f94d24968921-000",
+        "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+        "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+        "cchunk-pymupdf-v1-06b6dedf7872d290-000",
+        "cchunk-pymupdf-v1-38d6610960704fc6-000",
+        "cchunk-pymupdf-v1-952a0b7c9f91d08d-000",
+        "cchunk-pymupdf-v1-a6d5b5646d750b21-000"
+      ],
+      "top5_match": false,
+      "top10_match": false,
+      "old_hit_at5": true,
+      "new_hit_at5": true
+    }
+  ],
+  "question_hit_at5_changes": [
+    "S003"
+  ],
+  "repair": "Freeze the canonical A2 artifact through the emitted identity contract; reject non-matching live captures and use artifact replay for reproducible comparisons. No retrieval algorithm change.",
+  "identity_contract": {
+    "contract_version": "phase13e0r-a2-identity-v1",
+    "authority": "formal_development_effectiveness_2026-09-03.json",
+    "authority_sha256": "9d4839a4c5fe8717877c7d92c206149a137997e20f1f3c957c5f4ffdc08c3bb3",
+    "dataset_fingerprint": "deac5832de37a95f933267aba10e40215582f1136cd6a60dfabf2d9784385060",
+    "generation_id": "dev-v2-20260902",
+    "generation_identity": {
+      "generation_id": "dev-v2-20260902",
+      "corpus_fingerprint": "ed7bf1da6aab63a7afcf88c21480c6e987d231b9de65de2dd0977ce4b4e60e68",
+      "child_manifest_hash": "b1a6334f6e725591e5d796f318e76d3eb77c46fa8c8cc3f6342dc850ad77d1e0",
+      "child_count": 453,
+      "lexical_index_fingerprint": "6a1fd370918362422d7539f60265cf3992e06f1f9ddd5c69d9e8545c3d7f1c13"
+    },
+    "retrieval_config": {
+      "candidate_top_n": 20,
+      "final_top_k": 10,
+      "rrf_k": 60
+    },
+    "reranker": {
+      "calls": 24,
+      "success_count": 23,
+      "provider": "aliyun_model_studio",
+      "model": "qwen3-rerank",
+      "timeout_seconds": 2.0,
+      "external_result_determinism": "not_guaranteed",
+      "fallback_count": 1,
+      "fallback_rate": 0.041666666666666664
+    },
+    "evaluator": "industrial_rag.services.retrieval_evaluation.evaluate_rankings",
+    "live_capture_may_not_replace_authority": true,
+    "replay_required_when_external_reranker_differs": true
+  },
+  "validation_or_holdout_accessed": false
+}
