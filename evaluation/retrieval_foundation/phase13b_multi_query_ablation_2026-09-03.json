@@ -1,0 +1,1463 @@
+{
+  "final_status": "PASS_TO_EVIDENCE_DIVERSITY",
+  "scope": "development_only_offline_ablation",
+  "dataset_identity": {
+    "fingerprint": "deac5832de37a95f933267aba10e40215582f1136cd6a60dfabf2d9784385060",
+    "question_count": 24,
+    "split": "Development"
+  },
+  "generation_identity": {
+    "generation_id": "dev-v2-20260902",
+    "corpus_fingerprint": "ed7bf1da6aab63a7afcf88c21480c6e987d231b9de65de2dd0977ce4b4e60e68",
+    "child_manifest_hash": "b1a6334f6e725591e5d796f318e76d3eb77c46fa8c8cc3f6342dc850ad77d1e0"
+  },
+  "a2_source_artifact": "D:\\基于Lightrag的工业手册问答系统\\lightrag_industry_qa_portfolio-retrieval-foundation-upgrade\\evaluation\\retrieval_foundation\\formal_development_effectiveness_2026-09-03.json",
+  "a2_definition": "frozen LightRAG + BM25 + RRF + qwen3-rerank",
+  "a3_definition": "original query + 2-3 variants; candidate union/dedup; one RRF; one qwen3-rerank",
+  "runtime_config": {
+    "candidate_top_n": 20,
+    "final_top_k": 10,
+    "rrf_k": 60,
+    "reranker_model": "qwen3-rerank",
+    "reranker_calls": 24,
+    "reranker_success": 24,
+    "reranker_fallback": 0
+  },
+  "metrics": {
+    "A2": {
+      "overall": {
+        "n": 24,
+        "recall@5": 0.8177083333333334,
+        "recall@10": 0.8312499999999999,
+        "mrr@5": 0.8937499999999999,
+        "mrr@10": 0.8937499999999999,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.75,
+        "complete_evidence_coverage@10": 0.75
+      },
+      "parameter": {
+        "n": 4,
+        "recall@5": 0.725,
+        "recall@10": 0.725,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "difficulty=EASY": {
+        "n": 5,
+        "recall@5": 0.78,
+        "recall@10": 0.78,
+        "mrr@5": 0.75,
+        "mrr@10": 0.75,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6,
+        "complete_evidence_coverage@10": 0.6
+      },
+      "source_document=doc-4ffb6df91a9a": {
+        "n": 15,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.73,
+        "mrr@5": 0.83,
+        "mrr@10": 0.83,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6,
+        "complete_evidence_coverage@10": 0.6
+      },
+      "evidence_pattern=multi_evidence": {
+        "n": 7,
+        "recall@5": 0.375,
+        "recall@10": 0.42142857142857143,
+        "mrr@5": 0.8857142857142858,
+        "mrr@10": 0.8857142857142858,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.14285714285714285,
+        "complete_evidence_coverage@10": 0.14285714285714285
+      },
+      "question_type=parameter": {
+        "n": 4,
+        "recall@5": 0.725,
+        "recall@10": 0.725,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "fault_handling": {
+        "n": 3,
+        "recall@5": 0.4666666666666666,
+        "recall@10": 0.5333333333333333,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 0.3333333333333333
+      },
+      "difficulty=MEDIUM": {
+        "n": 11,
+        "recall@5": 0.7818181818181817,
+        "recall@10": 0.8,
+        "mrr@5": 0.8818181818181817,
+        "mrr@10": 0.8818181818181817,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.7272727272727273,
+        "complete_evidence_coverage@10": 0.7272727272727273
+      },
+      "question_type=fault_handling": {
+        "n": 3,
+        "recall@5": 0.4666666666666666,
+        "recall@10": 0.5333333333333333,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 0.3333333333333333
+      },
+      "installation_debugging": {
+        "n": 2,
+        "recall@5": 0.6,
+        "recall@10": 0.6,
+        "mrr@5": 0.6,
+        "mrr@10": 0.6,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "question_type=installation_debugging": {
+        "n": 2,
+        "recall@5": 0.6,
+        "recall@10": 0.6,
+        "mrr@5": 0.6,
+        "mrr@10": 0.6,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "procedure": {
+        "n": 3,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.75,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "difficulty=HARD": {
+        "n": 8,
+        "recall@5": 0.890625,
+        "recall@10": 0.90625,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.875,
+        "complete_evidence_coverage@10": 0.875
+      },
+      "question_type=procedure": {
+        "n": 3,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.75,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "evidence_pattern=adjacent_chunk_evidence": {
+        "n": 1,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "evidence_pattern=table_structured": {
+        "n": 3,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.75,
+        "mrr@10": 0.75,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "maintenance": {
+        "n": 5,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.9,
+        "mrr@10": 0.9,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=maintenance": {
+        "n": 5,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.9,
+        "mrr@10": 0.9,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "evidence_pattern=single_evidence": {
+        "n": 13,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.9230769230769231,
+        "mrr@10": 0.9230769230769231,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "safety_warning_limit": {
+        "n": 3,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.8333333333333334,
+        "mrr@10": 0.8333333333333334,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=safety_warning_limit": {
+        "n": 3,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.8333333333333334,
+        "mrr@10": 0.8333333333333334,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "component_structure": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.625,
+        "mrr@10": 0.625,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=component_structure": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.625,
+        "mrr@10": 0.625,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "condition_prerequisite": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=condition_prerequisite": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "source_document=doc-6a9ea3ff1f42": {
+        "n": 9,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      }
+    },
+    "A3": {
+      "overall": {
+        "n": 24,
+        "recall@5": 0.7760416666666666,
+        "recall@10": 0.8364583333333333,
+        "mrr@5": 0.8833333333333333,
+        "mrr@10": 0.8902777777777778,
+        "question_hit@5": 0.9583333333333334,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.7083333333333334,
+        "complete_evidence_coverage@10": 0.75
+      },
+      "parameter": {
+        "n": 4,
+        "recall@5": 0.725,
+        "recall@10": 0.725,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "difficulty=EASY": {
+        "n": 5,
+        "recall@5": 0.58,
+        "recall@10": 0.78,
+        "mrr@5": 0.7,
+        "mrr@10": 0.7333333333333333,
+        "question_hit@5": 0.8,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.4,
+        "complete_evidence_coverage@10": 0.6
+      },
+      "source_document=doc-4ffb6df91a9a": {
+        "n": 15,
+        "recall@5": 0.6416666666666667,
+        "recall@10": 0.7383333333333333,
+        "mrr@5": 0.8133333333333332,
+        "mrr@10": 0.8244444444444443,
+        "question_hit@5": 0.9333333333333333,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5333333333333333,
+        "complete_evidence_coverage@10": 0.6
+      },
+      "evidence_pattern=multi_evidence": {
+        "n": 7,
+        "recall@5": 0.375,
+        "recall@10": 0.43928571428571433,
+        "mrr@5": 0.8857142857142858,
+        "mrr@10": 0.8857142857142858,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.14285714285714285,
+        "complete_evidence_coverage@10": 0.14285714285714285
+      },
+      "question_type=parameter": {
+        "n": 4,
+        "recall@5": 0.725,
+        "recall@10": 0.725,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "fault_handling": {
+        "n": 3,
+        "recall@5": 0.4666666666666666,
+        "recall@10": 0.5333333333333333,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 0.3333333333333333
+      },
+      "difficulty=MEDIUM": {
+        "n": 11,
+        "recall@5": 0.7818181818181817,
+        "recall@10": 0.8,
+        "mrr@5": 0.8818181818181817,
+        "mrr@10": 0.8818181818181817,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.7272727272727273,
+        "complete_evidence_coverage@10": 0.7272727272727273
+      },
+      "question_type=fault_handling": {
+        "n": 3,
+        "recall@5": 0.4666666666666666,
+        "recall@10": 0.5333333333333333,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 0.3333333333333333
+      },
+      "installation_debugging": {
+        "n": 2,
+        "recall@5": 0.6,
+        "recall@10": 0.6,
+        "mrr@5": 0.6,
+        "mrr@10": 0.6,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "question_type=installation_debugging": {
+        "n": 2,
+        "recall@5": 0.6,
+        "recall@10": 0.6,
+        "mrr@5": 0.6,
+        "mrr@10": 0.6,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "procedure": {
+        "n": 3,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.7916666666666666,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "difficulty=HARD": {
+        "n": 8,
+        "recall@5": 0.890625,
+        "recall@10": 0.921875,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.875,
+        "complete_evidence_coverage@10": 0.875
+      },
+      "question_type=procedure": {
+        "n": 3,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.7916666666666666,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "evidence_pattern=adjacent_chunk_evidence": {
+        "n": 1,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "evidence_pattern=table_structured": {
+        "n": 3,
+        "recall@5": 0.6666666666666666,
+        "recall@10": 1.0,
+        "mrr@5": 0.6666666666666666,
+        "mrr@10": 0.7222222222222222,
+        "question_hit@5": 0.6666666666666666,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "maintenance": {
+        "n": 5,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.9,
+        "mrr@10": 0.9,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=maintenance": {
+        "n": 5,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.9,
+        "mrr@10": 0.9,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "evidence_pattern=single_evidence": {
+        "n": 13,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.9230769230769231,
+        "mrr@10": 0.9230769230769231,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "safety_warning_limit": {
+        "n": 3,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.8333333333333334,
+        "mrr@10": 0.8333333333333334,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=safety_warning_limit": {
+        "n": 3,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.8333333333333334,
+        "mrr@10": 0.8333333333333334,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "component_structure": {
+        "n": 2,
+        "recall@5": 0.5,
+        "recall@10": 1.0,
+        "mrr@5": 0.5,
+        "mrr@10": 0.5833333333333334,
+        "question_hit@5": 0.5,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=component_structure": {
+        "n": 2,
+        "recall@5": 0.5,
+        "recall@10": 1.0,
+        "mrr@5": 0.5,
+        "mrr@10": 0.5833333333333334,
+        "question_hit@5": 0.5,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "condition_prerequisite": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=condition_prerequisite": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "source_document=doc-6a9ea3ff1f42": {
+        "n": 9,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      }
+    }
+  },
+  "multi_evidence": {
+    "A2": {
+      "at5": {
+        "n": 8,
+        "complete": 2,
+        "rate": 0.25
+      },
+      "at10": {
+        "n": 8,
+        "complete": 2,
+        "rate": 0.25
+      }
+    },
+    "A3": {
+      "at5": {
+        "n": 8,
+        "complete": 2,
+        "rate": 0.25
+      },
+      "at10": {
+        "n": 8,
+        "complete": 2,
+        "rate": 0.25
+      }
+    }
+  },
+  "query_count": {
+    "average": 4,
+    "min": 4,
+    "max": 4
+  },
+  "candidate_count": {
+    "average_union": 63.458333333333336,
+    "average_fused": 20
+  },
+  "latency_ms": {
+    "average_total": 8545.40656666662,
+    "p50_total": 8161.771800001588
+  },
+  "regression_count": 0,
+  "regression_count_at5": 1,
+  "phase13a_six_miss_recovery": {
+    "questions": [
+      {
+        "question_id": "S014",
+        "a2_missing_gold": [
+          "cchunk-pymupdf-v1-93807a18f7b7345f-000"
+        ],
+        "a3_evidence": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-93807a18f7b7345f-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          }
+        ]
+      },
+      {
+        "question_id": "S015",
+        "a2_missing_gold": [
+          "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+          "cchunk-pymupdf-v1-5989850607a8046c-000",
+          "cchunk-pymupdf-v1-78a156ed97cebd53-000"
+        ],
+        "a3_evidence": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5989850607a8046c-000",
+            "recovered_by_a3": false,
+            "first_variant": {
+              "variant_id": "variant_2",
+              "variant_query": "泵不输送液体时的常见故障原因与对应解决方法 SUMMIT 手册",
+              "source": "sparse",
+              "first_rank": 3
+            },
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-78a156ed97cebd53-000",
+            "recovered_by_a3": false,
+            "first_variant": {
+              "variant_id": "original",
+              "variant_query": "SUMMIT 手册中，泵不输送液体的常见原因和对应处理方法有哪些？",
+              "source": "lightrag",
+              "first_rank": 18
+            },
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          }
+        ]
+      },
+      {
+        "question_id": "S006",
+        "a2_missing_gold": [
+          "cchunk-pymupdf-v1-5388c52812f37351-000",
+          "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+          "cchunk-pymupdf-v1-d8638f275d20c6d6-000"
+        ],
+        "a3_evidence": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5388c52812f37351-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+            "recovered_by_a3": false,
+            "first_variant": {
+              "variant_id": "original",
+              "variant_query": "SUMMIT 手册规定的最高轴承工作温度是多少？",
+              "source": "lightrag",
+              "first_rank": 20
+            },
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          }
+        ]
+      },
+      {
+        "question_id": "S003",
+        "a2_missing_gold": [
+          "cchunk-pymupdf-v1-6590f00e21e280d0-000",
+          "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+          "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+          "cchunk-pymupdf-v1-663e640852497df6-000"
+        ],
+        "a3_evidence": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6590f00e21e280d0-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+            "recovered_by_a3": false,
+            "first_variant": {
+              "variant_id": "variant_2",
+              "variant_query": "SUMMIT 2196 泵出口管路布置时止回阀与隔离阀之间的间距规定",
+              "source": "lightrag",
+              "first_rank": 2
+            },
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-663e640852497df6-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          }
+        ]
+      },
+      {
+        "question_id": "S016",
+        "a2_missing_gold": [
+          "cchunk-pymupdf-v1-99121c418e138c64-000",
+          "cchunk-pymupdf-v1-317e33cc54ca5b18-000",
+          "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+          "cchunk-pymupdf-v1-16686d3e3ddcc21b-000"
+        ],
+        "a3_evidence": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-99121c418e138c64-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-317e33cc54ca5b18-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+            "recovered_by_a3": false,
+            "first_variant": {
+              "variant_id": "original",
+              "variant_query": "SUMMIT 手册中，轴承高温运行通常由什么原因造成，如何处理？",
+              "source": "sparse",
+              "first_rank": 17
+            },
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-16686d3e3ddcc21b-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          }
+        ]
+      },
+      {
+        "question_id": "S011",
+        "a2_missing_gold": [
+          "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+          "cchunk-pymupdf-v1-bf2be6315d2f187b-000",
+          "cchunk-pymupdf-v1-ac2c48838803419d-000",
+          "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+          "cchunk-pymupdf-v1-91e5666cf6078fb9-000",
+          "cchunk-pymupdf-v1-93807a18f7b7345f-000"
+        ],
+        "a3_evidence": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+            "recovered_by_a3": false,
+            "first_variant": {
+              "variant_id": "variant_1",
+              "variant_query": "SUMMIT 手册中离心泵启动前的检查项目和前置条件有哪些",
+              "source": "sparse",
+              "first_rank": 14
+            },
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bf2be6315d2f187b-000",
+            "recovered_by_a3": true,
+            "first_variant": {
+              "variant_id": "original",
+              "variant_query": "按 SUMMIT 手册，离心泵的标准启动步骤是什么？",
+              "source": "lightrag",
+              "first_rank": 14
+            },
+            "pre_rerank_rank": 5,
+            "final_rank": 10,
+            "in_final_top5": false,
+            "in_final_top10": true
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ac2c48838803419d-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-91e5666cf6078fb9-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-93807a18f7b7345f-000",
+            "recovered_by_a3": false,
+            "first_variant": null,
+            "pre_rerank_rank": null,
+            "final_rank": null,
+            "in_final_top5": false,
+            "in_final_top10": false
+          }
+        ]
+      }
+    ],
+    "missing_gold_total": 21,
+    "recovered_gold_total": 1,
+    "recovery_rate": 0.047619047619047616
+  },
+  "query_expansions": [
+    {
+      "question_id": "S014",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "用塞尺法设置 2196-R 型泵叶轮间隙时，最终塞尺厚度如何确定？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "2196-R 型泵叶轮间隙调整时塞尺厚度选择依据是什么？"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "使用塞尺法设置 2196-R 泵叶轮间隙的步骤和最终塞尺规格要求有哪些？"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "2196-R 泵采用塞尺法测量叶轮间隙时，影响最终塞尺厚度的因素及推荐值是什么？"
+        }
+      ]
+    },
+    {
+      "question_id": "S015",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "SUMMIT 手册中，泵不输送液体的常见原因和对应处理方法有哪些？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "SUMMIT 手册中泵不输送液体的故障原因及处理措施"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "泵不输送液体时的常见故障原因与对应解决方法 SUMMIT 手册"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "SUMMIT 泵无法输送液体的可能原因、相关组件及操作步骤"
+        }
+      ]
+    },
+    {
+      "question_id": "S006",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "SUMMIT 手册规定的最高轴承工作温度是多少？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "SUMMIT 手册中轴承最高工作温度的参数规定是多少"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "SUMMIT 手册规定的轴承温度限制及工作条件"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "轴承在 SUMMIT 手册中的最高允许工作温度值"
+        }
+      ]
+    },
+    {
+      "question_id": "S003",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "SUMMIT 2196 系列泵出口管路中的止回阀、隔离阀和异径接头应怎样布置？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "SUMMIT 2196 系列泵出口管路中止回阀、隔离阀和异径接头的安装顺序和布置要求"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "SUMMIT 2196 泵出口管路布置时止回阀与隔离阀之间的间距规定"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "SUMMIT 2196 系列泵出口管路中异径接头的安装位置及方向要求"
+        }
+      ]
+    },
+    {
+      "question_id": "S016",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "SUMMIT 手册中，轴承高温运行通常由什么原因造成，如何处理？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "SUMMIT 手册中轴承高温运行的常见原因及处理措施"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "轴承在高温下运行的故障原因与解决方案 SUMMIT 手册"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "SUMMIT 手册中与轴承高温相关的故障排查步骤和推荐操作"
+        }
+      ]
+    },
+    {
+      "question_id": "S011",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "按 SUMMIT 手册，离心泵的标准启动步骤是什么？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "SUMMIT 手册中离心泵启动前的检查项目和前置条件有哪些"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "离心泵在 SUMMIT 手册中的标准启动操作步骤顺序是什么"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "根据 SUMMIT 手册，离心泵启动过程中需要注意的参数限制和安全措施"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-001",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "2196-R 型泵用塞尺法设置叶轮间隙时，应先把叶轮推到什么状态再测量？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "2196-R 型泵塞尺法测量叶轮间隙前叶轮应推至什么位置"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "2196-R 泵叶轮间隙调整时使用塞尺法的前置操作步骤"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "2196-R 泵叶轮推向极限位置测量间隙的方法和条件"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-002",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "2196 系列泵的填料函在启动时应调节到每分钟多少滴漏？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "2196 系列泵填料函启动时滴漏速率参数"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "2196 系列泵填料函每分钟滴漏调节标准"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "2196 泵填料函初始运行滴漏量规定"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-003",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "SUMMIT 泵泵送温度超过 350°F 时，轴承应采用什么润滑方案？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "SUMMIT 泵 轴承 润滑方案 温度超过 350°F"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "SUMMIT 泵 高温工况 轴承润滑类型 350°F"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "SUMMIT 泵 轴承 润滑剂选择 高温限制 350°F"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-004",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "安装 2196 系列泵的入口管时，偏心异径管接的平面应朝哪个方向？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "2196 系列泵入口管安装时偏心异径管平面朝向要求"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "2196 系列泵 偏心异径管 接口方向 安装规范"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "偏心异径管 平面朝向 入口管 2196 泵 安装步骤"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-005",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "联轴器罩拆装前需要采取哪些断电和挂牌措施？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "联轴器罩拆装前的断电和挂牌上锁（LOTO）操作步骤及安全要求"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "进行联轴器罩拆装时对电源隔离和警示标识的具体安全措施规定"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "联轴器罩维护作业前需执行的电气隔离、断电验证及挂牌程序"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-006",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "2196 泵的轴承架加润滑油时，油位应加到观察窗的什么位置？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "2196 泵轴承架润滑油油位标准 观察窗位置"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "2196 泵 加润滑油操作步骤 油位限制"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "2196 泵 轴承架 润滑油 观察窗 中间刻度"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-007",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "2196 泵的零件清单中，零件号 101 和 122 分别对应什么部件？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "2196 泵零件清单中零件号 101 和 122 对应的部件名称"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "2196 泵中零件号 101 和 122 的具体功能部件是什么"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "2196 泵组件结构中零件 101 与 122 的对应术语"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-008",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "高温工况下安装 2196 泵时，联轴器对正检查有什么额外要求？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "2196 泵 高温工况 联轴器对正检查 额外要求"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "2196 泵 安装 联轴器对正 高温条件 操作步骤 前置条件"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "2196 泵 联轴器对正检查 高温工况 相关组件 参数限制"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-009",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "叶轮间隙为什么会影响泵的性能，手册将它定义为哪两个表面之间的距离？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "叶轮间隙对泵性能的影响原因及定义的两个表面间距离"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "手册中叶轮间隙的定义涉及哪两个表面之间的距离"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "泵的叶轮间隙影响性能的机理及相关组件术语"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-010",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "DESMI 泵组启动前必须确认哪些条件已经满足？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "DESMI 泵组启动前需要满足哪些操作条件和前置检查项？"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "DESMI 泵组启动前必须确认的参数限制和系统状态有哪些？"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "DESMI 泵组启动前涉及的相关组件、控制信号和安全联锁条件是什么？"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-011",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "DESMI 水泵注液和排气时，吸入管路上的截断装置应处于什么状态？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "DESMI 水泵注液和排气操作时吸入管路截断装置的开关状态要求"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "DESMI 水泵启动前注液排气过程中吸入管路阀门应开启还是关闭"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "DESMI 水泵注液排气操作步骤中对吸入管路截断装置的前置条件规定"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-012",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "DESMI 泵在排出阀关闭时能否长时间运行？如果不能，应如何保证最小液体流量？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "DESMI 泵 排出阀关闭 最小液体流量 限制"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "DESMI 泵 长时间运行 安全警告 排出阀关闭"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "DESMI 泵 运行条件 最小流量保证 方法"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-013",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "DESMI 手册给出的最小进水压力由哪些压力或水头项共同决定？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "DESMI 手册中最小进水压力的组成项包括哪些压力或水头参数？"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "影响 DESMI 设备最小进水压力的具体水头项和压力项有哪些？"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "DESMI 最小进水压力的计算涉及哪些相关的压力损失或水头项？"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-014",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "吸入管路过滤器堵塞时，怎样监测污染程度并安排维护？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "吸入管路过滤器污染程度监测方法及维护周期安排"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "如何通过压差指示器判断吸入管路过滤器堵塞并制定维护计划"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "吸入管路过滤器堵塞的故障原因与预防性维护措施"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-015",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "备用 DESMI 泵为保持可用，手册建议多久启动一次？还应监测哪些状态？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "DESMI 泵备用状态启动频率 维护周期"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "DESMI 备用泵启动间隔时间 监测参数"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "DESMI 泵定期运行维护 建议监测状态"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-016",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "泵组长期停用期间，应以什么频率运行多长时间来降低沉积或卡滞风险？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "泵组长期停用期间运行频率和持续时间要求"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "防止泵组停用期间沉积或卡滞的定期运行操作步骤"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "泵组长期停机维护中降低卡滞风险的相关组件运行规范"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-017",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "DESMI 泵发生机械密封短时间后泄漏且此前长期存放时，手册列出的处理方向是什么？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "DESMI 泵机械密封短期泄漏且长期存放后的处理措施"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "DESMI 泵长期存放后启用时机械密封泄漏的故障原因及处理方向"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "DESMI 泵机械密封泄漏与长期存放相关的检查步骤和解决方案"
+        }
+      ]
+    },
+    {
+      "question_id": "D-V2-018",
+      "variants": [
+        {
+          "variant_id": "original",
+          "query": "拆卸 DESMI DNS 标准结构的后拉单元时，如何支撑泵端以避免倾倒伤害？"
+        },
+        {
+          "variant_id": "variant_1",
+          "query": "拆卸DESMI DNS标准结构后拉单元时支撑泵端的安全措施"
+        },
+        {
+          "variant_id": "variant_2",
+          "query": "防止泵端倾倒的DESMI DNS后拉单元拆卸步骤"
+        },
+        {
+          "variant_id": "variant_3",
+          "query": "DESMI DNS泵端支撑要求和倾倒伤害预警"
+        }
+      ]
+    }
+  ],
+  "validation_or_holdout_accessed": false,
+  "a2_retrieval_rerun": false,
+  "preflight_checks": {
+    "question_count": true,
+    "question_ids_unique": true,
+    "dataset_fingerprint": true,
+    "evidence_mapping_complete": true,
+    "development_only": true,
+    "manifest_status": true,
+    "generation_id": true,
+    "child_count": true,
+    "corpus_fingerprint": true,
+    "child_manifest_hash": true,
+    "light_rag_workspace": true,
+    "source_documents": true,
+    "lexical_index_identity": true,
+    "mapping_children_exist": true
+  }
+}
