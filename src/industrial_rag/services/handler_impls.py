@@ -9,7 +9,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from industrial_rag.db.models import TaskType
+from industrial_rag.db.models import TaskType, UpdateOperation
+from industrial_rag.repositories.update_job_repository import UpdateJobRepository
 from industrial_rag.services.cleanup_service import KnowledgeBaseCleanupService
 from industrial_rag.services.generation_fingerprint_service import build_generation_fingerprint
 from industrial_rag.services.task_context import TaskExecutionContext, TaskExecutionResult
@@ -153,6 +154,12 @@ async def handle_parse(ctx: TaskExecutionContext) -> TaskExecutionResult:
 @register_handler(TaskType.rebuild)
 async def handle_rebuild(ctx: TaskExecutionContext) -> TaskExecutionResult:
     """Full KB index rebuild using IndexService."""
+    if (ctx.task.payload or {}).get("reason") == "manual reindex request":
+        return await _create_update_job_from_document_task(
+            ctx,
+            operation=UpdateOperation.reindex,
+        )
+
     try:
         await ctx.update_progress(0.0, "starting_rebuild")
         from industrial_rag.services.index_service import IndexService
@@ -293,66 +300,85 @@ async def handle_index(ctx: TaskExecutionContext) -> TaskExecutionResult:
 # ---------------------------------------------------------------------------
 
 
+async def _create_update_job_from_document_task(
+    ctx: TaskExecutionContext,
+    *,
+    operation: UpdateOperation,
+) -> TaskExecutionResult:
+    """Adapt one legacy document task into a pending UpdateJob.
+
+    Candidate construction, validation, and promotion remain owned by later
+    Phase15-B steps. This adapter must not parse, index, or activate anything.
+    """
+    document_id = ctx.task.document_id
+    if operation is UpdateOperation.reparse and document_id is None:
+        return TaskExecutionResult(
+            success=False,
+            error_code="reparse_no_document",
+            error_message="Reparse task has no document_id",
+        )
+    if document_id is not None and await ctx.doc_repo.get(document_id) is None:
+        return TaskExecutionResult(
+            success=False,
+            error_code="document_not_found",
+            error_message=f"Document {document_id} not found",
+        )
+
+    job_repository = UpdateJobRepository(ctx.task_repo._session)
+    payload = dict(ctx.task.payload or {})
+    job_id = payload.get("update_job_id")
+    if isinstance(job_id, str):
+        existing = await job_repository.get_by_kb_and_id(
+            ctx.task.knowledge_base_id, job_id
+        )
+        if existing is not None and existing.operation is operation:
+            await ctx.update_progress(1.0, "update_job_created")
+            return TaskExecutionResult(
+                success=True,
+                result={
+                    "action": "update_job_created",
+                    "update_job_id": existing.id,
+                    "operation": existing.operation.value,
+                    "document_id": existing.document_id,
+                    "idempotent": True,
+                },
+            )
+
+    knowledge_base = await ctx.kb_repo.get(ctx.task.knowledge_base_id)
+    if knowledge_base is None:
+        return TaskExecutionResult(
+            success=False,
+            error_code="knowledge_base_not_found",
+            error_message=f"Knowledge base {ctx.task.knowledge_base_id} not found",
+        )
+    job = await job_repository.create(
+        knowledge_base_id=knowledge_base.id,
+        base_generation_id=knowledge_base.active_vector_generation_id,
+        operation=operation,
+        document_id=document_id,
+        created_by=f"lifecycle_task:{ctx.task.id}",
+    )
+    payload["update_job_id"] = job.id
+    await ctx.task_repo.update(ctx.task.id, payload=payload)
+    await ctx.update_progress(1.0, "update_job_created")
+    return TaskExecutionResult(
+        success=True,
+        result={
+            "action": "update_job_created",
+            "update_job_id": job.id,
+            "operation": job.operation.value,
+            "document_id": job.document_id,
+            "idempotent": False,
+        },
+    )
+
+
 @register_handler(TaskType.reparse)
 async def handle_reparse(ctx: TaskExecutionContext) -> TaskExecutionResult:
-    """Re-parse: create temp artifacts, validate, then atomically replace.
-
-    On failure, old artifacts are preserved.
-    """
-    try:
-        await ctx.update_progress(0.0, "starting_reparse")
-        doc_id = ctx.task.document_id
-        kb_id = ctx.task.knowledge_base_id
-        if doc_id is None:
-            return TaskExecutionResult(
-                success=False, error_code="reparse_no_document",
-                error_message="Reparse task has no document_id",
-            )
-        doc = await ctx.doc_repo.get(doc_id)
-        if doc is None:
-            return TaskExecutionResult(
-                success=False, error_code="document_not_found",
-                error_message=f"Document {doc_id} not found",
-            )
-
-        await ctx.doc_repo.update(doc_id, parse_status="parsing")
-        await ctx.update_progress(0.10, "parsing")
-
-        from industrial_rag.services.parse_service import ParseService
-        from industrial_rag.storage_layout import kb_parsed_dir
-
-        parsed_base = kb_parsed_dir(kb_id) / "documents" / doc_id
-        svc = ParseService(ctx.task_repo._session)
-        manifest = await svc.parse_document(
-            kb_id, doc_id, ctx.task.id, parsed_base=parsed_base,
-        )
-
-        await ctx.doc_repo.update(doc_id, status="parsed", parse_status="done")
-        await ctx.update_progress(1.0, "reparse_done")
-
-        # Trigger follow-up rebuild
-        from industrial_rag.services.ingestion_pipeline import IngestionPipeline
-
-        pipeline = IngestionPipeline(
-            ctx.task_repo._session, runtime_manager=ctx.runtime_manager,
-        )
-        follow_up_id = await pipeline.on_parse_succeeded(kb_id, doc_id, manifest)
-
-        return TaskExecutionResult(
-            success=True,
-            result={
-                "action": "document_reparsed",
-                "document_id": doc_id,
-                "manifest": manifest,
-                "follow_up_task_id": follow_up_id,
-            },
-        )
-    except Exception as exc:
-        if doc_id:
-            await ctx.doc_repo.update(doc_id, last_error=str(exc)[:500])
-        return TaskExecutionResult(
-            success=False, error_code="reparse_failed", error_message=str(exc)[:500],
-        )
+    """Create the reparse UpdateJob without touching active artifacts."""
+    return await _create_update_job_from_document_task(
+        ctx, operation=UpdateOperation.reparse
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -362,5 +388,7 @@ async def handle_reparse(ctx: TaskExecutionContext) -> TaskExecutionResult:
 
 @register_handler(TaskType.reindex)
 async def handle_reindex(ctx: TaskExecutionContext) -> TaskExecutionResult:
-    """Re-index: full KB rebuild."""
-    return await handle_rebuild(ctx)
+    """Create the reindex UpdateJob without touching active artifacts."""
+    return await _create_update_job_from_document_task(
+        ctx, operation=UpdateOperation.reindex
+    )

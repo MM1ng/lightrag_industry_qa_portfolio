@@ -12,11 +12,20 @@ from industrial_rag.db.models import (
     Base,
     Document,
     KnowledgeBase,
+    LifecycleTask,
+    TaskType,
     UpdateJobStatus,
     UpdateOperation,
 )
 from industrial_rag.db.session import reset_for_testing
+from industrial_rag.repositories.document_repository import DocumentRepository
+from industrial_rag.repositories.knowledge_base_repository import (
+    KnowledgeBaseRepository,
+)
+from industrial_rag.repositories.task_repository import TaskRepository
 from industrial_rag.repositories.update_job_repository import UpdateJobRepository
+from industrial_rag.services.document_service import DocumentService
+from industrial_rag.services.task_context import TaskExecutionContext
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -189,3 +198,154 @@ def test_migration_preserves_legacy_jobs_and_adds_reparse_constraint(
 
     command.downgrade(config, "e2f3a4b5c6d7")
     reset_for_testing()
+
+
+async def _task_context(
+    session,
+    kb: KnowledgeBase,
+    document: Document,
+    task_type: TaskType,
+    payload: dict | None = None,
+) -> TaskExecutionContext:
+    task = LifecycleTask(
+        knowledge_base_id=kb.id,
+        document_id=document.id,
+        task_type=task_type,
+        payload=payload or {"requested_by": "phase15b-test"},
+    )
+    session.add(task)
+    await session.commit()
+    return TaskExecutionContext(
+        task=task,
+        kb_repo=KnowledgeBaseRepository(session),
+        doc_repo=DocumentRepository(session),
+        task_repo=TaskRepository(session),
+    )
+
+
+@pytest.mark.asyncio
+async def test_document_service_queues_reindex_as_reindex_task(update_job_session) -> None:
+    session, kb, document = update_job_session
+
+    response = await DocumentService(session).request_reindex(kb.id, document.id)
+
+    task = await TaskRepository(session).get(response["task_id"])
+    assert task is not None
+    assert task.task_type is TaskType.reindex
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("task_type", "operation_value"),
+    [(TaskType.reparse, "reparse"), (TaskType.reindex, "reindex")],
+)
+async def test_handler_creates_pending_update_job_for_document_operation(
+    update_job_session,
+    task_type: TaskType,
+    operation_value: str,
+) -> None:
+    from industrial_rag.services.handler_impls import handle_reindex, handle_reparse
+
+    session, kb, document = update_job_session
+    context = await _task_context(session, kb, document, task_type)
+    handler = handle_reparse if task_type is TaskType.reparse else handle_reindex
+
+    result = await handler(context)
+
+    assert result.success is True
+    assert result.result is not None
+    job_id = result.result["update_job_id"]
+    job = await UpdateJobRepository(session).get(job_id)
+    assert job is not None
+    assert job.operation is UpdateOperation(operation_value)
+    assert job.status is UpdateJobStatus.pending
+    assert job.document_id == document.id
+    assert context.task.payload["update_job_id"] == job.id
+
+
+@pytest.mark.asyncio
+async def test_document_handlers_do_not_use_legacy_publish_path(
+    update_job_session,
+    monkeypatch,
+) -> None:
+    from industrial_rag.services.handler_impls import handle_reindex, handle_reparse
+    from industrial_rag.services.index_service import IndexService
+    from industrial_rag.services.parse_service import ParseService
+
+    async def legacy_path_called(*_args, **_kwargs):
+        raise AssertionError("document lifecycle handler entered legacy publish path")
+
+    monkeypatch.setattr(ParseService, "parse_document", legacy_path_called)
+    monkeypatch.setattr(IndexService, "index_knowledge_base", legacy_path_called)
+    session, kb, document = update_job_session
+
+    reparse = await handle_reparse(
+        await _task_context(session, kb, document, TaskType.reparse)
+    )
+    reindex = await handle_reindex(
+        await _task_context(session, kb, document, TaskType.reindex)
+    )
+
+    assert reparse.success is True
+    assert reindex.success is True
+
+
+@pytest.mark.asyncio
+async def test_document_handlers_do_not_activate_generation(
+    update_job_session,
+    monkeypatch,
+) -> None:
+    from industrial_rag.repositories.vector_index_generation_repository import (
+        VectorIndexGenerationRepository,
+    )
+    from industrial_rag.services.handler_impls import handle_reindex, handle_reparse
+
+    async def generation_activation_called(*_args, **_kwargs):
+        raise AssertionError("document lifecycle handler activated a generation")
+
+    monkeypatch.setattr(
+        VectorIndexGenerationRepository,
+        "activate",
+        generation_activation_called,
+    )
+    session, kb, document = update_job_session
+
+    reparse = await handle_reparse(
+        await _task_context(session, kb, document, TaskType.reparse)
+    )
+    reindex = await handle_reindex(
+        await _task_context(session, kb, document, TaskType.reindex)
+    )
+
+    assert reparse.success is True
+    assert reindex.success is True
+
+
+@pytest.mark.asyncio
+async def test_legacy_manual_reindex_rebuild_task_converges_to_update_job(
+    update_job_session,
+    monkeypatch,
+) -> None:
+    from industrial_rag.services.handler_impls import handle_rebuild
+    from industrial_rag.services.index_service import IndexService
+
+    async def legacy_publish_path_called(*_args, **_kwargs):
+        raise AssertionError("legacy manual reindex entered IndexService")
+
+    monkeypatch.setattr(IndexService, "index_knowledge_base", legacy_publish_path_called)
+    session, kb, document = update_job_session
+    context = await _task_context(
+        session,
+        kb,
+        document,
+        TaskType.rebuild,
+        payload={"reason": "manual reindex request"},
+    )
+
+    result = await handle_rebuild(context)
+
+    assert result.success is True
+    assert result.result is not None
+    job = await UpdateJobRepository(session).get(result.result["update_job_id"])
+    assert job is not None
+    assert job.operation is UpdateOperation.reindex

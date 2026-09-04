@@ -187,7 +187,7 @@ class DocumentService:
         task = await self._task_repo.create(
             knowledge_base_id=kb_id,
             document_id=doc_id,
-            task_type=TaskType.rebuild,
+            task_type=TaskType.reindex,
             payload={"file_name": doc.original_file_name, "reason": "manual reindex request"},
         )
         return {"task_id": task.id, "document_id": doc_id, "status": "pending"}
