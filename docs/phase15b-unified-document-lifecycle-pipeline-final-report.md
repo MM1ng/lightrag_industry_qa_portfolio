@@ -1,48 +1,40 @@
-# Phase15-B Unified Document Lifecycle Pipeline — Final Acceptance Report
+# Phase15-B 统一文档生命周期流水线——最终验收报告
 
-**Acceptance date:** 2026-09-04  
-**Scope:** Phase15-B Steps 1–5, final acceptance only.  
-**Commit range:** `2ec75af` through `ea699e0`.
+**验收日期：** 2026-09-04
+**验收范围：** Phase15-B 第 1–5 步的最终验收。
+**提交范围：** `2ec75af` 至 `ea699e0`。
 
-## 1. Executive Summary
+## 1. 执行摘要
 
-Phase15-B aligns document lifecycle operations with the durable `UpdateJob`
-pipeline. The five supported operations — `add`, `replace`, `delete`,
-`reparse`, and `reindex` — build an isolated candidate generation and retain
-the serving generation until canonical validation succeeds and the explicit
-Promote operation changes the active pointer.
+Phase15-B 将文档生命周期操作统一到持久化的 `UpdateJob` 流水线。五种受支持操作——`add`、`replace`、`delete`、`reparse` 和 `reindex`——都会构建隔离的 Candidate Generation；在 canonical validation 成功且显式执行 Promote 前，线上服务中的 Active Generation 保持不变。
 
-`reparse` and `reindex` are now persisted `UpdateJob` operations. Legacy
-`LifecycleTask` document handlers act as compatibility adapters: they create
-and execute an `UpdateJob`, but do not activate or promote a generation.
-This acceptance step adds no product features and does not change production
-code.
+`reparse` 和 `reindex` 现已是持久化的 `UpdateJob` 操作。遗留的 `LifecycleTask` 文档处理器仅作为兼容性适配器：它们创建并执行 `UpdateJob`，但不具备激活或 Promote Generation 的权限。本次最终验收未新增产品能力，也未修改生产代码。
 
-## 2. Before/After Architecture
+## 2. 改造前后架构
 
-| Concern | Before Phase15-B | After Phase15-B |
+| 关注点 | Phase15-B 前 | Phase15-B 后 |
 | --- | --- | --- |
-| Reparse/reindex contract | Not represented as durable `UpdateJob` operations | Persisted `UpdateOperation.reparse` and `UpdateOperation.reindex` with repository create/query/recovery support |
-| Document lifecycle entry | Legacy `LifecycleTask` paths could reach parse/index behavior directly | Lifecycle handlers converge to an `UpdateJob` and candidate build |
-| Candidate isolation | Reparse/reindex were not covered by the common candidate contract | Both create a distinct `VectorIndexGeneration`; Active remains unchanged during build and validation |
-| Publication authority | Legacy document paths could be confused with indexing/publishing work | Document publication is gated by Validation and `promote_generation`; `IndexService` requires an explicit backend-migration target |
-| Concurrency safety | Existing Phase9 lease protections | Reparse/reindex are covered by the same fenced candidate and Promote path |
+| reparse/reindex 契约 | 未作为持久化 `UpdateJob` 操作表示 | 增加 `UpdateOperation.reparse` 和 `UpdateOperation.reindex`，支持 repository 创建、查询与恢复 |
+| 文档生命周期入口 | 遗留 `LifecycleTask` 路径可能直接进入解析或索引行为 | 生命周期处理器统一收敛到 `UpdateJob` 与 Candidate 构建 |
+| Candidate 隔离 | reparse/reindex 未纳入通用 Candidate 契约 | 两者均创建独立 `VectorIndexGeneration`；构建和验证期间 Active 不变 |
+| 发布权限 | 遗留文档路径可能与索引/发布职责混淆 | 文档发布受 Validation 和 `promote_generation` 约束；`IndexService` 必须显式指定后端迁移目标 |
+| 并发安全 | 已有 Phase9 Lease 保护 | reparse/reindex 复用同一套带 fencing 的 Candidate 与 Promote 路径 |
 
-## 3. Lifecycle Flow
+## 3. 生命周期流程
 
-All document operations use the following safety boundary:
+所有文档操作遵循以下安全边界：
 
 ```text
 add | replace | delete | reparse | reindex
                     |
                     v
-              UpdateJob (durable intent)
+              UpdateJob（持久化意图）
                     |
                     v
        IncrementalUpdateService.execute_job
                     |
                     v
-   Candidate VectorIndexGeneration (isolated)
+   Candidate VectorIndexGeneration（隔离）
                     |
                     v
        GenerationValidationService / Validation Gate
@@ -54,88 +46,56 @@ add | replace | delete | reparse | reindex
           KnowledgeBase.active_vector_generation_id
 ```
 
-`execute_job` builds a candidate only. It neither validates nor promotes. A
-candidate cannot be promoted while it is still `building`; a `ready` candidate
-must also have current canonical validation evidence. The active-generation
-pointer changes through the fenced Promote transition.
+`execute_job` 仅构建 Candidate，不执行验证或发布。处于 `building` 的 Candidate 无法 Promote；处于 `ready` 的 Candidate 仍必须具备当前有效的 canonical validation evidence。Active Generation 指针只能通过带 fencing 的 Promote 转换改变。
 
-Operation-specific scope remains deliberate:
+操作范围保持明确：
 
-- `reparse` requires `document_id` and rebuilds candidate parsing/chunk
-  artifacts for that document.
-- `reindex` uses the current KnowledgeBase active-document snapshot and does
-  not change parser, chunking, or embedding configuration.
+- `reparse` 必须携带 `document_id`，用于为单个文档重建 Candidate 解析/分块产物。
+- `reindex` 仅使用当前 KnowledgeBase 的活动文档快照构建 Candidate 索引，不改变 parser、chunking 或 embedding 配置。
 
-## 4. Changed Components
+## 4. 已变更组件
 
-| Component | Phase15-B responsibility |
+| 组件 | Phase15-B 职责 |
 | --- | --- |
-| `UpdateOperation` / migration | Added backward-compatible `reparse` and `reindex` values and a reparse document-id constraint |
-| `UpdateJobRepository` | Persists, queries, and recovers the new operation values |
-| `DocumentService` and lifecycle handlers | Preserve compatibility while creating/executing UpdateJobs for reparse/reindex |
-| `IncrementalUpdateService` | Extends the existing service with an execution entry that builds candidates; it was not rewritten |
-| `IndexService` | Reserves direct indexing for explicit vector-backend migration rather than document lifecycle publication |
-| Phase15-B tests | Cover operation persistence, handler convergence, candidate isolation, validation, Promote, and fencing |
+| `UpdateOperation` / migration | 以向后兼容方式增加 `reparse`、`reindex`，并增加 reparse 必须提供 document_id 的约束 |
+| `UpdateJobRepository` | 持久化、查询并恢复新增操作类型 |
+| `DocumentService` 与生命周期处理器 | 在保留兼容性的同时，为 reparse/reindex 创建并执行 UpdateJob |
+| `IncrementalUpdateService` | 在不重写服务的前提下扩展 Candidate 构建入口 |
+| `IndexService` | 将直接索引限定为显式向量后端迁移，不再承担文档生命周期发布 |
+| Phase15-B 测试 | 覆盖操作持久化、处理器收敛、Candidate 隔离、验证、Promote 与 fencing |
 
-## 5. Security Guarantees
+## 5. 安全保证
 
-- **No unvalidated publish:** a candidate in `building` state is rejected by
-  Promote. A `ready` candidate must pass `ValidationGateService.require_eligible`.
-- **Failure isolation:** a failed validation marks the candidate and its job
-  failed without changing the active-generation pointer.
-- **Evidence binding:** Promote rechecks canonical validation evidence against
-  frozen generation artifacts, document registry, Qdrant content, strategy,
-  and content epoch.
-- **Atomic publication:** `KBLeaseService.switch_active_generation` guards the
-  pointer compare-and-set, generation state update, and generation epoch with
-  the current lease and fencing token.
-- **Stale-writer rejection:** an expired reindex lease cannot restore an older
-  Active Generation after a newer promote.
-- **Compatibility without authority:** `LifecycleTask` remains available for
-  creation, status, and recovery compatibility but has no document publication
-  authority.
+- **禁止未验证发布：** 处于 `building` 状态的 Candidate 会被 Promote 拒绝；`ready` Candidate 必须通过 `ValidationGateService.require_eligible`。
+- **失败隔离：** 验证失败会将 Candidate 与其 Job 标记为失败，不改变 Active Generation 指针。
+- **证据绑定：** Promote 会重新校验 canonical validation evidence 是否仍与冻结的 Generation 产物、文档注册表、Qdrant 内容、策略和内容 epoch 一致。
+- **原子发布：** `KBLeaseService.switch_active_generation` 使用当前 Lease 与 fencing token 保护指针 compare-and-set、Generation 状态变更和 generation epoch。
+- **拒绝陈旧写入：** 已过期的 reindex Lease 无法在新 Promote 后恢复旧的 Active Generation。
+- **保留兼容而不保留权限：** `LifecycleTask` 仍可用于创建、查询状态和恢复兼容，但不拥有文档发布权限。
 
-## 6. Test Evidence
+## 6. 测试证据
 
-All commands below were run in the Phase15-B worktree on 2026-09-04.
+以下命令均于 2026-09-04 在 Phase15-B worktree 内执行。
 
-| Command / suite | Result | Evidence covered |
+| 命令 / 测试集 | 结果 | 覆盖证据 |
 | --- | --- | --- |
-| `pytest tests/test_phase15b_unified_document_lifecycle.py -v` | 26 passed | UpdateJob contract, legacy handler convergence, reparse/reindex candidate construction, validation gating, Promote, and stale-lease fencing |
-| `pytest tests/test_phase9.py -v` | 24 passed | Add/replace/delete candidate lifecycle, validation failure isolation, Promote, rollback, restart recovery, snapshot integrity, and concurrency |
-| `pytest tests/test_phase9b_validation_gate.py -v` | 8 passed | Canonical validation evidence, artifact/Qdrant tamper detection, and required validation |
-| `pytest tests/test_phase9b_job_recovery.py -v` | 4 passed | Atomic claims, stale-worker rejection, recovery, and KB lease binding |
-| `pytest tests/test_phase9b_multi_instance.py -v` | 10 passed | Multi-instance runtime behavior, candidate isolation, and Promote/rollback propagation |
-| `ruff check src tests` | passed | Static lint checks for source and tests |
+| `pytest tests/test_phase15b_unified_document_lifecycle.py -v` | 26 passed | UpdateJob 契约、遗留处理器收敛、reparse/reindex Candidate 构建、验证门禁、Promote 与陈旧 Lease fencing |
+| `pytest tests/test_phase9.py -v` | 24 passed | add/replace/delete Candidate 生命周期、验证失败隔离、Promote、回滚、重启恢复、快照完整性和并发 |
+| `pytest tests/test_phase9b_validation_gate.py -v` | 8 passed | canonical validation evidence、artifact/Qdrant 篡改检测及必需验证 |
+| `pytest tests/test_phase9b_job_recovery.py -v` | 4 passed | 原子 claim、陈旧 worker 拒绝、恢复与 KB Lease 绑定 |
+| `pytest tests/test_phase9b_multi_instance.py -v` | 10 passed | 多实例运行时行为、Candidate 隔离及 Promote/rollback 传播 |
+| `ruff check src tests` | passed | 源码和测试的静态检查 |
 
-The requested combined Phase9 command was also initiated. The desktop command
-output channel has a 30-second cutoff, so its final summary was obtained by
-running the same four requested files independently; their results total
-46 passed tests.
+请求的组合 Phase9 命令也已启动。桌面执行通道存在 30 秒输出截止，因此最终结果通过将同样的四个指定文件分别运行获得；合计 46 项测试通过。
 
-## 7. Known Limitations
+## 7. 已知限制
 
-- Lifecycle execution remains synchronous for `LifecycleTask` compatibility;
-  Phase15-B intentionally does not introduce an async worker.
-- Reindex is a candidate-index rebuild for the current KB snapshot only. It
-  does not perform parser, chunking, or embedding upgrades.
-- `LifecycleTask` storage and compatibility APIs remain. They are adapters and
-  recovery mechanisms, not a second document publication state machine.
-- The acceptance suites use offline test doubles for Qdrant and canonical
-  runner interactions. A release rollout still needs an operator-run canary
-  using the production validation endpoint, real vector backend, and an
-  observed rollback drill.
-- Retrieval, Evaluation, parser algorithms, embedding strategy, and frontend
-  behavior are intentionally outside Phase15-B scope.
+- 为兼容 `LifecycleTask`，生命周期执行仍为同步模式；Phase15-B 按约束未引入 Async Worker。
+- reindex 仅针对当前 KB 快照重建 Candidate 索引；不执行 parser、chunking 或 embedding 升级。
+- `LifecycleTask` 表和兼容 API 仍被保留。它们仅用于适配与恢复，不再构成第二套文档发布状态机。
+- 验收测试对 Qdrant 和 canonical runner 使用离线测试替身。正式发布前仍需要使用真实向量后端、生产 validation endpoint 和可观测回滚演练执行 operator-run canary。
+- Retrieval、Evaluation、Parser 算法、Embedding 策略和 Frontend 均明确不在 Phase15-B 范围内。
 
-## 8. Recommendation for Phase15-C
+## 8. 对 Phase15-C 的建议
 
-Proceed to Phase15-C only after a controlled deployment rehearsal confirms
-the same validation evidence and fenced Promote behavior against production
-dependencies. Keep the Phase15-B invariants unchanged: document changes must
-remain `UpdateJob`-backed, candidates must remain isolated until validation,
-and Active Generation must change only through the Promote path. Any future
-worker, parser/configuration upgrade, or observability enhancement should be
-specified and accepted as a separate phase rather than folded into this
-completed lifecycle alignment.
-
+建议在受控部署演练确认生产依赖环境中的 validation evidence 与带 fencing 的 Promote 行为后，再进入 Phase15-C。必须保持 Phase15-B 的不变量：所有文档变更均由 `UpdateJob` 持久化；Candidate 在验证前保持隔离；Active Generation 仅可通过 Promote 路径变更。任何新的 worker、parser/configuration 升级或可观测性增强，都应作为独立阶段定义和验收，不应混入已完成的生命周期对齐范围。
