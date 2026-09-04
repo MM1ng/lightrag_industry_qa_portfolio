@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     Float,
@@ -104,6 +105,8 @@ class UpdateOperation(enum.StrEnum):
     add = "add"
     replace = "replace"
     delete = "delete"
+    reparse = "reparse"
+    reindex = "reindex"
 
 
 class UpdateJobStatus(enum.StrEnum):
@@ -430,7 +433,7 @@ class LifecycleTask(Base):
 
 
 class UpdateJob(Base):
-    """One incremental knowledge-base update operation (add / replace / delete).
+    """One incremental knowledge-base update operation.
 
     Each job owns a candidate generation.  The candidate inherits unchanged
     documents from the active generation and only processes the changed
@@ -439,6 +442,12 @@ class UpdateJob(Base):
     """
 
     __tablename__ = "update_jobs"
+    __table_args__ = (
+        CheckConstraint(
+            "operation != 'reparse' OR document_id IS NOT NULL",
+            name="ck_update_jobs_reparse_requires_document",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_new_uuid)
     knowledge_base_id: Mapped[str] = mapped_column(
