@@ -22,7 +22,7 @@ from industrial_rag.services.generation_artifacts import (
     generation_artifact_evidence,
 )
 from industrial_rag.services.lexical_retrieval import BM25Index
-from industrial_rag.services.reranker_runtime import RerankerRuntime, RerankProvider
+from industrial_rag.services.reranker_runtime import RerankerResult, RerankerRuntime, RerankProvider
 from industrial_rag.services.rrf_fusion import reciprocal_rank_fusion
 
 
@@ -232,6 +232,7 @@ def load_development_cases(dataset_path: Path, manifest_path: Path) -> tuple[dic
 
 
 LightRAGRetriever = Callable[[str, int], Awaitable[Sequence[Mapping[str, Any]]]]
+TraceObserver = Callable[[Mapping[str, Any]], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,6 +257,7 @@ async def run_ab_evaluation(
     candidate_top_n: int = 20,
     final_top_k: int = 10,
     rrf_k: int = 60,
+    trace_observer: TraceObserver | None = None,
 ) -> dict[str, Any]:
     checked_cases = assert_development_only(cases)
     if candidate_top_n <= 0 or final_top_k <= 0:
@@ -310,6 +312,17 @@ async def run_ab_evaluation(
                 latency_ms=a1_latency,
             )
         )
+        if trace_observer is not None:
+            trace_observer(
+                _trace_event(
+                    "pre_rerank",
+                    case,
+                    dense_rows=dense_rows,
+                    sparse_rows=sparse_rows,
+                    fused_rows=fused_rows,
+                    rerank_result=None,
+                )
+            )
         rerank_started = time.perf_counter()
         rerank_result = await RerankerRuntime(
             provider=reranker_provider,
@@ -324,6 +337,17 @@ async def run_ab_evaluation(
         if reranker_model:
             for row in a2_rows:
                 row["rerank_model"] = reranker_model
+        if trace_observer is not None:
+            trace_observer(
+                _trace_event(
+                    "post_rerank",
+                    case,
+                    dense_rows=dense_rows,
+                    sparse_rows=sparse_rows,
+                    fused_rows=fused_rows,
+                    rerank_result=rerank_result,
+                )
+            )
         variant_runs[Variant.A2.value].append(
             _VariantRun(
                 ranked_ids=tuple(row["child_chunk_id"] for row in a2_rows),
@@ -344,6 +368,44 @@ async def run_ab_evaluation(
         final_top_k=final_top_k,
         rrf_k=rrf_k,
     )
+
+
+def _trace_event(
+    event: str,
+    case: Mapping[str, Any],
+    *,
+    dense_rows: Sequence[Mapping[str, Any]],
+    sparse_rows: Sequence[Mapping[str, Any]],
+    fused_rows: Sequence[Mapping[str, Any]],
+    rerank_result: RerankerResult | None,
+) -> dict[str, Any]:
+    """Expose immutable copies of the real A2 stages for offline diagnostics."""
+    return {
+        "event": event,
+        "question_id": str(case["id"]),
+        "question": str(case.get("question") or ""),
+        "dense_candidates": [dict(row) for row in dense_rows],
+        "sparse_candidates": [dict(row) for row in sparse_rows],
+        "fusion_candidates": [dict(row) for row in fused_rows],
+        "rerank_candidates": (
+            [dict(row) for row in rerank_result.trace_candidates]
+            if rerank_result is not None
+            else []
+        ),
+        "rerank_status": (
+            "success"
+            if rerank_result is not None and rerank_result.fallback_reason is None
+            else "unavailable"
+        ),
+        "rerank_failure_reason": (
+            rerank_result.fallback_reason if rerank_result is not None else None
+        ),
+        "final_candidates": (
+            [dict(row) for row in rerank_result.candidates]
+            if rerank_result is not None
+            else []
+        ),
+    }
 
 
 def _normalize_rows(rows: Sequence[Mapping[str, Any]], chunk_ids: frozenset[str], *, source: str) -> list[dict[str, Any]]:

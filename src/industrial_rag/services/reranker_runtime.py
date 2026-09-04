@@ -20,6 +20,7 @@ class RerankRuntimeBlocked(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class RerankerResult:
     candidates: tuple[dict[str, Any], ...]
+    trace_candidates: tuple[dict[str, Any], ...]
     enabled: bool
     provider: str
     latency_ms: float
@@ -85,9 +86,14 @@ class RerankerRuntime:
                     raise RerankRuntimeBlocked("invalid_provider_result")
                 return self._fallback(baseline[:limit], started, "invalid_provider_result")
             scored.sort(key=lambda item: (-item[2], item[0]))
+            trace_candidates = tuple(
+                {**item[1], "rerank_rank": rank}
+                for rank, item in enumerate(scored, 1)
+            )
             final = tuple(item[1] for item in scored[:limit])
             return RerankerResult(
                 candidates=final,
+                trace_candidates=trace_candidates,
                 enabled=True,
                 provider=self._provider_name,
                 latency_ms=(time.perf_counter() - started) * 1000,
@@ -111,6 +117,10 @@ class RerankerRuntime:
     ) -> RerankerResult:
         return RerankerResult(
             candidates=baseline,
+            trace_candidates=tuple(
+                {**candidate, "rerank_rank": rank}
+                for rank, candidate in enumerate(baseline, 1)
+            ),
             enabled=False,
             provider=self._provider_name,
             latency_ms=(time.perf_counter() - started) * 1000,

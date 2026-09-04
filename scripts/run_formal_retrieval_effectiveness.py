@@ -7,6 +7,7 @@ import asyncio
 import json
 import sys
 import time
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from statistics import median
 from typing import Any
@@ -94,7 +95,11 @@ def _cases_for_runner(cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-async def _run(args: argparse.Namespace) -> dict[str, Any]:
+async def _run(
+    args: argparse.Namespace,
+    *,
+    trace_observer: Callable[[Mapping[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     cases, generation, preflight_report = preflight(args.dataset, args.manifest, args.mapping, args.generation)
     runner_cases = _cases_for_runner(cases)
     lexical_payload = (generation.workspace / "retrieval" / "lexical_index.json").read_bytes()
@@ -136,6 +141,7 @@ async def _run(args: argparse.Namespace) -> dict[str, Any]:
             reranker_provider_name="aliyun_model_studio",
             reranker_model="qwen3-rerank",
             allow_reranker_fallback=False,
+            trace_observer=trace_observer,
         )
     finally:
         await service.close()
