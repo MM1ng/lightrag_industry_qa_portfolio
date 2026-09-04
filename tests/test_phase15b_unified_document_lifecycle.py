@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
 
+import pymupdf
 import pytest
 import pytest_asyncio
 from alembic import command
 from alembic.config import Config
+from industrial_rag.config import Settings
 from industrial_rag.db.models import (
     Base,
     Document,
@@ -16,6 +20,8 @@ from industrial_rag.db.models import (
     TaskType,
     UpdateJobStatus,
     UpdateOperation,
+    VectorIndexGeneration,
+    VectorIndexGenerationStatus,
 )
 from industrial_rag.db.session import reset_for_testing
 from industrial_rag.repositories.document_repository import DocumentRepository
@@ -25,6 +31,12 @@ from industrial_rag.repositories.knowledge_base_repository import (
 from industrial_rag.repositories.task_repository import TaskRepository
 from industrial_rag.repositories.update_job_repository import UpdateJobRepository
 from industrial_rag.services.document_service import DocumentService
+from industrial_rag.services.generation_artifacts import freeze_generation_child_chunks
+from industrial_rag.services.generation_fingerprint_service import (
+    build_generation_fingerprint,
+)
+from industrial_rag.services.incremental_update_service import IncrementalUpdateService
+from industrial_rag.services.parse_service import load_child_chunks, load_parent_chunks
 from industrial_rag.services.task_context import TaskExecutionContext
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
@@ -58,6 +70,90 @@ async def update_job_session():
         await session.commit()
         yield session, kb, document
     await engine.dispose()
+
+
+class _CandidateBuildQdrant:
+    """Minimal offline client for generation creation and count checks."""
+
+    async def collection_exists(self, _name: str) -> bool:
+        return False
+
+    async def create_collection(self, **_kwargs) -> None:
+        return None
+
+    async def count(self, _name: str, **_kwargs) -> SimpleNamespace:
+        return SimpleNamespace(count=0)
+
+    async def close(self) -> None:
+        return None
+
+
+async def _service_with_active_snapshot(
+    session,
+    kb: KnowledgeBase,
+    document: Document,
+    tmp_path: Path,
+    monkeypatch,
+) -> tuple[IncrementalUpdateService, VectorIndexGeneration]:
+    """Prepare a frozen active generation without invoking external services."""
+    data_root = tmp_path / "kb-data"
+    monkeypatch.setenv("KB_DATA_ROOT", str(data_root))
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "phase15b-test-key")
+    source_path = data_root / kb.id / "uploads" / document.stored_file_name
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    source_pdf = pymupdf.open()
+    source_pdf.new_page().insert_text((72, 72), "Phase15-B candidate source")
+    source_pdf.save(source_path)
+    source_pdf.close()
+    document.file_path = str(source_path)
+
+    client = _CandidateBuildQdrant()
+    service = IncrementalUpdateService(
+        session,
+        qdrant_client_factory=lambda: client,
+    )
+    await service._parse_document_pymupdf(kb, document)
+
+    parsed_dir = data_root / kb.id / "parsed" / "documents" / document.id
+    children = load_child_chunks(parsed_dir)
+    parents = load_parent_chunks(parsed_dir)
+    active_workspace = data_root / kb.id / "qdrant" / "active" / "workspace"
+    active_token = "gphase15bactive"
+    snapshot_pairs = [(document, child) for child in children]
+    snapshot_parent_pairs = [(document, parent) for parent in parents]
+    snapshot = freeze_generation_child_chunks(
+        active_workspace,
+        generation_id=active_token,
+        document_children=snapshot_pairs,
+        document_parents=snapshot_parent_pairs,
+    )
+    fingerprint = build_generation_fingerprint(kb, snapshot_pairs)
+    active = VectorIndexGeneration(
+        knowledge_base_id=kb.id,
+        backend="qdrant",
+        generation=active_token,
+        status=VectorIndexGenerationStatus.active,
+        workspace_path=str(active_workspace),
+        collections={},
+        document_manifest_hash=fingerprint.document_manifest_hash,
+        child_chunks_manifest_hash=snapshot.child_manifest_hash,
+        embedding_config_hash=fingerprint.embedding_config_hash,
+        chunking_config_hash=fingerprint.chunking_config_hash,
+    )
+    session.add(active)
+    await session.flush()
+    kb.active_vector_generation_id = active.id
+    await session.commit()
+
+    async def no_external_ingest(*_args, **_kwargs) -> int:
+        return 0
+
+    async def no_external_remove(*_args, **_kwargs) -> list[str]:
+        return []
+
+    monkeypatch.setattr(service, "_ingest_document", no_external_ingest)
+    monkeypatch.setattr(service, "_remove_document_points", no_external_remove)
+    return service, active
 
 
 def test_model_supports_reparse_and_reindex_operations() -> None:
@@ -220,7 +316,16 @@ async def _task_context(
         kb_repo=KnowledgeBaseRepository(session),
         doc_repo=DocumentRepository(session),
         task_repo=TaskRepository(session),
+        settings=Settings.from_mapping({"DASHSCOPE_API_KEY": "phase15b-test-key"}),
     )
+
+
+async def _candidate_build_result(job_id: str) -> dict[str, str]:
+    return {
+        "status": "candidate_built",
+        "job_id": job_id,
+        "candidate_generation_id": "candidate-for-test",
+    }
 
 
 @pytest.mark.asyncio
@@ -241,11 +346,20 @@ async def test_document_service_queues_reindex_as_reindex_task(update_job_sessio
 )
 async def test_handler_creates_pending_update_job_for_document_operation(
     update_job_session,
+    monkeypatch,
     task_type: TaskType,
     operation_value: str,
 ) -> None:
     from industrial_rag.services.handler_impls import handle_reindex, handle_reparse
 
+    async def candidate_built(self, _kb_id: str, job_id: str, *, actor: str | None = None):
+        return {
+            "status": "candidate_built",
+            "job_id": job_id,
+            "candidate_generation_id": "candidate-for-test",
+        }
+
+    monkeypatch.setattr(IncrementalUpdateService, "execute_job", candidate_built)
     session, kb, document = update_job_session
     context = await _task_context(session, kb, document, task_type)
     handler = handle_reparse if task_type is TaskType.reparse else handle_reindex
@@ -254,6 +368,7 @@ async def test_handler_creates_pending_update_job_for_document_operation(
 
     assert result.success is True
     assert result.result is not None
+    assert result.result["action"] == "candidate_built"
     job_id = result.result["update_job_id"]
     job = await UpdateJobRepository(session).get(job_id)
     assert job is not None
@@ -277,6 +392,11 @@ async def test_document_handlers_do_not_use_legacy_publish_path(
 
     monkeypatch.setattr(ParseService, "parse_document", legacy_path_called)
     monkeypatch.setattr(IndexService, "index_knowledge_base", legacy_path_called)
+    monkeypatch.setattr(
+        IncrementalUpdateService,
+        "execute_job",
+        lambda _self, _kb_id, job_id, **_kwargs: _candidate_build_result(job_id),
+    )
     session, kb, document = update_job_session
 
     reparse = await handle_reparse(
@@ -308,6 +428,11 @@ async def test_document_handlers_do_not_activate_generation(
         "activate",
         generation_activation_called,
     )
+    monkeypatch.setattr(
+        IncrementalUpdateService,
+        "execute_job",
+        lambda _self, _kb_id, job_id, **_kwargs: _candidate_build_result(job_id),
+    )
     session, kb, document = update_job_session
 
     reparse = await handle_reparse(
@@ -333,6 +458,11 @@ async def test_legacy_manual_reindex_rebuild_task_converges_to_update_job(
         raise AssertionError("legacy manual reindex entered IndexService")
 
     monkeypatch.setattr(IndexService, "index_knowledge_base", legacy_publish_path_called)
+    monkeypatch.setattr(
+        IncrementalUpdateService,
+        "execute_job",
+        lambda _self, _kb_id, job_id, **_kwargs: _candidate_build_result(job_id),
+    )
     session, kb, document = update_job_session
     context = await _task_context(
         session,
@@ -349,3 +479,110 @@ async def test_legacy_manual_reindex_rebuild_task_converges_to_update_job(
     job = await UpdateJobRepository(session).get(result.result["update_job_id"])
     assert job is not None
     assert job.operation is UpdateOperation.reindex
+
+
+@pytest.mark.asyncio
+async def test_reparse_execution_builds_isolated_candidate_and_preserves_active(
+    update_job_session,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """A reparse rebuilds a candidate while retaining the serving generation."""
+    session, kb, document = update_job_session
+    service, active = await _service_with_active_snapshot(
+        session, kb, document, tmp_path, monkeypatch
+    )
+    job = await UpdateJobRepository(session).create(
+        knowledge_base_id=kb.id,
+        base_generation_id=active.id,
+        operation=UpdateOperation.reparse,
+        document_id=document.id,
+        created_by="phase15b-test",
+    )
+    await session.commit()
+
+    result = await service.execute_job(kb.id, job.id)
+
+    candidate = await service._generation_repo.get(result["candidate_generation_id"])
+    current_active = await service._generation_repo.get_active(kb.id)
+    assert result["status"] == "candidate_built"
+    assert candidate is not None
+    assert candidate.id != active.id
+    assert candidate.status is VectorIndexGenerationStatus.building
+    assert current_active is not None
+    assert current_active.id == active.id
+    assert kb.active_vector_generation_id == active.id
+
+
+@pytest.mark.asyncio
+async def test_reindex_execution_clones_active_snapshot_without_parser_or_activation(
+    update_job_session,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Reindex operates on the active snapshot and never re-parses or promotes."""
+    session, kb, document = update_job_session
+    service, active = await _service_with_active_snapshot(
+        session, kb, document, tmp_path, monkeypatch
+    )
+    job = await UpdateJobRepository(session).create(
+        knowledge_base_id=kb.id,
+        base_generation_id=active.id,
+        operation=UpdateOperation.reindex,
+        document_id=None,
+        created_by="phase15b-test",
+    )
+    await session.commit()
+
+    async def parser_called(*_args, **_kwargs):
+        raise AssertionError("reindex must not invoke the parser")
+
+    monkeypatch.setattr(service, "_parse_document_pymupdf", parser_called)
+
+    result = await service.execute_job(kb.id, job.id)
+
+    candidate = await service._generation_repo.get(result["candidate_generation_id"])
+    current_active = await service._generation_repo.get_active(kb.id)
+    assert result["status"] == "candidate_built"
+    assert candidate is not None
+    assert candidate.id != active.id
+    assert candidate.child_chunks_manifest_hash == active.child_chunks_manifest_hash
+    assert current_active is not None
+    assert current_active.id == active.id
+    assert kb.active_vector_generation_id == active.id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "task_type",
+    [TaskType.reparse, TaskType.reindex],
+)
+async def test_lifecycle_handlers_execute_their_update_job(
+    update_job_session,
+    monkeypatch,
+    task_type: TaskType,
+) -> None:
+    """Lifecycle adapters hand both operations to the UpdateJob pipeline."""
+    from industrial_rag.services.handler_impls import handle_reindex, handle_reparse
+
+    calls: list[tuple[str, str]] = []
+
+    async def execute_job(self, kb_id: str, job_id: str, *, actor: str | None = None):
+        calls.append((kb_id, job_id))
+        return {
+            "status": "candidate_built",
+            "job_id": job_id,
+            "candidate_generation_id": "candidate-for-test",
+        }
+
+    monkeypatch.setattr(IncrementalUpdateService, "execute_job", execute_job, raising=False)
+    session, kb, document = update_job_session
+    context = await _task_context(session, kb, document, task_type)
+    handler = handle_reparse if task_type is TaskType.reparse else handle_reindex
+
+    result = await handler(context)
+
+    assert result.success is True
+    assert result.result is not None
+    assert result.result["action"] == "candidate_built"
+    assert calls == [(kb.id, result.result["update_job_id"])]

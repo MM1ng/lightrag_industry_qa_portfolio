@@ -155,7 +155,7 @@ async def handle_parse(ctx: TaskExecutionContext) -> TaskExecutionResult:
 async def handle_rebuild(ctx: TaskExecutionContext) -> TaskExecutionResult:
     """Full KB index rebuild using IndexService."""
     if (ctx.task.payload or {}).get("reason") == "manual reindex request":
-        return await _create_update_job_from_document_task(
+        return await _create_and_execute_update_job_from_document_task(
             ctx,
             operation=UpdateOperation.reindex,
         )
@@ -307,8 +307,8 @@ async def _create_update_job_from_document_task(
 ) -> TaskExecutionResult:
     """Adapt one legacy document task into a pending UpdateJob.
 
-    Candidate construction, validation, and promotion remain owned by later
-    Phase15-B steps. This adapter must not parse, index, or activate anything.
+    Candidate construction is delegated to IncrementalUpdateService by the
+    caller. Validation and promotion remain separate lifecycle stages.
     """
     document_id = ctx.task.document_id
     if operation is UpdateOperation.reparse and document_id is None:
@@ -373,10 +373,55 @@ async def _create_update_job_from_document_task(
     )
 
 
+async def _create_and_execute_update_job_from_document_task(
+    ctx: TaskExecutionContext,
+    *,
+    operation: UpdateOperation,
+) -> TaskExecutionResult:
+    """Create or recover an UpdateJob, then build its candidate generation."""
+    created = await _create_update_job_from_document_task(ctx, operation=operation)
+    if not created.success or created.result is None:
+        return created
+
+    from industrial_rag.services.incremental_update_service import (
+        IncrementalUpdateService,
+    )
+
+    job_id = str(created.result["update_job_id"])
+    try:
+        candidate = await IncrementalUpdateService(
+            ctx.task_repo._session,
+            settings=ctx.settings,
+            runtime_manager=ctx.runtime_manager,
+        ).execute_job(
+            ctx.task.knowledge_base_id,
+            job_id,
+            actor=f"lifecycle_task:{ctx.task.id}",
+        )
+    except Exception as exc:
+        return TaskExecutionResult(
+            success=False,
+            error_code="update_job_execution_failed",
+            error_message=str(exc)[:500],
+        )
+
+    await ctx.update_progress(1.0, "candidate_built")
+    return TaskExecutionResult(
+        success=True,
+        result={
+            **created.result,
+            "action": "candidate_built",
+            "candidate_generation_id": candidate["candidate_generation_id"],
+            "candidate_generation": candidate.get("candidate_generation"),
+            "idempotent": candidate.get("idempotent", False),
+        },
+    )
+
+
 @register_handler(TaskType.reparse)
 async def handle_reparse(ctx: TaskExecutionContext) -> TaskExecutionResult:
-    """Create the reparse UpdateJob without touching active artifacts."""
-    return await _create_update_job_from_document_task(
+    """Build a reparse candidate without touching active generation state."""
+    return await _create_and_execute_update_job_from_document_task(
         ctx, operation=UpdateOperation.reparse
     )
 
@@ -388,7 +433,7 @@ async def handle_reparse(ctx: TaskExecutionContext) -> TaskExecutionResult:
 
 @register_handler(TaskType.reindex)
 async def handle_reindex(ctx: TaskExecutionContext) -> TaskExecutionResult:
-    """Create the reindex UpdateJob without touching active artifacts."""
-    return await _create_update_job_from_document_task(
+    """Build a reindex candidate without touching active generation state."""
+    return await _create_and_execute_update_job_from_document_task(
         ctx, operation=UpdateOperation.reindex
     )

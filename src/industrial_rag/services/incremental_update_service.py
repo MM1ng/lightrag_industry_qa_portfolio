@@ -1,7 +1,7 @@
 """Incremental knowledge-base updates with generation lifecycle (Phase 9).
 
 One candidate generation is created per update operation (add / replace /
-delete).  The candidate inherits unchanged documents from the active
+delete / reparse / reindex).  The candidate inherits unchanged documents from the active
 generation by *copying* its workspace and Qdrant points (vectors are reused,
 never recomputed for unchanged chunks).  Only the changed document is parsed,
 chunked, embedded and indexed.  Promote/rollback are atomic pointer switches;
@@ -688,6 +688,52 @@ class IncrementalUpdateService:
             raise AppError(AppErrorCode.update_job_not_found, f"更新任务不存在: {job_id}")
         return self._job_summary(job)
 
+    async def execute_job(
+        self,
+        kb_id: str,
+        job_id: str,
+        *,
+        actor: str | None = None,
+    ) -> dict[str, Any]:
+        """Build one pending UpdateJob into an isolated candidate generation.
+
+        This is intentionally synchronous for LifecycleTask compatibility. It
+        does not validate or promote the candidate; those remain explicit
+        existing lifecycle operations.
+        """
+        await self._require_kb(kb_id)
+        job = await self._job_repo.get_by_kb_and_id(kb_id, job_id)
+        if job is None:
+            raise AppError(AppErrorCode.update_job_not_found, f"更新任务不存在: {job_id}")
+        if job.candidate_generation_id is not None:
+            candidate = await self._generation_repo.get(job.candidate_generation_id)
+            if candidate is not None and candidate.status in {
+                VectorIndexGenerationStatus.building,
+                VectorIndexGenerationStatus.validating,
+                VectorIndexGenerationStatus.ready,
+                VectorIndexGenerationStatus.active,
+            }:
+                return {
+                    "status": "candidate_built",
+                    "idempotent": True,
+                    "knowledge_base_id": kb_id,
+                    "job_id": job.id,
+                    "document_id": job.document_id,
+                    "operation": job.operation.value,
+                    "candidate_generation_id": candidate.id,
+                    "candidate_generation": candidate.generation,
+                }
+        if job.status not in {
+            UpdateJobStatus.pending,
+            UpdateJobStatus.recovery_required,
+        }:
+            raise AppError(
+                AppErrorCode.invalid_state_transition,
+                f"更新任务状态为 {job.status.value}，无法构建候选 Generation",
+                status_code=409,
+            )
+        return await self._execute_persisted_job(kb_id, job.id, actor=actor)
+
     async def resume_job(
         self,
         kb_id: str,
@@ -893,10 +939,19 @@ class IncrementalUpdateService:
             doc = (
                 await self._doc_repo.get(job.document_id)
                 if job.document_id is not None
+                and job.operation != UpdateOperation.reindex
                 else None
             )
+            if job.operation == UpdateOperation.reparse:
+                if doc is None:
+                    raise RuntimeError("Reparse update job has no document")
+                old_doc = doc
             removed_internal_ids: list[str] = []
-            if job.operation in (UpdateOperation.add, UpdateOperation.replace) and doc is not None:
+            if job.operation in (
+                UpdateOperation.add,
+                UpdateOperation.replace,
+                UpdateOperation.reparse,
+            ) and doc is not None:
                 t0 = time.perf_counter()
                 await self._parse_document_pymupdf(kb, doc)
                 t_parse += time.perf_counter() - t0
@@ -928,7 +983,23 @@ class IncrementalUpdateService:
                 expected_child_manifest_hash=generation.child_chunks_manifest_hash,
             )
 
-            if job.operation in (UpdateOperation.add, UpdateOperation.replace) and doc is not None:
+            if job.operation == UpdateOperation.reparse and old_doc is not None:
+                t0 = time.perf_counter()
+                removed_internal_ids = await self._remove_document_points(
+                    kb_id,
+                    generation,
+                    candidate_workspace,
+                    old_doc,
+                    children=previous_children.get(old_doc.id, []),
+                )
+                stats["invalidated_chunks"] = len(removed_internal_ids)
+                t_graph += time.perf_counter() - t0
+
+            if job.operation in (
+                UpdateOperation.add,
+                UpdateOperation.replace,
+                UpdateOperation.reparse,
+            ) and doc is not None:
                 t0 = time.perf_counter()
                 added = await self._ingest_document(
                     kb,
@@ -1107,7 +1178,11 @@ class IncrementalUpdateService:
         ]
         if (
             changed_document is not None
-            and job.operation in (UpdateOperation.add, UpdateOperation.replace)
+            and job.operation in (
+                UpdateOperation.add,
+                UpdateOperation.replace,
+                UpdateOperation.reparse,
+            )
             and all(document.id != changed_document.id for document in documents)
         ):
             documents.append(changed_document)
