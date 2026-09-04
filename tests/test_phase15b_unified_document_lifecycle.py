@@ -24,6 +24,7 @@ from industrial_rag.db.models import (
     VectorIndexGenerationStatus,
 )
 from industrial_rag.db.session import reset_for_testing
+from industrial_rag.errors import AppError, AppErrorCode
 from industrial_rag.repositories.document_repository import DocumentRepository
 from industrial_rag.repositories.knowledge_base_repository import (
     KnowledgeBaseRepository,
@@ -36,6 +37,7 @@ from industrial_rag.services.generation_fingerprint_service import (
     build_generation_fingerprint,
 )
 from industrial_rag.services.incremental_update_service import IncrementalUpdateService
+from industrial_rag.services.kb_lease_service import KBLeaseService
 from industrial_rag.services.parse_service import load_child_chunks, load_parent_chunks
 from industrial_rag.services.task_context import TaskExecutionContext
 from sqlalchemy import create_engine, inspect, text
@@ -75,14 +77,20 @@ async def update_job_session():
 class _CandidateBuildQdrant:
     """Minimal offline client for generation creation and count checks."""
 
-    async def collection_exists(self, _name: str) -> bool:
-        return False
+    def __init__(self) -> None:
+        self._collections: set[str] = set()
 
-    async def create_collection(self, **_kwargs) -> None:
-        return None
+    async def collection_exists(self, name: str) -> bool:
+        return name in self._collections
+
+    async def create_collection(self, *, collection_name: str, **_kwargs) -> None:
+        self._collections.add(collection_name)
 
     async def count(self, _name: str, **_kwargs) -> SimpleNamespace:
         return SimpleNamespace(count=0)
+
+    async def scroll(self, **_kwargs) -> tuple[list[SimpleNamespace], None]:
+        return [], None
 
     async def close(self) -> None:
         return None
@@ -99,6 +107,7 @@ async def _service_with_active_snapshot(
     data_root = tmp_path / "kb-data"
     monkeypatch.setenv("KB_DATA_ROOT", str(data_root))
     monkeypatch.setenv("DASHSCOPE_API_KEY", "phase15b-test-key")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     source_path = data_root / kb.id / "uploads" / document.stored_file_name
     source_path.parent.mkdir(parents=True, exist_ok=True)
     source_pdf = pymupdf.open()
@@ -110,6 +119,13 @@ async def _service_with_active_snapshot(
     client = _CandidateBuildQdrant()
     service = IncrementalUpdateService(
         session,
+        settings=Settings(
+            api_key="provider-test-key",
+            working_dir=data_root,
+            vector_backend="qdrant",
+            qdrant_url="http://qdrant.invalid",
+            validation_artifact_dir=tmp_path / "validation-artifacts",
+        ),
         qdrant_client_factory=lambda: client,
     )
     await service._parse_document_pymupdf(kb, document)
@@ -676,3 +692,300 @@ async def test_lifecycle_handlers_execute_their_update_job(
     assert result.result is not None
     assert result.result["action"] == "candidate_built"
     assert calls == [(kb.id, result.result["update_job_id"])]
+
+
+async def _build_document_lifecycle_candidate(
+    session,
+    kb: KnowledgeBase,
+    document: Document,
+    tmp_path: Path,
+    monkeypatch,
+    *,
+    operation: UpdateOperation,
+) -> tuple[IncrementalUpdateService, VectorIndexGeneration, VectorIndexGeneration, object]:
+    """Build one real Step3 candidate while retaining its active predecessor."""
+    service, active = await _service_with_active_snapshot(
+        session, kb, document, tmp_path, monkeypatch
+    )
+    job = await UpdateJobRepository(session).create(
+        knowledge_base_id=kb.id,
+        base_generation_id=active.id,
+        operation=operation,
+        document_id=document.id if operation is UpdateOperation.reparse else None,
+        created_by="phase15b-test",
+    )
+    await session.commit()
+    result = await service.execute_job(kb.id, job.id)
+    candidate = await service._generation_repo.get(result["candidate_generation_id"])
+    assert candidate is not None
+    return service, active, candidate, job
+
+
+async def _passing_golden_runner(_kb_id: str, _generation) -> dict[str, object]:
+    """Offline canonical runner result with every product gate satisfied."""
+    return {
+        "citation_traceability": True,
+        "golden_subset_regression": True,
+        "add_specific": True,
+        "replace_specific": True,
+        "delete_specific": True,
+        "http_success_rate": 1.0,
+        "trace_complete_rate": 1.0,
+        "negative_unsupported_answer_rate": 0.0,
+        "no_5xx": True,
+        "fabricated_citation": 0,
+        "secret_leak": 0,
+        "old_document_references": 0,
+        "results": [{"id": "phase15b", "status_code": 200}],
+    }
+
+
+async def _failing_golden_runner(kb_id: str, generation) -> dict[str, object]:
+    report = await _passing_golden_runner(kb_id, generation)
+    report["no_5xx"] = False
+    return report
+
+
+async def _assert_document_operation_requires_validation(
+    session,
+    kb: KnowledgeBase,
+    document: Document,
+    tmp_path: Path,
+    monkeypatch,
+    *,
+    operation: UpdateOperation,
+) -> None:
+    service, active, candidate, job = await _build_document_lifecycle_candidate(
+        session, kb, document, tmp_path, monkeypatch, operation=operation
+    )
+
+    with pytest.raises(AppError) as caught:
+        await service.promote_generation(kb.id, candidate.id)
+    assert caught.value.code is AppErrorCode.generation_invalid_state
+    await session.refresh(kb)
+    assert kb.active_vector_generation_id == active.id
+
+    validation = await service.validate_generation(
+        kb.id,
+        candidate.id,
+        golden_runner=_passing_golden_runner,
+    )
+    await session.refresh(candidate)
+    await session.refresh(job)
+    assert validation["passed"] is True
+    assert candidate.status is VectorIndexGenerationStatus.ready
+    assert job.status is UpdateJobStatus.ready
+    await session.refresh(kb)
+    assert kb.active_vector_generation_id == active.id
+
+
+@pytest.mark.asyncio
+async def test_reparse_validation_flow_requires_candidate_validation_before_promote(
+    update_job_session,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Removing reparse validation would permit an unapproved publish."""
+    session, kb, document = update_job_session
+    await _assert_document_operation_requires_validation(
+        session,
+        kb,
+        document,
+        tmp_path,
+        monkeypatch,
+        operation=UpdateOperation.reparse,
+    )
+
+
+@pytest.mark.asyncio
+async def test_reindex_validation_flow_requires_candidate_validation_before_promote(
+    update_job_session,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Removing reindex validation would permit an unapproved publish."""
+    session, kb, document = update_job_session
+    await _assert_document_operation_requires_validation(
+        session,
+        kb,
+        document,
+        tmp_path,
+        monkeypatch,
+        operation=UpdateOperation.reindex,
+    )
+
+
+@pytest.mark.asyncio
+async def test_failed_reparse_validation_keeps_active_generation(
+    update_job_session,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """A failing document validation must not mutate the serving generation."""
+    session, kb, document = update_job_session
+    service, active, candidate, job = await _build_document_lifecycle_candidate(
+        session,
+        kb,
+        document,
+        tmp_path,
+        monkeypatch,
+        operation=UpdateOperation.reparse,
+    )
+
+    validation = await service.validate_generation(
+        kb.id,
+        candidate.id,
+        golden_runner=_failing_golden_runner,
+    )
+
+    await session.refresh(candidate)
+    await session.refresh(job)
+    await session.refresh(kb)
+    assert validation["passed"] is False
+    assert candidate.status is VectorIndexGenerationStatus.failed
+    assert job.status is UpdateJobStatus.failed
+    assert kb.active_vector_generation_id == active.id
+
+
+@pytest.mark.asyncio
+async def test_validated_reindex_promote_switches_active_generation_atomically(
+    update_job_session,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """A valid reindex can publish only through the guarded Promote transition."""
+    session, kb, document = update_job_session
+    service, active, candidate, job = await _build_document_lifecycle_candidate(
+        session,
+        kb,
+        document,
+        tmp_path,
+        monkeypatch,
+        operation=UpdateOperation.reindex,
+    )
+    await service.validate_generation(
+        kb.id,
+        candidate.id,
+        golden_runner=_passing_golden_runner,
+    )
+
+    promoted = await service.promote_generation(kb.id, candidate.id)
+
+    await session.refresh(kb)
+    await session.refresh(candidate)
+    await session.refresh(active)
+    await session.refresh(job)
+    assert promoted["status"] == "promoted"
+    assert kb.active_vector_generation_id == candidate.id
+    assert candidate.status is VectorIndexGenerationStatus.active
+    assert active.status is VectorIndexGenerationStatus.archived
+    assert job.status is UpdateJobStatus.promoted
+
+
+@pytest_asyncio.fixture
+async def phase15b_fencing_factory(tmp_path):
+    """Independent sessions make the fencing check exercise database guards."""
+    database_path = tmp_path / "phase15b-fencing.db"
+    engine = create_async_engine(f"sqlite+aiosqlite:///{database_path.as_posix()}")
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    kb_id, active_id, candidate_id = "d" * 32, "e" * 32, "f" * 32
+    async with factory() as session:
+        session.add_all(
+            [
+                KnowledgeBase(
+                    id=kb_id,
+                    name="phase15b-fencing",
+                    workspace_path="C:/tmp/phase15b/fencing-active",
+                    upload_path="C:/tmp/phase15b/fencing-uploads",
+                    parsed_path="C:/tmp/phase15b/fencing-parsed",
+                    active_vector_generation_id=active_id,
+                ),
+                VectorIndexGeneration(
+                    id=active_id,
+                    knowledge_base_id=kb_id,
+                    backend="qdrant",
+                    generation="phase15b-active",
+                    status=VectorIndexGenerationStatus.active,
+                    workspace_path="C:/tmp/phase15b/fencing-active",
+                    collections={"chunks": "phase15b-active-chunks"},
+                    document_manifest_hash="1" * 64,
+                    child_chunks_manifest_hash="2" * 64,
+                    embedding_config_hash="3" * 64,
+                    chunking_config_hash="4" * 64,
+                ),
+                VectorIndexGeneration(
+                    id=candidate_id,
+                    knowledge_base_id=kb_id,
+                    backend="qdrant",
+                    generation="phase15b-candidate",
+                    status=VectorIndexGenerationStatus.ready,
+                    workspace_path="C:/tmp/phase15b/fencing-candidate",
+                    collections={"chunks": "phase15b-candidate-chunks"},
+                    document_manifest_hash="5" * 64,
+                    child_chunks_manifest_hash="6" * 64,
+                    embedding_config_hash="7" * 64,
+                    chunking_config_hash="8" * 64,
+                ),
+            ]
+        )
+        await session.commit()
+    yield factory, kb_id, active_id, candidate_id
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_expired_reindex_lease_cannot_overwrite_newer_active_generation(
+    phase15b_fencing_factory,
+) -> None:
+    """Removing token/pointer fencing would let a stale job undo a newer promote."""
+    factory, kb_id, active_id, candidate_id = phase15b_fencing_factory
+    started = datetime.now(tz=UTC)
+
+    async with factory() as session:
+        old_lease = await KBLeaseService(session).acquire(
+            kb_id,
+            owner="reindex-stale-worker",
+            operation="reindex",
+            now=started,
+            ttl=timedelta(seconds=1),
+        )
+    assert old_lease is not None
+
+    after_expiry = started + timedelta(seconds=2)
+    async with factory() as session:
+        new_lease = await KBLeaseService(session).acquire(
+            kb_id,
+            owner="reindex-current-worker",
+            operation="promote_generation",
+            now=after_expiry,
+            ttl=timedelta(seconds=30),
+        )
+    assert new_lease is not None
+    assert new_lease.fencing_token > old_lease.fencing_token
+
+    async with factory() as session:
+        switched = await KBLeaseService(session).switch_active_generation(
+            new_lease,
+            target_generation_id=candidate_id,
+            expected_active_generation_id=active_id,
+            target_workspace_path="C:/tmp/phase15b/fencing-candidate",
+            now=after_expiry,
+        )
+        assert switched is True
+        await session.commit()
+
+    async with factory() as session:
+        stale_switched = await KBLeaseService(session).switch_active_generation(
+            old_lease,
+            target_generation_id=active_id,
+            expected_active_generation_id=candidate_id,
+            target_workspace_path="C:/tmp/phase15b/fencing-active",
+            now=after_expiry,
+        )
+        kb = await session.get(KnowledgeBase, kb_id)
+
+    assert stale_switched is False
+    assert kb is not None
+    assert kb.active_vector_generation_id == candidate_id
