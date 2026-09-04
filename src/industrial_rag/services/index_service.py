@@ -1,4 +1,4 @@
-"""Full knowledge-base shadow indexing with generation activation."""
+"""Explicit vector-backend migration indexing with generation activation."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 class IndexService:
-    """Build a complete local LightRAG workspace before activating one generation."""
+    """Build and activate an explicitly requested backend migration generation."""
 
     def __init__(
         self,
@@ -63,6 +63,11 @@ class IndexService:
         *,
         target_backend: VectorBackend | None = None,
     ) -> dict[str, Any]:
+        if target_backend is None:
+            raise RuntimeError(
+                "IndexService requires an explicit backend migration target; "
+                "document lifecycle updates must use UpdateJob"
+            )
         kb = await self._kb_repo.get(kb_id)
         if kb is None:
             raise RuntimeError(f"KnowledgeBase {kb_id} not found")

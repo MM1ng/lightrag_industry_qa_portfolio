@@ -147,37 +147,28 @@ async def handle_parse(ctx: TaskExecutionContext) -> TaskExecutionResult:
 
 
 # ---------------------------------------------------------------------------
-# Index / Rebuild — REAL LightRAG workspace build + health verification
+# Legacy document index / rebuild compatibility
 # ---------------------------------------------------------------------------
 
 
 @register_handler(TaskType.rebuild)
 async def handle_rebuild(ctx: TaskExecutionContext) -> TaskExecutionResult:
-    """Full KB index rebuild using IndexService."""
-    if (ctx.task.payload or {}).get("reason") == "manual reindex request":
-        return await _create_and_execute_update_job_from_document_task(
+    """Adapt legacy document rebuild tasks to the UpdateJob lifecycle."""
+    payload = ctx.task.payload or {}
+    if payload.get("trigger") == "document_delete":
+        return await _create_update_job_from_document_task(
             ctx,
-            operation=UpdateOperation.reindex,
+            operation=UpdateOperation.delete,
         )
-
-    try:
-        await ctx.update_progress(0.0, "starting_rebuild")
-        from industrial_rag.services.index_service import IndexService
-
-        svc = IndexService(
-            ctx.task_repo._session,
-            settings=ctx.settings,
-            runtime_manager=ctx.runtime_manager,
-        )
-        result = await svc.index_knowledge_base(
-            ctx.task.knowledge_base_id, ctx.task.id,
-        )
-        await ctx.update_progress(1.0, "rebuild_done")
-        return TaskExecutionResult(success=True, result=result)
-    except Exception as exc:
-        return TaskExecutionResult(
-            success=False, error_code="rebuild_failed", error_message=str(exc)[:500],
-        )
+    operation = (
+        UpdateOperation.add
+        if payload.get("trigger") == "parse_completed" and ctx.task.document_id
+        else UpdateOperation.reindex
+    )
+    return await _create_and_execute_update_job_from_document_task(
+        ctx,
+        operation=operation,
+    )
 
 
 @register_handler(TaskType.migrate_to_qdrant)
@@ -291,8 +282,13 @@ async def handle_rollback_to_nano(ctx: TaskExecutionContext) -> TaskExecutionRes
 
 @register_handler(TaskType.index)
 async def handle_index(ctx: TaskExecutionContext) -> TaskExecutionResult:
-    """Index: delegates to the rebuild handler (full KB rebuild for safety)."""
-    return await handle_rebuild(ctx)
+    """Adapt legacy document index tasks to the UpdateJob lifecycle."""
+    return await _create_and_execute_update_job_from_document_task(
+        ctx,
+        operation=(
+            UpdateOperation.add if ctx.task.document_id else UpdateOperation.reindex
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -310,7 +306,12 @@ async def _create_update_job_from_document_task(
     Candidate construction is delegated to IncrementalUpdateService by the
     caller. Validation and promotion remain separate lifecycle stages.
     """
-    document_id = ctx.task.document_id
+    payload = ctx.task.payload or {}
+    document_id = (
+        str(payload["deleted_document_id"])
+        if operation is UpdateOperation.delete and payload.get("deleted_document_id")
+        else ctx.task.document_id
+    )
     if operation is UpdateOperation.reparse and document_id is None:
         return TaskExecutionResult(
             success=False,
@@ -325,7 +326,7 @@ async def _create_update_job_from_document_task(
         )
 
     job_repository = UpdateJobRepository(ctx.task_repo._session)
-    payload = dict(ctx.task.payload or {})
+    payload = dict(payload)
     job_id = payload.get("update_job_id")
     if isinstance(job_id, str):
         existing = await job_repository.get_by_kb_and_id(

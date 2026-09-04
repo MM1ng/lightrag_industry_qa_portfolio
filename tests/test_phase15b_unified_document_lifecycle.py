@@ -411,7 +411,7 @@ async def test_document_handlers_do_not_use_legacy_publish_path(
 
 
 @pytest.mark.asyncio
-async def test_document_handlers_do_not_activate_generation(
+async def test_document_handlers_no_bypass_activate_generation(
     update_job_session,
     monkeypatch,
 ) -> None:
@@ -444,6 +444,96 @@ async def test_document_handlers_do_not_activate_generation(
 
     assert reparse.success is True
     assert reindex.success is True
+
+
+@pytest.mark.asyncio
+async def test_index_service_rejects_implicit_document_publish_path(
+    update_job_session,
+) -> None:
+    """IndexService is reserved for explicit backend migration, not documents."""
+    from industrial_rag.services.index_service import IndexService
+
+    session, kb, _document = update_job_session
+
+    with pytest.raises(RuntimeError, match="explicit backend migration"):
+        await IndexService(session).index_knowledge_base(kb.id, "legacy-task")
+
+
+@pytest.mark.asyncio
+async def test_parse_rebuild_lifecycle_task_converges_to_add_update_job(
+    update_job_session,
+    monkeypatch,
+) -> None:
+    """A legacy parse follow-up cannot rebuild and publish directly."""
+    from industrial_rag.services.handler_impls import handle_rebuild
+    from industrial_rag.services.index_service import IndexService
+
+    async def direct_index_called(*_args, **_kwargs):
+        raise AssertionError("document rebuild entered IndexService")
+
+    monkeypatch.setattr(IndexService, "index_knowledge_base", direct_index_called)
+    monkeypatch.setattr(
+        IncrementalUpdateService,
+        "execute_job",
+        lambda _self, _kb_id, job_id, **_kwargs: _candidate_build_result(job_id),
+    )
+    session, kb, document = update_job_session
+    result = await handle_rebuild(
+        await _task_context(
+            session,
+            kb,
+            document,
+            TaskType.rebuild,
+            payload={"trigger": "parse_completed", "document_id": document.id},
+        )
+    )
+
+    assert result.success is True
+    assert result.result is not None
+    job = await UpdateJobRepository(session).get(result.result["update_job_id"])
+    assert job is not None
+    assert job.operation is UpdateOperation.add
+
+
+@pytest.mark.asyncio
+async def test_document_delete_rebuild_lifecycle_task_creates_delete_update_job(
+    update_job_session,
+    monkeypatch,
+) -> None:
+    """Legacy delete rebuild recovery creates a job without publishing."""
+    from industrial_rag.services.handler_impls import handle_rebuild
+    from industrial_rag.services.index_service import IndexService
+
+    async def direct_index_called(*_args, **_kwargs):
+        raise AssertionError("document delete rebuild entered IndexService")
+
+    monkeypatch.setattr(IndexService, "index_knowledge_base", direct_index_called)
+    session, kb, document = update_job_session
+    task = LifecycleTask(
+        knowledge_base_id=kb.id,
+        document_id=None,
+        task_type=TaskType.rebuild,
+        payload={"trigger": "document_delete", "deleted_document_id": document.id},
+    )
+    session.add(task)
+    await session.commit()
+    context = TaskExecutionContext(
+        task=task,
+        kb_repo=KnowledgeBaseRepository(session),
+        doc_repo=DocumentRepository(session),
+        task_repo=TaskRepository(session),
+        settings=Settings.from_mapping({"DASHSCOPE_API_KEY": "phase15b-test-key"}),
+    )
+
+    result = await handle_rebuild(context)
+
+    assert result.success is True
+    assert result.result is not None
+    assert result.result["action"] == "update_job_created"
+    job = await UpdateJobRepository(session).get(result.result["update_job_id"])
+    assert job is not None
+    assert job.operation is UpdateOperation.delete
+    assert job.document_id == document.id
 
 
 @pytest.mark.asyncio
@@ -515,12 +605,12 @@ async def test_reparse_execution_builds_isolated_candidate_and_preserves_active(
 
 
 @pytest.mark.asyncio
-async def test_reindex_execution_clones_active_snapshot_without_parser_or_activation(
+async def test_reindex_candidate_preserves_active_until_promote(
     update_job_session,
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    """Reindex operates on the active snapshot and never re-parses or promotes."""
+    """Reindex leaves Active unchanged; only Promote may switch it later."""
     session, kb, document = update_job_session
     service, active = await _service_with_active_snapshot(
         session, kb, document, tmp_path, monkeypatch
