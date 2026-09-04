@@ -1,0 +1,45 @@
+{
+  "review_scope": "Source-PDF visual audit, not a modification to Development gold. Three explicitly table-labelled gold pages form the table metric. Other observations are diagnostic samples, not whole-corpus accuracy.",
+  "method": "Rendered frozen PDFs with PyMuPDF at 1.4 scale; inspected original pages and saved parser records. Reproducible anchor/order/cell checks accompany visual findings. No LLM-generated quality score is used as sole evaluator.",
+  "reviewed_pages": {"doc-4ffb6df91a9a": [11,14,16,17,19,23,24,35], "doc-6a9ea3ff1f42": [28,30,38,50,51]},
+  "tables": [
+    {"question_id":"D-V2-002", "document_id":"doc-4ffb6df91a9a", "page":11, "mineru_block_id":"mineru-doc-4ffb6df91a9a-0092", "intact":true,
+     "expected_rows":[[{"text":"","rowspan":1,"colspan":1},{"text":"泵型号","rowspan":1,"colspan":5}],[{"text":"","rowspan":1,"colspan":1},{"text":"STO","rowspan":1,"colspan":1},{"text":"MTO","rowspan":1,"colspan":1},{"text":"LTO","rowspan":1,"colspan":1},{"text":"XLO","rowspan":1,"colspan":1},{"text":"XLO-17","rowspan":1,"colspan":1}],[{"text":"填料尺寸","rowspan":1,"colspan":1},{"text":"5/16\"","rowspan":1,"colspan":1},{"text":"3/8\"","rowspan":1,"colspan":1},{"text":"3/8\"","rowspan":1,"colspan":1},{"text":"7/16\"","rowspan":1,"colspan":1},{"text":"7/16\"","rowspan":1,"colspan":1}],[{"text":"填料环数量","rowspan":1,"colspan":1},{"text":"5","rowspan":1,"colspan":5}]],
+     "reason":"Header, all five models, fractional inch sizes and merged ring-count cell agree with source. The question's 40–65 drops/min answer is prose above the table, not a table cell; label retained without alteration."},
+    {"question_id":"D-V2-003", "document_id":"doc-4ffb6df91a9a", "page":16, "mineru_block_id":"mineru-doc-4ffb6df91a9a-0155", "intact":false,
+     "expected_rows":[[{"text":"可以使用的润滑脂","rowspan":1,"colspan":2}],[{"text":"雪铁戈","rowspan":1,"colspan":1},{"text":"Mystic EP2","rowspan":1,"colspan":1}],[{"text":"道达尔：","rowspan":1,"colspan":1},{"text":"81EP2","rowspan":1,"colspan":1}],[{"text":"美孚：","rowspan":1,"colspan":1},{"text":"美孚力士 EP2","rowspan":1,"colspan":1}],[{"text":"美孚合成","rowspan":1,"colspan":1},{"text":"SCH 100","rowspan":1,"colspan":1}]],
+     "reason":"Body brand/product pairs recovered, but source merged two-column heading becomes two cells (heading plus empty), losing colspan=2. Question temperature limitation remains prose, not table data."},
+    {"question_id":"D-V2-007", "document_id":"doc-4ffb6df91a9a", "page":35, "mineru_block_id":"mineru-doc-4ffb6df91a9a-0408", "intact":false,
+     "expected_header_rows":[[{"text":"2196-LF 型零件清单","rowspan":1,"colspan":6}],[{"text":"零件号","rowspan":1,"colspan":1},{"text":"数量","rowspan":1,"colspan":1},{"text":"描述","rowspan":1,"colspan":1},{"text":"零件号","rowspan":1,"colspan":1},{"text":"数量","rowspan":1,"colspan":1},{"text":"描述","rowspan":1,"colspan":1}]],
+     "reason":"Correct answer-bearing rows 101/1/叶轮 and 122/1/轴 survive. But title colspan=5 disagrees with six source columns; 数量 and 描述 merge into a single header cell, with spurious blank cells. Strict table-intact fails."}
+  ],
+  "ordered_checks": [
+    {"id":"alignment_steps", "document_id":"doc-4ffb6df91a9a", "page":11,
+     "anchors":["1.使用隔套式弹性联轴器", "2.在连接两个半联轴器之前", "3.点动运行电机", "4.泵对正后安装联轴器罩"]},
+    {"id":"warning_and_startup", "document_id":"doc-4ffb6df91a9a", "page":17,
+     "anchors":["叶轮间隙", "启动泵之前，先检查叶轮间隙", "操作泵之前先切断电源", "灌注", "1.用手旋转泵", "2.确保入口阀打开", "3.将出口阀半关闭", "请勿在出口阀长时间关闭", "4.解除对泵驱动器电源的锁定", "7.根据需要调节出口阀"]},
+    {"id":"repair_safety_steps", "document_id":"doc-4ffb6df91a9a", "page":23,
+     "anchors":["尝试对泵进行维修之前", "1.执行停机程序", "2.切断电源", "3.使泵冷却", "4.关闭入口阀和出口阀", "5.排空泵"]},
+    {"id":"heading_conditions_warning", "document_id":"doc-6a9ea3ff1f42", "page":28,
+     "anchors":["6.调试、启动和关闭", "6.1.调试/启动的前提条件", "泵组已正确连接到电源", "6.2.水泵注液和排气", "水泵启动错误可能在泵内形成爆炸性环境", "启动水泵前，应对吸入管路和水泵进行排气"]},
+    {"id":"cross_page_steps_page51", "document_id":"doc-6a9ea3ff1f42", "page":51,
+     "anchors":["3.拆下固定螺栓", "4.拆下叶轮锁紧螺母", "5.拆下固定螺栓", "6.旋松机封顶丝"]}
+  ],
+  "section_checks": [
+    {"id":"grease_leaf", "document_id":"doc-4ffb6df91a9a", "page":16, "anchor":"对于温度超过", "expected_leaf":"润滑脂润滑"},
+    {"id":"commissioning_leaf", "document_id":"doc-6a9ea3ff1f42", "page":28, "anchor":"泵组已正确连接到电源", "expected_leaf":"6.1. 调试/启动的前提条件"},
+    {"id":"warning_section", "document_id":"doc-6a9ea3ff1f42", "page":28, "anchor":"启动水泵前，应对吸入管路和水泵进行排气", "expected_leaf":"6.2. 水泵注液和排气"}
+  ],
+  "lineage_checks": [
+    {"id":"page51_step3", "document_id":"doc-6a9ea3ff1f42", "expected_page":51, "anchor":"3.拆下固定螺栓"},
+    {"id":"page51_step4", "document_id":"doc-6a9ea3ff1f42", "expected_page":51, "anchor":"4.拆下叶轮锁紧螺母"}
+  ],
+  "supplemental_findings": [
+    {"document_id":"doc-4ffb6df91a9a", "page":14, "finding":"Temperature table preserves values but 华氏度 spans four columns instead of the source's three numeric columns. Lubricant table includes raw math $1 5 0 ^ { \\circ }$ F; raw text not silently rewritten."},
+    {"document_id":"doc-4ffb6df91a9a", "page":19, "finding":"Thermal-clearance table recovers six-column grid, title colspan=6, ten temperature rows and note colspan=6. This is a real structure gain, separate from whole-gold ordered matching."},
+    {"document_id":"doc-4ffb6df91a9a", "page":23, "finding":"Fault table recovers symptom rowspans 5 and 6 with correct cause/remedy relationships. However the separate safety box loses steps 3/4/5 (cool pump, close inlet/outlet, drain). All content_list blocks on page were checked, not merely selected match blocks."},
+    {"document_id":"doc-4ffb6df91a9a", "page":24, "finding":"Fault table recovers symptom rowspans 3/2/4/5 and assigns heavier-liquid cause to excessive motor current; source PyMuPDF interleaves it with bearing-temperature text. Bullet removal is not semantic content loss."},
+    {"document_id":"doc-6a9ea3ff1f42", "page":38, "finding":"First three source mechanical-seal failure rows regain four-column associations. But subsequent-page rows are also merged into page38; page-specific lineage cannot be assumed from the merged content_list block."},
+    {"document_id":"doc-6a9ea3ff1f42", "page":50, "finding":"Steps 1 and 2 collapse into one table cell associated with first image, leaving second cell empty. Steps 3–6 from page51 and 7–8 from following page are merged here. layout.json repeats merged HTML on page50 and marks page51 table lines_deleted=true. No inferred cell-to-page mapping was fabricated."}
+  ]
+}
