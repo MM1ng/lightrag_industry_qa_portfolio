@@ -1,0 +1,14 @@
+{
+  "phase": "14A",
+  "status": "PARSER_AB_BLOCKED",
+  "generation": "dev-v2-20260902",
+  "dataset_fingerprint": "deac5832de37a95f933267aba10e40215582f1136cd6a60dfabf2d9784385060",
+  "pdf_identity_verified": true,
+  "blocker": {
+    "type": "httpx.ConnectError",
+    "stage": "MinerU completed-result ZIP download",
+    "model_calls": "submitted once; no valid result artifact downloaded"
+  },
+  "metrics": null,
+  "retrieval_or_qa_modified": false
+}
