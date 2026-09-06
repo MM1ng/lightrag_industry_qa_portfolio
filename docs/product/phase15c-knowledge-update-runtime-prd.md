@@ -8,12 +8,12 @@
 | Name | Knowledge Update Runtime |
 | 中文名称 | 知识库更新运行时 |
 | Subtitle | Persistent Background Execution for Document Updates |
-| Version | 1.0 |
+| Version | 1.1 — code-grounded amendment |
 | Status | Ready for Review；架构定位已批准，PRD 已编写，尚未实施或完成运行验收 |
 | Product | Industrial Knowledge Assistant Platform |
 | Date | 2026-09-06 |
 | Owner role | 产品负责人、技术架构师；研发负责实现，测试及部署运营负责人负责验收 |
-| Repository baseline | `dev/retrieval-foundation-qa-downstream`，本次核查 HEAD `2be1577` |
+| Repository baseline | `dev/retrieval-foundation-qa-downstream`；初版核查 `2be1577`，本次修订代码与远端基线 `0686940bd41989e47805a38f17eeab2c8aa6aade` |
 | Deliverable | `docs/product/phase15c-knowledge-update-runtime-prd.md` |
 
 本文将已批准的架构转化为产品行为、约束与验收条件。所有“必须”“不得”均是后续实现要求，不表示当前代码已经具备该行为。创建本文不授权进入 Phase15-C1，不执行业务开发、数据库迁移、测试修改或模型调用。
@@ -39,6 +39,18 @@
 | 前期生命周期计划曾包含后台执行相关任务 | 以 Phase15-B 最终验收中“未引入 Async Worker”为现状，将运行时接入归入 Phase15-C，不倒推为 Phase15-B 已完成。 |
 
 以上为明确覆盖或需求细化。数据库队列、claim once、短事务、状态分离及显式发布边界均沿用最新架构评审，不重新设计生命周期。
+
+### 1.3 本次代码核查修订
+
+| 代码证据（基线 0686940） | 现状与修订要求 |
+| --- | --- |
+| `src/industrial_rag/services/incremental_update_service.py`：`_parse_document_pymupdf`，约 1229–1303 行 | 直接在 `kb_parsed_documents_dir(kb.id)/doc.id/current` 以写模式输出 `child_chunks.jsonl`、`parent_chunks.jsonl`，并更新 Document 解析元数据。当前路径不含 attempt。 |
+| 同文件：`_candidate_snapshot_pairs`，约 1209–1220 行；`services/parse_service.py`：`load_child_chunks`、`load_parent_chunks`，约 543–568 行 | 变更文档的候选快照从共享 `current` 读取；即使 Candidate workspace 和向量集合隔离，解析输出仍可能被旧 Worker 覆盖后被新 attempt 读取。 |
+| `services/parse_service.py`：解析临时目录与 current swap，约 196、280 行 | 另有 parse-task 临时输出再替换共享 current 的兼容逻辑；临时文件名不同不等于消费者绑定了 attempt。C1 要核对完整写入和读取链路，不能仅隔离最终索引。 |
+| `services/index_service.py`：`index_knowledge_base`，约 59–71、229 行 | 显式 `target_backend` 是现有后端迁移前置条件；路径内仍有 Generation activate。不得以全局禁止 activate 的方式修改其职责。 |
+| `services/handler_impls.py`：`handle_migrate_to_qdrant`、`handle_rollback_to_nano`，约 174–278 行 | 前者显式传入 Qdrant 迁移目标；后者检查 Nano 输入指纹后激活并更新后端/指针。两者是现有显式后端迁移/维护路径，不是五类文档更新的发布旁路许可。 |
+
+修订结论：C1 的 P0 isolation 必须延伸至 **per-attempt parsed artifact staging/isolation**，同时精确限定 **Promote sole authority** 的适用对象。这里只增加需求和验收，不修改上述代码、不执行任何解析或迁移。对应验收清单见 [Phase15-C acceptance checklist](phase15c-acceptance-checklist.md)。
 
 ## 2. Background
 
@@ -76,6 +88,8 @@ Document API / Legacy Adapter
 202 表示提交已持久接受；它不要求 Worker 等待响应送达后才领取。图中次序表达职责边界，Worker 可在事务提交后立即看到 Job。创建新更新意图的请求不得等待后台构建。
 
 本阶段不是 Knowledge Platform Runtime、Task Platform 或通用 Workflow Engine。UpdateJobRepository 本身就是 persistent queue，不新增 JobQueue 抽象或第二张 RuntimeJob 队列表。JobRunner 通过既有 Worker/Repository 契约领取和执行，不能形成第二次 claim。
+
+**发布权限的作用域**：本文“Promote sole authority”“只有 Promote 才切换 Active”等表述，仅约束 `add / replace / delete / reparse / reindex` 五类 document lifecycle operation 的新内容发布。既有显式 Generation rollback 和后端迁移/维护（包括 `migrate_to_qdrant`、`rollback_to_nano`）保持各自入口、前置校验和行为，不要求它们统一改经 document UpdateJob/Promote。不得全局禁止底层 activate 或删除这些 handler；也不得允许五类文档操作借维护路径绕过 Validation/Promote。本期不重设计维护流程，不宣称它们已具备与文档 Promote 完全相同的 Gate/fencing 契约。
 
 ## 4. Goals
 
@@ -134,6 +148,7 @@ Document API / Legacy Adapter
 - 单次 claim ownership、独立 heartbeat、execution state。
 - 有限 retry/backoff、启动及周期 recovery、cooperative cancellation。
 - 持久输入快照、attempt 产物隔离、短事务边界。
+- per-attempt parsed artifact staging/isolation：隔离父块、子块等解析产物及候选消费引用；归属 Runtime isolation，不属于 Parser 算法升级。
 - 基础任务查询、既有列表入口的分页修正和状态筛选。
 - Legacy 文档 Adapter 收敛、历史数据兼容、最小运行指标。
 - 独立 Worker 部署方式与生产安全验收；开发可支持 embedded worker。
@@ -240,6 +255,14 @@ attempt 在成功领取时递增，包含原始尝试；max_attempts 是同 Job 
 
 失权后的外部请求即使成功，也只能写入不可发布的旧 attempt。旧 Candidate 必须失去有效发布资格，新 Job 候选引用不得被旧 Worker 回写。物理回收由既有受控 GC 处理，并尊重 Active、回滚和输入保留条件。
 
+**FR-14a Parsed artifact isolation — C1 P0**：reparse 当前解析输出写入共享 `parsed/documents/{doc_id}/current`，新 Runtime 不得继续将该路径作为进行中 attempt 的可变解析输出或新候选的隐式输入。每次构建尝试必须有绑定 KB、job_id、attempt、document/source version 的独立 parsed staging 目录，涵盖 parent/child chunks 及该次解析消费的其他产物。具体目录命名由 C1 契约确定，不新增 Parser 算法或改变解析配置。
+
+Candidate 快照构建、chunk 读取及后续 Embedding/indexing 必须显式消费本 attempt 的已完整提交解析产物引用，并核验输入摘要/配置指纹，不能在读取时重新解析共享 `current` 指针。先写本 attempt staging，完整性校验后通过受 ownership/fencing 保护的短事务登记不可变引用，再进入下一阶段。失权 Worker 即使完成解析、文件写入或旧 current swap，也不得覆盖新 attempt 的文件、消费引用或 Document 元数据；仅在 DB 完成时检查 fencing 不足以保护共享文件。
+
+若保留共享 current 供兼容或维护读取，本期后台 attempt 不直接更新它，且不得令维护消费者看到半成品 staging；兼容投影如确有必要，必须另行明确有效所有者和完整产物的发布契约，不允许猜测为“解析完成即可替换”。不同尝试不得复用仍可能被写入的 parsed 目录。失败、取消和失权产物保留隔离，沿既有受控清理处理。
+
+本要求适用于 reparse，以及复用同一解析写入链路的 add/replace。这是 Runtime 的产物存储、所有权与消费绑定调整，不是 Parser、Chunk 或 Embedding 算法升级。
+
 ### FR-15 Query Job Status — P1
 
 复用既有 GET 详情。返回双状态、当前阶段、attempt/max_attempts/retry_count、心跳/时间、next_run_at、取消申请、脱敏错误、Candidate 引用和构建结果；验证/发布事实来自各自现有事实来源。可执行动作由服务端依据状态、错误和权限计算。
@@ -253,6 +276,8 @@ LifecycleTaskExecutor 仅保留 legacy compatibility，不作为新 Runtime 核�
 同一 Legacy 请求和 UpdateJob 的关联必须在可恢复的持久事务中完成；重复 handler 调用不创建多个 Job。task_id 可继续兼容返回，但必须提供同一 job_id。旧入口返回前已能查到该 Job，不能等待 Legacy Executor 之后才创建。
 
 ### FR-17 Explicit Validation/Promote Boundary — P0
+
+本 FR 的 sole-authority 约束仅适用于五类 document lifecycle operation；范围定义见第 3 节。现有显式 backend migration/maintenance（`migrate_to_qdrant`、`rollback_to_nano`）不纳入文档更新状态机改造，必须保留原有正向行为及原有无效输入/陈旧指纹拒绝行为。不得通过全局拦截 `VectorIndexGenerationRepository.activate` 验收“sole authority”，而应分别验证文档 handler 无旁路及显式维护路径无误伤。
 
 execution_status=SUCCEEDED 仅代表 Candidate 构建完成。开始显式验证前必须证明构建完成、产物完整冻结、Candidate 属于有效 attempt 且未取消；验证过程中 Runtime 不重新领取构建。
 
@@ -457,6 +482,8 @@ Worker 启动后从数据库发现已接受任务，不依赖上次进程的内�
 6. 确需重建且仍有预算时，next_run_at 到期后取得新的 Lease/fencing、claim 新 attempt，在新 workspace/namespace 执行。旧 Candidate 被隔离，不能再次被验证/Promote。
 7. 不可恢复或预算耗尽则 FAILED；执行中失权的旧 Worker不得自行覆盖这个结果。
 
+重建隔离同时覆盖 parsed staging：恢复后的候选只读新 attempt 明确绑定的解析快照。旧 Worker 在解析写入后或共享 current 替换前失权再恢复，不能污染新 attempt 的父/子块。检查点记录 parsed artifact 引用和摘要，文件存在或旧 current 内容“看起来完整”不能充当本 attempt 完成证据。
+
 ### 14.3 安全承诺
 
 允许重复 Embedding/Qdrant 请求与重复计算费用，不允许重复的有效状态提交。数据库 fencing 保护元数据，attempt namespace 隔离保护外部副作用；两者缺一不可。所有 success/failure/checkpoint 提交和相关文档状态写入都必须校验当前 ownership/fencing，不能只保护“成功”而放过异常分支。
@@ -489,6 +516,7 @@ claim transaction
 - 领取、心跳、取消请求、checkpoint、success/failure 的事务各自有界；业务异常处理不得通过不受 fencing 保护的 commit 覆盖新 owner。
 - cancel_requested_at、当前执行状态、有效 owner 和结果条件在 completion transaction 中共同判断，避免检查后又被取消的窗口。
 - 外部写入完成但 DB checkpoint 失败：不认为已完成，按输入/产物凭据对账或隔离重建；不宣称 DB rollback 能撤销外部调用。
+- parsed staging 写入同样在长 DB 事务之外，写入目标从开始即绑定本 attempt；完整产物引用的登记和 Document 解析元数据提交必须受 ownership/fencing 保护，禁止“先覆盖共享 current，后在 DB 检查租约”。
 - DB 完成提交成功但释放 Lease 失败：任务仍是完成状态，只处理过期 Lease，不因释放失败重新构建。
 - 现有默认 SQLite 的长写事务是心跳/取消阻塞风险。应通过短事务与低并发验收解决；本期不默认引入新数据库或外部队列。
 
@@ -532,7 +560,7 @@ claim transaction
 | AC-10 | RUNNING 时申请取消，保持外部调用暂未返回 | 先返回 202/取消中；到安全 checkpoint 或确认失权并隔离后才确认取消；全过程不 Promote、不强杀 | FR-12 |
 | AC-11 | 五类构建成功 | execution_status=SUCCEEDED，完整产物可核验，status=building，Active ID/epoch 不被构建改动 | FR-07/17 |
 | AC-12 | 对成功构建执行显式 Validation，并使 Gate 失败 | status=failed，execution_status 保持 SUCCEEDED，Active 不变；构建 retry 被拒绝 | FR-17 |
-| AC-13 | 对验证通过的有效 Candidate 显式 Promote | 只有此发布路径按现有 Gate/fencing 切换 Active；无证据、取消或陈旧候选拒绝；现有显式 rollback 另行保留 | FR-17 |
+| AC-13 | 对五类文档操作的验证通过 Candidate 显式 Promote | 五类文档新内容只有此路径按现有 Gate/fencing 发布；无证据、取消或陈旧候选拒绝；既有显式 rollback/backend migration/maintenance 不适用全局禁写规则 | FR-17；§3 |
 | AC-14 | 新 Candidate 构建期间并发查询 | 查询仍从旧 Active 读取，不读取 Candidate 或失败 attempt；既有代际刷新契约保持 | FR-14/17 |
 | AC-15 | 完成实现后运行既有回归基线 | Phase15-B、Phase9、Validation Gate、Job Recovery、Multi-instance 相关测试全通过，保存本次结果 | NFR Safety |
 | AC-16 | 在多个真实阶段提交 checkpoint 并查询 | 阶段、attempt、双状态可见；失败可找到最后阶段；无伪造百分比或“已上线” | FR-08/15 |
@@ -548,10 +576,15 @@ claim transaction
 | AC-26 | 人为仅创建部分 Candidate 文件/集合，缺少有效完成凭据 | 不因 candidate_built/存在候选就确认成功；隔离新 attempt 重建或明确失败 | FR-06/10 |
 | AC-27 | 等待执行期间改变 base，或发布前出现新 Active | 当前 Job 不静默使用新基准、不覆盖较新发布；给出 stale-base 冲突 | FR-13/17 |
 | AC-28 | Job 完成已提交但 Lease release 或 HTTP 响应丢失 | 构建不重放，返回已有成功事实；处理残留 Lease 不覆盖生命周期 | §14/15 |
+| AC-29 | reparse attempt A 在解析写入/旧 current swap 前停顿并失权，B 领取后产生带可区分标记的父/子块，再恢复 A；对 add/replace 共用链路参数化 | A/B parsed staging 不同；A 只能写隔离旧目录，不能修改 B 文件、消费引用或 Document 元数据；B 的 Candidate/Embedding 输入只含 B 绑定快照，共享 current 不被后台 attempt 覆盖 | FR-14a；C1 P0 |
+| AC-30 | parsed staging 写一半崩溃、checkpoint 登记前崩溃，以及取消后迟到解析结果 | 半成品不能被快照构建或维护消费者读取；新尝试独立 staging；无有效 owner 不登记引用；重试不退回共享 current；Active 产物与受保护兼容数据不受污染 | FR-13/14a；§14/15 |
+| AC-31 | 对五类文档 handler 执行旁路负向检查，再通过现有显式 migrate_to_qdrant/rollback_to_nano 路径做正反向回归 | 文档操作不能借迁移 handler 发布；显式迁移/维护在满足原条件时仍可工作，缺少迁移目标及陈旧 Nano 指纹仍按原规则拒绝；不得全局禁用 activate 或强制维护经 document UpdateJob | FR-17；§3 |
 
 回归文件基线：`tests/test_phase15b_unified_document_lifecycle.py`、`tests/test_phase9.py`、`tests/test_phase9b_validation_gate.py`、`tests/test_phase9b_job_recovery.py`、`tests/test_phase9b_multi_instance.py`，以及实际受影响的旧 Lifecycle/Runtime 测试。Phase15-B 报告的 26/24/8/4/10 passed 仅是历史证据，不能代替 Phase15-C 回归结果。
 
 生产验收必须包含真实向量后端、真实 validation endpoint 与可观测 Promote/Rollback canary；离线替身通过不足以关闭 Phase15-C4。
+
+本次新增 AC-29/30 为 C1 isolation 的设计与后续实现阻断项，AC-31 为权限作用域及维护兼容阻断项。既有可参考回归文件包括 `tests/test_vector_backend_api.py`、`tests/test_qdrant_e2e_migration.py` 和 `tests/test_phase15b_unified_document_lifecycle.py`；不假定它们已覆盖全部新断言，后续阶段需补齐证据。本次文档修订不运行这些测试。
 
 ## 18. Performance Targets
 
@@ -613,6 +646,8 @@ LifecycleTask 文档 handler 与 api.py 启动恢复统一转为提交/关联/�
 | P0 | Worker claim 后服务再次 claim/取同一所有权 | C1 所有权契约测试失败即停止 C2 |
 | P0 | 旧 Worker 的失败分支/元数据提交未受 fencing 保护 | success/failure/checkpoint 全路径拒绝陈旧写；任何一条可覆盖新 attempt 均阻断上线 |
 | P0 | 复用旧 attempt namespace，外部写入污染可发布 Candidate | 独立 workspace/namespace；旧 Candidate 不可验证/Promote；AC-08/09 不通过停止 |
+| P0 | parsed current 共享写入使新 attempt 消费旧 Worker 的解析结果 | C1 必须覆盖 parsed staging、读取绑定和元数据 fencing；AC-29/30 不通过停止 |
+| P0 | 把文档 Promote sole authority 扩大为全局 activate 禁令，误伤显式迁移/维护 | 五类文档旁路负向检查与迁移/维护正反向回归分开；AC-31 不通过停止 |
 | P0 | execution success 被解释成 ready 或自动上线 | 矩阵、显式 Gate 与接口展示共同约束；发现自动 Validation/Promote 停止 |
 | P0 | Cancel/Retry 与 Promote 竞态导致取消后上线 | 条件更新和现有 KB Lease 串行化；竞态验收不通过停止 |
 | P0 | 输入丢失或 stale base 导致更新错误版本 | 持久快照和 base 检查；不得自动 rebase 或猜测输入 |
@@ -632,9 +667,9 @@ LifecycleTask 文档 handler 与 api.py 启动恢复统一转为提交/关联/�
 ### 22.1 Phase15-C1 — Runtime Contract & Ownership
 
 - **Goal**：冻结双状态、claim once、输入和事务契约，使后台执行可安全接入。
-- **Scope**：FR-01/04/05/07/13/14 的契约与必要数据迁移设计；状态矩阵、幂等、错误分类、重试参数、历史回填策略；识别所有未 fenced 的关键提交和长事务边界。不启用生产消费。
-- **Acceptance**：原子 claim 与上下文传递设计无二次领取；每种输入可跨 Session 重建；字段复用清晰；矩阵覆盖全部现有枚举；兼容策略及数据库/输入存储选择已记录。后续实现需通过 AC-04/08/22/23 的相应测试。
-- **Stop gate**：所有权、事务或输入无法证明安全；历史 ready/promoted 可能重放；attempt 产物不能隔离；参数契约仍缺少有限边界。任一存在则停止 C2。
+- **Scope**：FR-01/04/05/07/13/14 的契约与必要数据迁移设计；状态矩阵、幂等、错误分类、重试参数、历史回填策略；识别所有未 fenced 的关键提交和长事务边界；明确 FR-14a per-attempt parsed staging、完整性登记与候选读取绑定，保留显式后端迁移/维护契约。不启用生产消费。
+- **Acceptance**：原子 claim 与上下文传递设计无二次领取；每种输入可跨 Session 重建；字段复用清晰；矩阵覆盖全部现有枚举；兼容策略及数据库/输入存储选择已记录。后续实现需通过 AC-04/08/22/23 及 AC-29/30/31 的相应测试；只隔离最终 Candidate/Qdrant 而未隔离 parsed artifact 不算通过。
+- **Stop gate**：所有权、事务或输入无法证明安全；历史 ready/promoted 可能重放；parsed/Candidate 产物或消费引用不能隔离；失权 Worker 仍可写共享 current/覆盖新解析输入；维护路径被全局 sole-authority 禁令误伤；参数契约仍缺少有限边界。任一存在则停止 C2。
 
 ### 22.2 Phase15-C2 — Background Worker Runtime
 
@@ -665,6 +700,7 @@ Phase15-C 只有同时满足以下条件才可关闭：
 - UpdateJobRepository 是唯一持久队列；新 Runtime 不依赖 LifecycleTaskExecutor 核心执行，不存在双 claim 或重复发布路径。
 - 六态 execution_status 与全部 lifecycle status 满足第 11 节矩阵，历史回填可解释，已验证/发布/回滚记录不重放。
 - 持久输入、短事务、独立心跳、attempt 隔离和所有关键提交 fencing 均通过故障注入验证。
+- parsed artifact staging/消费引用隔离通过 AC-29/30；显式 backend migration/maintenance 保持原行为并通过 AC-31。两项均为 P0，不以“Parser 不在范围内”或“所有 activate 都必须删除”规避。
 - Retry/backoff/limit、resume 兼容、协作取消、查询与列表分页全部实现且行为可审计。
 - 构建成功停在 Candidate；Validation 和 Promote 保持显式，现有 Gate、Rollback、Active 检索稳定性不退化。
 - 第 17 节全部验收有本阶段证据，Phase15-B/Phase9 相关回归通过；真实后端 canary 与运行回退演练通过。
