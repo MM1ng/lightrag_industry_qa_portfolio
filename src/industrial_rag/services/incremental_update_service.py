@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from industrial_rag.config import Settings
 from industrial_rag.db.models import (
+    ClaimedExecutionContext,
     DocumentStatus,
     KBStatus,
     UpdateJobStatus,
@@ -53,9 +54,10 @@ from industrial_rag.services.generation_artifacts import (
     load_generation_parent_records,
 )
 from industrial_rag.services.generation_fingerprint_service import build_generation_fingerprint
-from industrial_rag.services.kb_lease_service import KBLeaseService
+from industrial_rag.services.kb_lease_service import KBLeaseService, LeaseHandle
 from industrial_rag.storage_layout import (
     document_stored_path,
+    kb_parsed_attempt_staging_dir,
     kb_parsed_documents_dir,
     kb_qdrant_generation_workspace,
 )
@@ -873,12 +875,37 @@ class IncrementalUpdateService:
             await self._session.commit()
             return result
 
+    async def execute_claimed_job(
+        self, context: ClaimedExecutionContext, *, old_doc: Any | None = None
+    ) -> dict[str, Any]:
+        """Consume an existing Worker claim without acquiring another claim.
+
+        This is an integration boundary only; it starts no Worker or poller.
+        The persisted job and KB lease are checked before candidate work.
+        """
+        job = await self._job_repo.get_by_kb_and_id(context.knowledge_base_id, context.job_id)
+        if job is None or (job.worker_id, job.lease_token, job.fencing_token, job.attempt) != (
+            context.worker_id, context.lease_token, context.fencing_token, context.attempt
+        ):
+            raise AppError(AppErrorCode.invalid_state_transition, "Update job claim is not current.", status_code=409)
+        lease = LeaseHandle(
+            kb_id=context.knowledge_base_id,
+            owner=context.worker_id,
+            lease_token=context.lease_token,
+            fencing_token=context.fencing_token,
+            expires_at=context.lease_expires_at,
+        )
+        if not await KBLeaseService(self._session).is_current(lease, now=_utcnow()):
+            raise AppError(AppErrorCode.knowledge_base_busy, "Update job lease is not current.", status_code=409)
+        return await self._run_job(context.knowledge_base_id, context.job_id, old_doc=old_doc, context=context)
+
     async def _run_job(
         self,
         kb_id: str,
         job_id: str,
         *,
         old_doc: Any | None = None,
+        context: ClaimedExecutionContext | None = None,
     ) -> dict[str, Any]:
         """Build the candidate generation for one update job."""
         job = await self._job_repo.get(job_id)
@@ -953,7 +980,11 @@ class IncrementalUpdateService:
                 UpdateOperation.reparse,
             ) and doc is not None:
                 t0 = time.perf_counter()
-                await self._parse_document_pymupdf(kb, doc)
+                parsed_staging_dir = (
+                    kb_parsed_attempt_staging_dir(kb_id, context.job_id, context.attempt, doc.id)
+                    if context is not None else None
+                )
+                await self._parse_document_pymupdf(kb, doc, artifact_dir=parsed_staging_dir)
                 t_parse += time.perf_counter() - t0
 
             snapshot_pairs, previous_children, snapshot_parents = await self._candidate_snapshot_pairs(
@@ -962,6 +993,7 @@ class IncrementalUpdateService:
                 job=job,
                 changed_document=doc,
                 old_document=old_doc,
+                changed_parsed_dir=parsed_staging_dir if doc is not None else None,
             )
             snapshot = freeze_generation_child_chunks(
                 candidate_workspace,
@@ -1162,6 +1194,7 @@ class IncrementalUpdateService:
         job: Any,
         changed_document: Any | None,
         old_document: Any | None,
+        changed_parsed_dir: Path | None = None,
     ) -> tuple[list[tuple[Any, Any]], dict[str, list[Any]], list[tuple[Any, Any]]]:
         """Build the candidate's complete ChildChunk input before LightRAG sees it.
 
@@ -1208,7 +1241,9 @@ class IncrementalUpdateService:
         parent_pairs: list[tuple[Any, Any]] = []
         for document in documents:
             if changed_document is not None and document.id == changed_document.id:
-                parsed_dir = kb_parsed_documents_dir(kb_id) / document.id
+                parsed_dir = changed_parsed_dir or kb_parsed_documents_dir(kb_id) / document.id
+                if changed_parsed_dir is not None and not (parsed_dir / "complete.json").is_file():
+                    raise RuntimeError("Attempt parsed artifact is incomplete")
                 children = load_child_chunks(parsed_dir)
                 parents = load_parent_chunks(parsed_dir)
             elif active is not None:
@@ -1226,7 +1261,9 @@ class IncrementalUpdateService:
             parent_pairs.extend((document, parent) for parent in parents)
         return pairs, previous_children, parent_pairs
 
-    async def _parse_document_pymupdf(self, kb: Any, doc: Any) -> dict[str, Any]:
+    async def _parse_document_pymupdf(
+        self, kb: Any, doc: Any, *, artifact_dir: Path | None = None
+    ) -> dict[str, Any]:
         from industrial_rag.document_parser import parse_pdf
         from industrial_rag.structured_chunker import (
             ChunkerConfig,
@@ -1248,7 +1285,7 @@ class IncrementalUpdateService:
         if not children:
             raise RuntimeError("未能生成 ChildChunk")
         parsed_doc_dir = kb_parsed_documents_dir(kb.id) / doc.id
-        current_dir = parsed_doc_dir / "current"
+        current_dir = artifact_dir or parsed_doc_dir / "current"
         current_dir.mkdir(parents=True, exist_ok=True)
         with (current_dir / "child_chunks.jsonl").open(
             "w", encoding="utf-8", newline="\n"
@@ -1291,6 +1328,14 @@ class IncrementalUpdateService:
                     )
                     + "\n"
                 )
+        if artifact_dir is not None:
+            (current_dir / "complete.json").write_text(
+                json.dumps(
+                    {"document_id": doc.id, "child_chunk_count": len(children), "parent_chunk_count": len(parents)},
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
         await self._doc_repo.update(
             doc.id,
             page_count=max((c.page_start or 1) for c in children),

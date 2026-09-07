@@ -69,6 +69,24 @@ def kb_parsed_documents_dir(kb_id: str) -> Path:
     return kb_parsed_dir(kb_id) / "documents"
 
 
+def kb_parsed_attempt_staging_dir(
+    kb_id: str, job_id: str, attempt: int, document_id: str
+) -> Path:
+    """Return the immutable writer directory for one claimed parse attempt.
+
+    ``current`` remains a legacy parser compatibility location.  Runtime-owned
+    candidate builds must use this path and record it in their checkpoint.
+    """
+    _validate_kb_id(kb_id)
+    if not re.fullmatch(r"[a-f0-9]{8,64}", job_id):
+        raise ValueError(f"Invalid update job id: {job_id!r}")
+    if attempt < 1:
+        raise ValueError("attempt must be positive")
+    if not re.fullmatch(r"[a-f0-9]{8,64}", document_id):
+        raise ValueError(f"Invalid document id: {document_id!r}")
+    return kb_parsed_dir(kb_id) / "attempts" / job_id / str(attempt) / document_id / "staging"
+
+
 def kb_parent_chunks_dir(kb_id: str) -> Path:
     return kb_parsed_dir(kb_id) / "parent_chunks"
 

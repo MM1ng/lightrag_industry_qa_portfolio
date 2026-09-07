@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from industrial_rag.db.models import ClaimedExecutionContext
 from industrial_rag.repositories.update_job_repository import UpdateJobRepository
 from industrial_rag.services.kb_lease_service import KBLeaseService, LeaseHandle
 
@@ -22,6 +23,19 @@ class ClaimedUpdateJob:
     @property
     def fencing_token(self) -> int:
         return self.lease.fencing_token
+
+    @property
+    def execution_context(self) -> ClaimedExecutionContext:
+        """The sole ownership object a runtime consumer may receive."""
+        return ClaimedExecutionContext(
+            job_id=self.job_id,
+            knowledge_base_id=self.knowledge_base_id,
+            attempt=self.attempt,
+            worker_id=self.lease.owner,
+            lease_token=self.lease.lease_token,
+            fencing_token=self.lease.fencing_token,
+            lease_expires_at=self.lease.expires_at,
+        )
 
 
 class UpdateJobWorker:

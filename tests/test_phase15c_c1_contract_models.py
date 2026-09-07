@@ -4,6 +4,8 @@ from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from industrial_rag.db.models import (
     Base,
     CandidateAttemptReference,
@@ -14,7 +16,8 @@ from industrial_rag.db.models import (
     UpdateJobStatus,
     UpdateOperation,
 )
-from sqlalchemy import create_engine, text
+from industrial_rag.db.session import reset_for_testing
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -181,11 +184,43 @@ def test_ownership_context_rejects_incomplete_claim(changes: dict) -> None:
         replace(_context(), **changes)
 
 
-@pytest.mark.skip(reason="C1 contract only: AC-29/30 require later authorized runtime integration")
-def test_stale_parser_cannot_overwrite_next_attempt_staging_skeleton() -> None:
-    """Pause A, acquire B, resume A; compare B's parsed files and consumer references."""
+def test_attempt_staging_paths_are_isolated() -> None:
+    from industrial_rag.storage_layout import kb_parsed_attempt_staging_dir
+
+    first = kb_parsed_attempt_staging_dir("a" * 32, "b" * 32, 1, "c" * 32)
+    second = kb_parsed_attempt_staging_dir("a" * 32, "b" * 32, 2, "c" * 32)
+    assert first != second
+    assert first.parts[-5:] == ("attempts", "b" * 32, "1", "c" * 32, "staging")
+    assert second.parts[-5:] == ("attempts", "b" * 32, "2", "c" * 32, "staging")
 
 
 @pytest.mark.skip(reason="C1 contract only: single-claim service integration is not enabled")
 def test_claimed_context_is_consumed_without_second_claim_skeleton() -> None:
     """Future boundary check: IncrementalUpdateService consumes an existing lease."""
+
+
+def test_active_migration_adds_execution_contract_without_classifying_legacy_rows(
+    tmp_path, monkeypatch
+) -> None:
+    database_path = tmp_path / "phase15c-c1b.db"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{database_path.as_posix()}")
+    reset_for_testing()
+    config = Config("alembic.ini")
+    command.upgrade(config, "f15b0a1c2d3e")
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """INSERT INTO update_jobs (id, knowledge_base_id, operation, status,
+                retry_count, created_by, created_at, updated_at)
+                VALUES ('job', 'kb', 'add', 'ready', 0, 'test', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"""
+            )
+        )
+    command.upgrade(config, "head")
+    columns = {column["name"] for column in inspect(engine).get_columns("update_jobs")}
+    assert {"execution_status", "next_run_at", "cancel_requested_at", "execution_finished_at"} <= columns
+    with engine.connect() as connection:
+        assert connection.execute(text("SELECT execution_status FROM update_jobs WHERE id='job'")).scalar_one() is None
+    engine.dispose()
+    reset_for_testing()
