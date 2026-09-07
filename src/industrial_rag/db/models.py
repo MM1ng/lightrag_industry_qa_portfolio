@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import enum
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from sqlalchemy import (
@@ -122,6 +123,87 @@ class UpdateJobStatus(enum.StrEnum):
     recovery_required = "recovery_required"
     promoted = "promoted"
     rolled_back = "rolled_back"
+
+
+class UpdateJobExecutionStatus(enum.StrEnum):
+    """Candidate-build execution only; never evidence of validation or publication."""
+
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    RECOVERY_REQUIRED = "RECOVERY_REQUIRED"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+# NULL is the expand-only migration state for legacy, unclassified jobs.
+# This checks structural pairs only, not validation evidence or lease validity.
+UPDATE_JOB_EXECUTION_PAIR_CHECK = """
+execution_status IS NULL
+OR (execution_status = 'PENDING' AND status = 'pending')
+OR (execution_status = 'RUNNING' AND status IN ('claimed', 'running', 'building'))
+OR (execution_status = 'RECOVERY_REQUIRED' AND status = 'recovery_required')
+OR (execution_status = 'SUCCEEDED' AND status IN
+    ('building', 'validating', 'ready', 'succeeded', 'failed', 'cancelled',
+     'promoted', 'rolled_back'))
+OR (execution_status = 'FAILED' AND status = 'failed')
+OR (execution_status = 'CANCELLED' AND status = 'cancelled')
+"""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CandidateAttemptReference:
+    """Identity binding, not a mutable workspace path or permission to write."""
+
+    job_id: str
+    knowledge_base_id: str
+    attempt: int
+    candidate_generation_id: str
+
+    def __post_init__(self) -> None:
+        for value in (self.job_id, self.knowledge_base_id, self.candidate_generation_id):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("candidate identity must be non-empty")
+        if type(self.attempt) is not int or self.attempt < 1:
+            raise ValueError("candidate attempt must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ClaimedExecutionContext:
+    """Carry an already acquired claim; construction does not authorize execution.
+
+    Consumers must check the current persisted Job AND KB lease at each commit.
+    This value object deliberately has no claim, renewal, or execution methods.
+    """
+
+    job_id: str
+    knowledge_base_id: str
+    attempt: int
+    worker_id: str
+    lease_token: str = field(repr=False)
+    fencing_token: int
+    lease_expires_at: datetime
+    candidate_reference: CandidateAttemptReference | None = None
+
+    def __post_init__(self) -> None:
+        for value in (self.job_id, self.knowledge_base_id, self.worker_id, self.lease_token):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("claim identity and lease token must be non-empty")
+        for value in (self.attempt, self.fencing_token):
+            if type(value) is not int or value < 1:
+                raise ValueError("attempt and fencing token must be positive integers")
+        if (
+            not isinstance(self.lease_expires_at, datetime)
+            or self.lease_expires_at.utcoffset() is None
+        ):
+            raise ValueError("lease expiry must be timezone-aware")
+        reference = self.candidate_reference
+        if reference is not None and (
+            not isinstance(reference, CandidateAttemptReference)
+            or (reference.job_id, reference.knowledge_base_id, reference.attempt)
+            != (self.job_id, self.knowledge_base_id, self.attempt)
+        ):
+            raise ValueError("candidate must belong to this job, KB, and attempt")
 
 
 class ValidationRunStatus(enum.StrEnum):
@@ -447,6 +529,10 @@ class UpdateJob(Base):
             "operation != 'reparse' OR document_id IS NOT NULL",
             name="ck_update_jobs_reparse_requires_document",
         ),
+        CheckConstraint(
+            UPDATE_JOB_EXECUTION_PAIR_CHECK,
+            name="ck_update_jobs_lifecycle_execution",
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_new_uuid)
@@ -467,6 +553,34 @@ class UpdateJob(Base):
     new_content_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[UpdateJobStatus] = mapped_column(
         Enum(UpdateJobStatus), nullable=False, default=UpdateJobStatus.pending, index=True
+    )
+    # No PENDING default: unchanged Phase15-B writers remain legacy/unclassified.
+    # Existing databases require an explicit schema upgrade before this ORM is used.
+    execution_status: Mapped[UpdateJobExecutionStatus | None] = mapped_column(
+        Enum(
+            UpdateJobExecutionStatus,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            name="ck_update_jobs_execution_status",
+        ),
+        nullable=True,
+        default=None,
+    )
+    next_run_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+    )
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+    )
+    execution_finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
     )
     current_stage: Mapped[str | None] = mapped_column(String(200), nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
