@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from industrial_rag.db.models import ClaimedExecutionContext
+from industrial_rag.db.models import ClaimedExecutionContext, ParsedArtifactReference
 from industrial_rag.repositories.update_job_repository import UpdateJobRepository
 from industrial_rag.services.kb_lease_service import KBLeaseService, LeaseHandle
 
@@ -27,6 +27,12 @@ class ClaimedUpdateJob:
     @property
     def execution_context(self) -> ClaimedExecutionContext:
         """The sole ownership object a runtime consumer may receive."""
+        checkpoint = self.checkpoint or {}
+        parsed_reference = ParsedArtifactReference.from_checkpoint(
+            checkpoint.get("parsed_artifact_reference")
+        )
+        if parsed_reference is not None and parsed_reference.attempt != self.attempt:
+            parsed_reference = None
         return ClaimedExecutionContext(
             job_id=self.job_id,
             knowledge_base_id=self.knowledge_base_id,
@@ -35,6 +41,7 @@ class ClaimedUpdateJob:
             lease_token=self.lease.lease_token,
             fencing_token=self.lease.fencing_token,
             lease_expires_at=self.lease.expires_at,
+            parsed_artifact_reference=parsed_reference,
         )
 
 
@@ -112,6 +119,22 @@ class UpdateJobWorker:
                 lease_expires_at=now + self.lease_ttl,
             )
 
+    async def save_checkpoint(
+        self, claimed: ClaimedUpdateJob, *, checkpoint: dict, status, now: datetime
+    ) -> bool:
+        async with self._session_factory() as session:
+            return await UpdateJobRepository(session).save_checkpoint(
+                claimed.job_id,
+                knowledge_base_id=claimed.knowledge_base_id,
+                worker_id=self.worker_id,
+                lease_token=claimed.lease.lease_token,
+                fencing_token=claimed.fencing_token,
+                attempt=claimed.attempt,
+                checkpoint=checkpoint,
+                status=status,
+                now=now,
+            )
+
     async def complete(
         self,
         claimed: ClaimedUpdateJob,
@@ -122,9 +145,11 @@ class UpdateJobWorker:
         async with self._session_factory() as session:
             completed = await UpdateJobRepository(session).mark_succeeded_fenced(
                 claimed.job_id,
+                knowledge_base_id=claimed.knowledge_base_id,
                 worker_id=self.worker_id,
                 lease_token=claimed.lease.lease_token,
                 fencing_token=claimed.fencing_token,
+                attempt=claimed.attempt,
                 result=result,
                 now=now,
             )

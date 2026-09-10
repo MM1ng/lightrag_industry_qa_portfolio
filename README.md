@@ -6,6 +6,23 @@
 
 > 项目只回答文档知识问题，不执行设备控制，也不把实验能力描述为生产能力。
 
+## Demo Release Candidate
+
+当前工作区作为本地 Demo Release Candidate 交付，核心 RAG、Generation lifecycle 和 validation contract 已冻结。本次交付使用 Qdrant 后端，当前 Knowledge Base 已激活双文档 Generation：
+
+| 项目 | 当前结果 |
+| --- | --- |
+| Active Knowledge Base | `Demo Bootstrap KB 2` |
+| Active Generation | `g9b05e83c30b45eb7da1c5224` |
+| 文档数 | **2** |
+| Child chunks | **453** |
+| Canonical validation | **PASS** |
+| Final smoke | **7/8 PASS** |
+| Reranker | 关闭 |
+| Vector backend | Qdrant |
+
+Final smoke 的唯一已知失败是 D005：DESMI 手册中“维护、检查或安装前泵组必须处于停止状态”的证据位于 `t1739cn.pdf` 第 12 页，但当前 dense/mix 配置下该正确 chunk 未进入 initial top-20，因此请求返回 `insufficient_evidence`。这属于已知 retrieval recall edge case，不应解读为 citation 伪造、Generation lifecycle 或 validation threshold 问题。其余第一份手册、第二份手册、跨文档和 negative 场景均通过。
+
 ## Demo
 
 ### 问答与原文核验
@@ -240,6 +257,22 @@ ADMIN_API_KEY=
 保持空占位符的 `.env.example` 可以提交；真实 `.env`、Token 和 Provider Key 不得进入 Git。
 
 ### 3. Initialize and start the API
+
+本地 staging Demo 的标准启动方式是使用工作台脚本。脚本会读取 `.env.local_staging`、检查并启动项目使用的 Qdrant Docker 容器、执行数据库迁移、启动 API 和 Vue 前端，并检查 `/readyz` 与 `/chat`。请先确保 Docker Desktop 已运行：
+
+```powershell
+.\scripts\start_workbench.ps1 -NoBrowser
+```
+
+启动成功后访问 `http://127.0.0.1:5173/chat`。需要单独启动服务或排查问题时，可使用：
+
+```powershell
+.\scripts\start_qdrant.ps1
+.\scripts\start_api.ps1 -Port 8000 -EnvFile .env.local_staging
+.\scripts\start_frontend.ps1 -Port 5173
+```
+
+标准脚本不会创建新的 worktree；Qdrant 使用项目约定的本地 Docker 容器和 staging 端口。
 
 ```bash
 python -m alembic upgrade head

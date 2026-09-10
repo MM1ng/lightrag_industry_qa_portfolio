@@ -11,10 +11,19 @@ from pathlib import Path
 
 from industrial_rag.db.models import TaskType, UpdateOperation
 from industrial_rag.repositories.update_job_repository import UpdateJobRepository
+from industrial_rag.repositories.vector_index_generation_repository import (
+    VectorIndexGenerationRepository,
+)
 from industrial_rag.services.cleanup_service import KnowledgeBaseCleanupService
 from industrial_rag.services.generation_fingerprint_service import build_generation_fingerprint
 from industrial_rag.services.task_context import TaskExecutionContext, TaskExecutionResult
 from industrial_rag.services.task_handlers import register_handler
+from industrial_rag.services.update_job_snapshot import (
+    build_input_snapshot,
+    snapshot_base,
+    snapshot_configuration,
+    snapshot_document,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -318,7 +327,8 @@ async def _create_update_job_from_document_task(
             error_code="reparse_no_document",
             error_message="Reparse task has no document_id",
         )
-    if document_id is not None and await ctx.doc_repo.get(document_id) is None:
+    document = await ctx.doc_repo.get(document_id) if document_id is not None else None
+    if document_id is not None and document is None:
         return TaskExecutionResult(
             success=False,
             error_code="document_not_found",
@@ -352,12 +362,39 @@ async def _create_update_job_from_document_task(
             error_code="knowledge_base_not_found",
             error_message=f"Knowledge base {ctx.task.knowledge_base_id} not found",
         )
+    active_generation = await VectorIndexGenerationRepository(
+        ctx.task_repo._session
+    ).get_active(knowledge_base.id)
+    if operation is UpdateOperation.reparse:
+        assert document is not None
+        input_snapshot = build_input_snapshot(
+            operation=operation.value,
+            knowledge_base_id=knowledge_base.id,
+            base_generation=snapshot_base(active_generation),
+            configuration=snapshot_configuration(knowledge_base),
+            source=snapshot_document(document),
+            target=snapshot_document(document),
+        )
+    elif operation is UpdateOperation.reindex:
+        input_snapshot = build_input_snapshot(
+            operation=operation.value,
+            knowledge_base_id=knowledge_base.id,
+            base_generation=snapshot_base(active_generation),
+            configuration=snapshot_configuration(knowledge_base),
+            document_bindings=[
+                snapshot_document(active_document)
+                for active_document in await ctx.doc_repo.list_active_for_kb(knowledge_base.id)
+            ],
+        )
+    else:
+        input_snapshot = None
     job = await job_repository.create(
         knowledge_base_id=knowledge_base.id,
         base_generation_id=knowledge_base.active_vector_generation_id,
         operation=operation,
         document_id=document_id,
         created_by=f"lifecycle_task:{ctx.task.id}",
+        checkpoint={"input_snapshot": input_snapshot} if input_snapshot is not None else None,
     )
     payload["update_job_id"] = job.id
     await ctx.task_repo.update(ctx.task.id, payload=payload)

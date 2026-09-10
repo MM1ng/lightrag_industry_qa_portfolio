@@ -6,6 +6,8 @@ import math
 from collections import defaultdict
 from typing import Any
 
+from industrial_rag.evidence_identity import stable_evidence_identity
+
 RECALL_K = (1, 3, 5, 10, 20)
 
 
@@ -42,12 +44,18 @@ def _metric_group(cases: list[dict[str, Any]]) -> dict[str, Any]:
         for case in positives:
             expected = case["golden"]["expected_evidence"]
             retrieved = (case.get("trace") or {}).get("initial_results", [])[:k]
-            retrieved_chunks = {item.get("chunk_id") for item in retrieved}
+            retrieved_chunks = {
+                identity for item in retrieved
+                if (identity := stable_evidence_identity(item)) is not None
+            }
             retrieved_documents = {item.get("document_name") for item in retrieved}
             retrieved_pages = {
                 (item.get("document_name"), item.get("page_number")) for item in retrieved
             }
-            expected_chunks = {item["chunk_id"] for item in expected}
+            expected_chunks = {
+                identity for item in expected
+                if (identity := stable_evidence_identity(item)) is not None
+            }
             expected_documents = {item["document_name"] for item in expected}
             expected_pages = {
                 (item["document_name"], item["page_number"]) for item in expected
@@ -70,20 +78,24 @@ def _metric_group(cases: list[dict[str, Any]]) -> dict[str, Any]:
     ndcg_sum = 0.0
     for case in positives:
         expected = case["golden"]["expected_evidence"]
-        relevance = {item["chunk_id"]: int(item["relevance_grade"]) for item in expected}
+        relevance = {
+            stable_evidence_identity(item): int(item["relevance_grade"])
+            for item in expected
+            if stable_evidence_identity(item) is not None
+        }
         retrieved = (case.get("trace") or {}).get("initial_results", [])
         first_rank = next(
             (
                 int(item["initial_rank"])
                 for item in retrieved
-                if item.get("chunk_id") in relevance
+                if stable_evidence_identity(item) in relevance
             ),
             None,
         )
         if first_rank is not None:
             reciprocal_rank_sum += 1 / first_rank
         dcg = sum(
-            (2 ** relevance.get(item.get("chunk_id"), 0) - 1)
+            (2 ** relevance.get(stable_evidence_identity(item), 0) - 1)
             / math.log2(rank + 1)
             for rank, item in enumerate(retrieved[:10], start=1)
         )
@@ -112,10 +124,12 @@ def _metric_group(cases: list[dict[str, Any]]) -> dict[str, Any]:
     citation_denominator = 0
     for case in answered:
         expected_chunks = {
-            item["chunk_id"] for item in case["golden"]["expected_evidence"]
+            stable_evidence_identity(item)
+            for item in case["golden"]["expected_evidence"]
         }
         cited_chunks = {
-            item.get("chunk_id") for item in case["response"].get("citations", [])
+            stable_evidence_identity(item)
+            for item in case["response"].get("citations", [])
         }
         has_support = bool(expected_chunks & cited_chunks)
         unsupported += int(not has_support)
@@ -223,12 +237,18 @@ def diagnose_case(case: dict[str, Any]) -> dict[str, Any]:
     retrieved = trace.get("initial_results", [])
     expected_documents = {item["document_name"] for item in expected}
     expected_pages = {(item["document_name"], item["page_number"]) for item in expected}
-    expected_chunks = {item["chunk_id"] for item in expected}
+    expected_chunks = {
+        identity for item in expected
+        if (identity := stable_evidence_identity(item)) is not None
+    }
     retrieved_documents = {item.get("document_name") for item in retrieved}
     retrieved_pages = {
         (item.get("document_name"), item.get("page_number")) for item in retrieved
     }
-    retrieved_chunks = {item.get("chunk_id") for item in retrieved}
+    retrieved_chunks = {
+        identity for item in retrieved
+        if (identity := stable_evidence_identity(item)) is not None
+    }
     if not expected_documents & retrieved_documents:
         return _failure(base, "Retrieval Error", "wrong_document")
     if not expected_pages & retrieved_pages:
@@ -238,19 +258,21 @@ def diagnose_case(case: dict[str, Any]) -> dict[str, Any]:
     first_rank = min(
         int(item["initial_rank"])
         for item in retrieved
-        if item.get("chunk_id") in expected_chunks
+        if stable_evidence_identity(item) in expected_chunks
     )
     if first_rank > 10:
         return _failure(base, "Ranking Error", "correct_chunk_rank_too_low")
     selected_chunks = {
-        item.get("chunk_id") for item in trace.get("final_selected_chunks", [])
+        identity for item in trace.get("final_selected_chunks", [])
+        if (identity := stable_evidence_identity(item)) is not None
     }
     if not expected_chunks & selected_chunks:
         return _failure(base, "Evidence Selection Error", "expected_evidence_not_selected")
     if case["response"].get("status") == "insufficient_evidence":
         return _failure(base, "Refusal Decision Error", "evidence_threshold_too_high")
     cited_chunks = {
-        item.get("chunk_id") for item in case["response"].get("citations", [])
+        identity for item in case["response"].get("citations", [])
+        if (identity := stable_evidence_identity(item)) is not None
     }
     if not expected_chunks & cited_chunks:
         return _failure(base, "Citation Error", "citation_binding_failure")

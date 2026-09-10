@@ -129,6 +129,18 @@ class QueryApplicationService:
                 "Generation 的冻结检索快照不可验证。",
                 status_code=409,
             ) from error
+        # Citation identity must come from the immutable generation snapshot.
+        # The update-job document snapshot can intentionally describe a failed
+        # predecessor as inactive while its replacement candidate is still the
+        # source of truth for validation.
+        citation_document_ids = {
+            str(record.document_name): str(record.document_id)
+            for record in chunk_registry.context_records(
+                knowledge_base_id=kb.id,
+                generation_id=generation.id,
+            ).values()
+            if record.document_name and record.document_id
+        }
         rewrite = await self._query_rewriter.rewrite(question, history)
         rewrite_details = rewrite.to_trace()
         if rewrite.status == "ambiguous":
@@ -187,7 +199,9 @@ class QueryApplicationService:
                 retrieval_question,
                 mode=self._base_settings.phase10b_query_mode,  # type: ignore[arg-type]
             )
-        document_ids = await self._citation_document_ids(kb.id, generation)
+        document_ids = await self._citation_document_ids(
+            kb.id, generation, snapshot_ids=citation_document_ids
+        )
         if result.retrieval_trace is not None:
             normalized_retrieval_query = result.retrieval_trace.normalized_query
             trace = result.retrieval_trace.with_query_rewrite(
@@ -206,16 +220,22 @@ class QueryApplicationService:
             citation_document_ids=document_ids,
         )
 
-    async def _citation_document_ids(self, kb_id: str, generation) -> dict[str, str]:
-        mapping: dict[str, str] = {}
+    async def _citation_document_ids(
+        self,
+        kb_id: str,
+        generation,
+        *,
+        snapshot_ids: dict[str, str] | None = None,
+    ) -> dict[str, str]:
+        mapping: dict[str, str] = dict(snapshot_ids or {})
         job = await self._job_repository.find_by_candidate(generation.id)
         snapshot = (job.result or {}).get("documents", []) if job is not None else []
         for entry in snapshot:
-            if entry.get("is_active") and entry.get("logical_name") and entry.get("document_id"):
+            if entry.get("logical_name") and entry.get("document_id"):
                 mapping[str(entry["logical_name"])] = str(entry["document_id"])
         docs = await self._document_repository.list_by_kb(kb_id, include_deleted=True)
         for doc in sorted(docs, key=lambda item: (item.version, item.created_at)):
-            if snapshot and doc.id not in {str(item.get("document_id")) for item in snapshot if item.get("is_active")}:
+            if snapshot and doc.id not in {str(item.get("document_id")) for item in snapshot if item.get("is_active")} and doc.id not in set(mapping.values()):
                 continue
             mapping[doc.original_file_name] = doc.id
             if doc.logical_name:

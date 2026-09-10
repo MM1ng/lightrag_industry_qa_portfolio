@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from industrial_rag.evidence_identity import stable_evidence_identity
+
 RefusalState = Literal["success", "partial_answer", "insufficient_evidence", "safety_blocked"]
 
 
@@ -13,17 +15,32 @@ def classify_refusal_state(case: dict[str, Any]) -> RefusalState:
         return "safety_blocked"
     if response.get("status") == "insufficient_evidence":
         return "insufficient_evidence"
-    expected = {item["chunk_id"] for item in case["golden"].get("expected_evidence", [])}
-    cited = {item.get("chunk_id") for item in response.get("citations", [])}
+    expected = {
+        identity for item in case["golden"].get("expected_evidence", [])
+        if (identity := stable_evidence_identity(item)) is not None
+    }
+    cited = {
+        identity for item in response.get("citations", [])
+        if (identity := stable_evidence_identity(item)) is not None
+    }
     if expected and cited and not expected <= cited:
         return "partial_answer"
     return "success"
 
 
 def explain_case(case: dict[str, Any]) -> dict[str, Any]:
-    expected = {item["chunk_id"] for item in case["golden"].get("expected_evidence", [])}
-    selected = {item["chunk_id"] for item in (case.get("trace") or {}).get("final_selected_chunks", [])}
-    cited = {item.get("chunk_id") for item in case.get("response", {}).get("citations", [])}
+    expected = {
+        identity for item in case["golden"].get("expected_evidence", [])
+        if (identity := stable_evidence_identity(item)) is not None
+    }
+    selected = {
+        identity for item in (case.get("trace") or {}).get("final_selected_chunks", [])
+        if (identity := stable_evidence_identity(item)) is not None
+    }
+    cited = {
+        identity for item in case.get("response", {}).get("citations", [])
+        if (identity := stable_evidence_identity(item)) is not None
+    }
     return {
         "question_id": case["question_id"],
         "split": case["golden"]["split"],

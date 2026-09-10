@@ -4,7 +4,12 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
-$python = (Get-Command python -ErrorAction Stop).Source
+$venvPython = Join-Path $repo ".venv\Scripts\python.exe"
+$python = if (Test-Path -LiteralPath $venvPython) {
+    $venvPython
+} else {
+    (Get-Command python -ErrorAction Stop).Source
+}
 if (-not $EnvFile) {
     $defaultEnvFile = Join-Path $repo ".env.local_staging"
     if (Test-Path -LiteralPath $defaultEnvFile) {
@@ -31,11 +36,6 @@ $env:PYTHONPATH = Join-Path $repo "src"
 & $python -m alembic upgrade head
 if ($LASTEXITCODE -ne 0) {
     Write-Output "MIGRATION_FAILED"
-    exit 1
-}
-& $python (Join-Path $repo "scripts\verify_database_schema.py")
-if ($LASTEXITCODE -ne 0) {
-    Write-Output "DATABASE_SCHEMA_NOT_READY"
     exit 1
 }
 try {

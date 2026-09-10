@@ -198,6 +198,69 @@ async def test_canonical_http_record_contains_required_trace_and_safety_fields(
 
 
 @pytest.mark.asyncio
+async def test_negative_refusal_status_passes_without_answer_text_or_citations(
+    tmp_path, monkeypatch
+) -> None:
+    response = httpx.Response(
+        200,
+        json={
+            "request_id": "req-negative",
+            "trace_id": "trace-negative",
+            "status": "insufficient_evidence",
+            "answer": "",
+            "generation_id": "b" * 32,
+            "citations": [],
+        },
+    )
+
+    class _HTTPClient:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args) -> None:
+            return None
+
+        async def post(self, *_args, **_kwargs):
+            return response
+
+    monkeypatch.setattr(
+        "industrial_rag.services.canonical_validation_runner.AsyncClient",
+        _HTTPClient,
+    )
+    policy = GoldenSetPolicy(
+        questions=(
+            {
+                "id": "N001",
+                "question": "unsupported",
+                "expects_evidence": False,
+                "expected_citations": [],
+            },
+        ),
+        source_sha256="1" * 64,
+        source_path=tmp_path / "test-golden.json",
+        version="test",
+    )
+    settings = Settings(
+        api_key="provider-test-key",
+        admin_api_key="admin-test-key",
+        validation_base_url="http://validation.invalid",
+        working_dir=tmp_path,
+    )
+    report = await CanonicalValidationRunner(settings, policy)(
+        "a" * 32,
+        SimpleNamespace(id="b" * 32),
+    )
+    record = report["results"][0]
+    assert record["answer_status"] == "insufficient_evidence"
+    assert record["citation_trace"] == []
+    assert record["negative_case_passed"] is True
+    assert report["negative_unsupported_answer_rate"] == 0.0
+
+
+@pytest.mark.asyncio
 async def test_promote_gate_rejects_missing_validation(validation_state) -> None:
     factory, settings, qdrant, kb_id, generation_id, _ = validation_state
     async with factory() as session:

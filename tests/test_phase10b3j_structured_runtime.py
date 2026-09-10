@@ -87,6 +87,41 @@ async def test_valid_structured_output_calls_backend_once_and_maps_child(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_valid_structured_output_preserves_all_selected_context_citations(tmp_path: Path) -> None:
+    class MultiContextBackend(StructuredBackend):
+        async def aquery_data(self, query: str, param: object) -> dict[str, object]:
+            self.query_calls += 1
+            first = encode_source_ref(Citation("manual.pdf", 9, "child-1"))
+            second = encode_source_ref(Citation("manual.pdf", 10, "child-2"))
+            return {
+                "status": "success",
+                "data": {
+                    "entities": [],
+                    "relationships": [],
+                    "chunks": [
+                        {"content": "轴承架油位应在观察窗中间位置。", "file_path": first},
+                        {"content": "轴承架油位需要定期检查。", "file_path": second},
+                    ],
+                    "references": [],
+                },
+            }
+
+    backend = MultiContextBackend(
+        '{"status":"success","answer_points":[{"text":"综合结论。",'
+        '"source_ids":["S1"]}],"unresolved_requirement_ids":[]}'
+    )
+    service = LightRAGService(_settings(tmp_path, enabled=True), backend=backend)
+    await service.initialize()
+
+    result = await service.query("轴承架油位应保持在什么位置？")
+
+    assert result.citations == (
+        Citation("manual.pdf", 9, "child-1"),
+        Citation("manual.pdf", 10, "child-2"),
+    )
+
+
+@pytest.mark.asyncio
 async def test_invalid_source_uses_j0_postprocessing_without_second_generation(tmp_path: Path) -> None:
     backend = StructuredBackend(
         '{"status":"success","answer_points":[{"text":"保留文本。",'

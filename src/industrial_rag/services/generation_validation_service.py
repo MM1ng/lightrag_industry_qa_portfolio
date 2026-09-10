@@ -62,6 +62,7 @@ class GenerationValidationService:
             load_generation_manifest,
         )
 
+        manifest = None
         try:
             manifest = load_generation_manifest(
                 Path(generation.workspace_path),
@@ -92,9 +93,32 @@ class GenerationValidationService:
         from industrial_rag.services.golden_set_policy import (
             RUNNER_VERSION,
             load_canonical_policy,
+            scope_policy_for_documents,
         )
 
-        policy = load_canonical_policy()
+        # Bootstrap validation must only exercise evidence that this first
+        # candidate can contain.  Once a KB has an active generation, retain
+        # the established canonical/regression scope so active-document
+        # coverage cannot be hidden by narrowing the candidate set.
+        active_generation = await self._generation_repo.get_active(kb_id)
+        bootstrap = active_generation is None
+        candidate_documents = {
+            str(
+                document.get("document_name")
+                or document.get("logical_name")
+                or document.get("source_file")
+                or ""
+            )
+            for document in (manifest.documents if manifest is not None else ())
+        }
+        policy = (
+            load_canonical_policy(question_ids=None)
+            if bootstrap
+            else load_canonical_policy()
+        )
+        policy = scope_policy_for_documents(
+            policy, candidate_documents, bootstrap=bootstrap
+        )
         client_factory = self._qdrant_client_factory or self._new_qdrant_client
         evidence = await GenerationContentFingerprintService(
             self._session,
@@ -139,7 +163,7 @@ class GenerationValidationService:
         runner = golden_runner or CanonicalValidationRunner(self._settings, policy)
         run_report = await runner(kb_id, generation)
         gates["canonical_question_count"] = (
-            run_report.get("question_count") == 20
+            run_report.get("question_count") == len(policy.questions)
             if golden_runner is None
             else True
         )
@@ -245,17 +269,39 @@ class GenerationValidationService:
         job = await self._job_repo.find_by_candidate(generation.id)
         expected_ids: set[str] = set()
         expected_entries: list[dict[str, Any]] = []
-        if job is not None and (job.result or {}).get("documents"):
-            expected_entries = [
-                entry
-                for entry in job.result["documents"]
-                if entry.get("is_active")
-            ]
-            expected_ids = {entry["document_id"] for entry in expected_entries}
-        else:
-            docs = await self._doc_repo.list_active_for_kb(kb_id)
-            expected_ids = {d.id for d in docs}
         workspace = Path(generation.workspace_path)
+        # The frozen generation manifest is authoritative for candidate
+        # membership.  A reparse candidate may be built from a document row
+        # that was marked inactive by an earlier failed generation; using the
+        # mutable active-document view here incorrectly rejects the complete
+        # candidate and also prevents its citation IDs from being emitted.
+        try:
+            from industrial_rag.services.generation_artifacts import load_generation_manifest
+
+            manifest = load_generation_manifest(
+                workspace,
+                expected_generation_id=generation.generation,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
+            expected_entries = [
+                dict(entry) for entry in manifest.documents
+            ]
+            expected_ids = {
+                str(entry["document_id"])
+                for entry in expected_entries
+                if entry.get("document_id")
+            }
+        except Exception:
+            if job is not None and (job.result or {}).get("documents"):
+                expected_entries = [
+                    entry
+                    for entry in job.result["documents"]
+                    if entry.get("is_active")
+                ]
+                expected_ids = {entry["document_id"] for entry in expected_entries}
+            else:
+                docs = await self._doc_repo.list_active_for_kb(kb_id)
+                expected_ids = {d.id for d in docs}
         token_dir = workspace / f"qdrant-{generation.generation}"
         doc_status_path = (token_dir if token_dir.is_dir() else workspace) / "kv_store_doc_status.json"
         if not doc_status_path.is_file():

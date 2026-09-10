@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -30,19 +30,42 @@ class GoldenSetPolicy:
     questions: tuple[dict[str, Any], ...]
 
 
-def load_canonical_policy(path: Path = DEFAULT_GOLDEN_SET_PATH) -> GoldenSetPolicy:
+def load_canonical_policy(
+    path: Path = DEFAULT_GOLDEN_SET_PATH, *, question_ids: tuple[str, ...] | None = CANONICAL_QUESTION_IDS
+) -> GoldenSetPolicy:
     raw = path.read_bytes()
     rows = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()]
     by_id = {str(row.get("id")): row for row in rows}
-    missing = [question_id for question_id in CANONICAL_QUESTION_IDS if question_id not in by_id]
+    selected_ids = tuple(by_id) if question_ids is None else question_ids
+    missing = [question_id for question_id in selected_ids if question_id not in by_id]
     if missing:
         raise ValueError(f"canonical golden set missing IDs: {','.join(missing)}")
-    questions = tuple(by_id[question_id] for question_id in CANONICAL_QUESTION_IDS)
-    if len(questions) != 20 or len({item["id"] for item in questions}) != 20:
-        raise ValueError("canonical golden policy must contain exactly 20 unique questions")
+    questions = tuple(by_id[question_id] for question_id in selected_ids)
+    if not questions or len(questions) != len({item["id"] for item in questions}):
+        raise ValueError("golden policy must contain unique questions")
     return GoldenSetPolicy(
         version=GOLDEN_SET_VERSION,
         source_path=path.resolve(),
         source_sha256=hashlib.sha256(raw).hexdigest(),
         questions=questions,
     )
+
+
+def scope_policy_for_documents(
+    policy: GoldenSetPolicy, candidate_documents: set[str], *, bootstrap: bool
+) -> GoldenSetPolicy:
+    """Restrict only an empty-KB bootstrap run to evidence it can contain."""
+    if not bootstrap:
+        return policy
+    questions = tuple(
+        question
+        for question in policy.questions
+        if not question.get(
+            "expects_evidence", bool(question.get("expected_citations"))
+        )
+        or all(
+            citation.get("source_file") in candidate_documents
+            for citation in question.get("expected_citations", [])
+        )
+    )
+    return replace(policy, questions=questions)

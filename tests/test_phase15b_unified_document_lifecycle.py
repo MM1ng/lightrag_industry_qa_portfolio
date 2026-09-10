@@ -15,6 +15,7 @@ from industrial_rag.config import Settings
 from industrial_rag.db.models import (
     Base,
     Document,
+    DocumentStatus,
     KnowledgeBase,
     LifecycleTask,
     TaskType,
@@ -72,6 +73,33 @@ async def update_job_session():
         await session.commit()
         yield session, kb, document
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_add_snapshot_keeps_changed_document_active_for_promote(
+    update_job_session, monkeypatch
+):
+    session, kb, document = update_job_session
+    document.status = DocumentStatus.parsed
+    document.is_active = False
+    job = SimpleNamespace(operation=UpdateOperation.add, document_id=document.id, metrics={})
+    service = IncrementalUpdateService(session, settings=SimpleNamespace())
+
+    async def list_documents(_kb_id, *, include_deleted):
+        return [document]
+
+    monkeypatch.setattr(service._doc_repo, "list_by_kb", list_documents)
+    snapshot = await service._document_state_snapshot(kb.id, job)
+
+    assert snapshot == [
+        {
+            "document_id": document.id,
+            "logical_name": document.original_file_name,
+            "version": document.version,
+            "content_sha256": document.file_hash,
+            "is_active": True,
+        }
+    ]
 
 
 class _CandidateBuildQdrant:
@@ -880,6 +908,37 @@ async def test_validated_reindex_promote_switches_active_generation_atomically(
     assert candidate.status is VectorIndexGenerationStatus.active
     assert active.status is VectorIndexGenerationStatus.archived
     assert job.status is UpdateJobStatus.promoted
+
+
+@pytest.mark.asyncio
+async def test_promote_syncs_knowledge_base_readiness_metadata(
+    update_job_session,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    session, kb, document = update_job_session
+    service, _active, candidate, job = await _build_document_lifecycle_candidate(
+        session,
+        kb,
+        document,
+        tmp_path,
+        monkeypatch,
+        operation=UpdateOperation.reindex,
+    )
+    await service.validate_generation(
+        kb.id,
+        candidate.id,
+        golden_runner=_passing_golden_runner,
+    )
+
+    await service.promote_generation(kb.id, candidate.id)
+
+    await session.refresh(kb)
+    assert kb.vector_backend == "qdrant"
+    assert kb.workspace_path == candidate.workspace_path
+    assert kb.document_count == 1
+    assert kb.active_document_count == 1
+    assert kb.chunk_count > 0
 
 
 @pytest_asyncio.fixture

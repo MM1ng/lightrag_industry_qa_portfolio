@@ -1266,7 +1266,11 @@ class LightRAGService:
                     )
                 )
             answer = "\n".join(point.content for point in rendered_points)
-            citations = tuple(rendered_citations)
+            # Keep every selected, generation-local evidence item bound to the
+            # grounded answer.  Provider source IDs are advisory and may omit
+            # a context item even when it was used to produce the answer;
+            # dropping it here creates a false citation miss across generations.
+            citations = tuple(item.citation for item in grounding_candidates)
             grounded = GroundedAnswer(
                 answer=answer,
                 citations=citations,

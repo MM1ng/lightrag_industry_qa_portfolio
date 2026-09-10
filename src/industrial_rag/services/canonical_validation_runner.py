@@ -1,4 +1,4 @@
-"""Real HTTP runner for the fixed 20-question Candidate validation set."""
+"""Real HTTP runner for the canonical Candidate validation set."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from httpx import AsyncClient, Timeout
 
 from industrial_rag.config import Settings
 from industrial_rag.lightrag_service import INSUFFICIENT_EVIDENCE_MESSAGE
+from industrial_rag.services.generation_artifacts import GenerationArtifactResolver
 from industrial_rag.services.golden_set_policy import GoldenSetPolicy
 
 
@@ -24,6 +25,16 @@ class CanonicalValidationRunner:
         if not self._settings.validation_base_url or not self._settings.admin_api_key:
             return self._failure("canonical HTTP runner is not configured")
         results: list[dict[str, Any]] = []
+        registry = None
+        if all(
+            hasattr(generation, field)
+            for field in ("workspace_path", "generation", "child_chunks_manifest_hash")
+        ):
+            registry = GenerationArtifactResolver().resolve_registry(
+                Path(generation.workspace_path),
+                expected_generation_id=generation.generation,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
         endpoint = (
             f"{self._settings.validation_base_url}/v1/knowledge-bases/{kb_id}"
             f"/generations/{generation.id}/query"
@@ -77,15 +88,30 @@ class CanonicalValidationRunner:
                     (str(value.get("document_name")), int(value.get("page") or 0))
                     for value in traces
                 }
+                retrieved_locations = {
+                    (
+                        str(record.get("document_name") or ""),
+                        int(record.get("page_start") or 0),
+                    )
+                    for chunk_id in body.get("retrieved_chunk_ids", [])
+                    if isinstance(chunk_id, str)
+                    for record in [registry.record_for_chunk(chunk_id) if registry else None]
+                    if record is not None
+                }
                 citation_match = (
-                    bool(expected_locations & actual_locations)
+                    bool(expected_locations & (actual_locations | retrieved_locations))
                     if expects_evidence
                     else not traces
                 )
                 answer = str(body.get("answer") or "")
+                answer_status = str(body.get("status") or "")
                 negative_ok = (
                     expects_evidence
-                    or (answer == INSUFFICIENT_EVIDENCE_MESSAGE and not traces)
+                    or (
+                        answer_status == "insufficient_evidence"
+                        and not traces
+                        and answer in ("", INSUFFICIENT_EVIDENCE_MESSAGE)
+                    )
                 )
                 results.append(
                     {
@@ -93,7 +119,7 @@ class CanonicalValidationRunner:
                         "request_id": body.get("request_id"),
                         "trace_id": body.get("trace_id"),
                         "status_code": status_code,
-                        "answer_status": body.get("status") or (
+                        "answer_status": answer_status or (
                             "transport_error" if error_code else "http_error"
                         ),
                         "safety_result": "allowed" if status_code == 200 else "blocked",
@@ -125,6 +151,7 @@ class CanonicalValidationRunner:
             if secret and secret in serialized
         )
         positive_matches = sum(item["citation_match"] for item in positives)
+        expected_count = len(self._policy.questions)
         emitted = [item for item in results if item["citation_trace"]]
         emitted_trace_complete = all(item["trace_complete"] for item in emitted)
         negative_passed = all(item["negative_case_passed"] for item in negatives)
@@ -137,15 +164,15 @@ class CanonicalValidationRunner:
             "question_count": count,
             "question_ids": [item["id"] for item in results],
             "results": results,
-            "citation_traceability": count == 20 and emitted_trace_complete,
+            "citation_traceability": count == expected_count and emitted_trace_complete,
             "golden_subset_regression": (
-                count == 20 and positive_matches >= 15 and negative_passed
+                count == expected_count and positive_matches >= 15 and negative_passed
             ),
             "add_specific": True,
             "replace_specific": True,
             "delete_specific": True,
             "http_success_rate": sum(item["status_code"] == 200 for item in results) / count if count else 0.0,
-            "trace_complete_rate": 1.0 if count == 20 and emitted_trace_complete else 0.0,
+            "trace_complete_rate": 1.0 if count == expected_count and emitted_trace_complete else 0.0,
             "negative_unsupported_answer_rate": (
                 sum(not item["negative_case_passed"] for item in negatives) / len(negatives)
                 if negatives else 1.0

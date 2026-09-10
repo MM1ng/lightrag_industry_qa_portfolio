@@ -5,10 +5,15 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from industrial_rag.db.models import UpdateJob, UpdateJobStatus
+from industrial_rag.db.models import (
+    KBOperationLease,
+    ParsedArtifactReference,
+    UpdateJob,
+    UpdateJobStatus,
+)
 
 
 class UpdateJobRepository:
@@ -247,21 +252,49 @@ class UpdateJobRepository:
         self,
         job_id: str,
         *,
+        knowledge_base_id: str,
         worker_id: str,
         lease_token: str,
         fencing_token: int,
+        attempt: int,
         checkpoint: dict[str, Any],
         status: UpdateJobStatus,
         now: datetime,
     ) -> bool:
+        existing = await self.get(job_id)
+        existing_snapshot = (
+            (existing.checkpoint or {}).get("input_snapshot") if existing is not None else None
+        )
+        supplied_snapshot = checkpoint.get("input_snapshot")
+        if existing_snapshot is not None and supplied_snapshot not in (None, existing_snapshot):
+            raise ValueError("input_snapshot is immutable once an UpdateJob is accepted")
+        existing_checkpoint = dict(existing.checkpoint or {}) if existing is not None else {}
+        existing_reference = existing_checkpoint.get("parsed_artifact_reference")
+        supplied_reference = checkpoint.get("parsed_artifact_reference")
+        if existing_reference is not None and supplied_reference not in (None, existing_reference):
+            raise ValueError("parsed_artifact_reference is immutable within an attempt")
+        merged_checkpoint = {**existing_checkpoint, **checkpoint}
+        if existing_snapshot is not None:
+            merged_checkpoint["input_snapshot"] = existing_snapshot
+        if existing_reference is not None:
+            merged_checkpoint["parsed_artifact_reference"] = existing_reference
         statement = (
             update(UpdateJob)
             .where(
                 UpdateJob.id == job_id,
+                UpdateJob.knowledge_base_id == knowledge_base_id,
                 UpdateJob.worker_id == worker_id,
                 UpdateJob.lease_token == lease_token,
                 UpdateJob.fencing_token == fencing_token,
+                UpdateJob.attempt == attempt,
                 UpdateJob.lease_expires_at > now,
+                exists(select(KBOperationLease.knowledge_base_id).where(
+                    KBOperationLease.knowledge_base_id == knowledge_base_id,
+                    KBOperationLease.lock_owner == worker_id,
+                    KBOperationLease.lease_token == lease_token,
+                    KBOperationLease.fencing_token == fencing_token,
+                    KBOperationLease.expires_at > now,
+                )),
                 UpdateJob.status.in_(
                     [
                         UpdateJobStatus.claimed,
@@ -272,12 +305,70 @@ class UpdateJobRepository:
                 ),
             )
             .values(
-                checkpoint=checkpoint,
+                checkpoint=merged_checkpoint,
                 status=status,
-                current_stage=str(checkpoint.get("stage") or status.value),
+                current_stage=str(merged_checkpoint.get("stage") or status.value),
                 heartbeat_at=now,
                 updated_at=now,
             )
+            .execution_options(synchronize_session=False)
+        )
+        result = await self._session.execute(statement)
+        await self._session.commit()
+        return result.rowcount == 1
+
+    async def register_parsed_artifact_reference(
+        self,
+        job_id: str,
+        *,
+        worker_id: str,
+        lease_token: str,
+        fencing_token: int,
+        attempt: int,
+        reference: ParsedArtifactReference,
+        now: datetime,
+    ) -> bool:
+        """Fenced, additive checkpoint registration for an attempt-owned parse."""
+        if (reference.job_id, reference.knowledge_base_id, reference.attempt) != (
+            job_id,
+            reference.knowledge_base_id,
+            attempt,
+        ):
+            raise ValueError("parsed artifact reference does not belong to this claim")
+        existing = await self.get_by_kb_and_id(reference.knowledge_base_id, job_id)
+        if existing is None:
+            return False
+        checkpoint = dict(existing.checkpoint or {})
+        prior = checkpoint.get("parsed_artifact_reference")
+        serialized = reference.to_checkpoint()
+        if prior is not None and prior.get("attempt") == attempt and prior != serialized:
+            raise ValueError("parsed artifact reference is immutable for an attempt")
+        checkpoint["parsed_artifact_reference"] = serialized
+        current_lease = exists(
+            select(KBOperationLease.knowledge_base_id).where(
+                KBOperationLease.knowledge_base_id == reference.knowledge_base_id,
+                KBOperationLease.lock_owner == worker_id,
+                KBOperationLease.lease_token == lease_token,
+                KBOperationLease.fencing_token == fencing_token,
+                KBOperationLease.expires_at > now,
+            )
+        )
+        statement = (
+            update(UpdateJob)
+            .where(
+                UpdateJob.id == job_id,
+                UpdateJob.knowledge_base_id == reference.knowledge_base_id,
+                UpdateJob.worker_id == worker_id,
+                UpdateJob.lease_token == lease_token,
+                UpdateJob.fencing_token == fencing_token,
+                UpdateJob.attempt == attempt,
+                UpdateJob.lease_expires_at > now,
+                current_lease,
+                UpdateJob.status.in_(
+                    [UpdateJobStatus.claimed, UpdateJobStatus.running, UpdateJobStatus.building]
+                ),
+            )
+            .values(checkpoint=checkpoint, heartbeat_at=now, updated_at=now)
             .execution_options(synchronize_session=False)
         )
         result = await self._session.execute(statement)
@@ -288,20 +379,35 @@ class UpdateJobRepository:
         self,
         job_id: str,
         *,
+        knowledge_base_id: str,
         worker_id: str,
         lease_token: str,
         fencing_token: int,
+        attempt: int,
         result: dict[str, Any],
         now: datetime,
     ) -> bool:
+        """Persist success only while the exact claimant still owns the KB lease."""
+        current_lease = exists(
+            select(KBOperationLease.knowledge_base_id).where(
+                KBOperationLease.knowledge_base_id == knowledge_base_id,
+                KBOperationLease.lock_owner == worker_id,
+                KBOperationLease.lease_token == lease_token,
+                KBOperationLease.fencing_token == fencing_token,
+                KBOperationLease.expires_at > now,
+            )
+        )
         statement = (
             update(UpdateJob)
             .where(
                 UpdateJob.id == job_id,
+                UpdateJob.knowledge_base_id == knowledge_base_id,
                 UpdateJob.worker_id == worker_id,
                 UpdateJob.lease_token == lease_token,
                 UpdateJob.fencing_token == fencing_token,
+                UpdateJob.attempt == attempt,
                 UpdateJob.lease_expires_at > now,
+                current_lease,
                 UpdateJob.status.in_(
                     [
                         UpdateJobStatus.claimed,
@@ -368,6 +474,43 @@ class UpdateJobRepository:
             current_stage="building_candidate",
         )
 
+    async def mark_building_fenced(
+        self,
+        job_id: str,
+        *,
+        worker_id: str,
+        lease_token: str,
+        fencing_token: int,
+        attempt: int,
+        candidate_generation_id: str,
+        now: datetime,
+    ) -> bool:
+        """Bind a candidate only while the exact persisted claimant remains current."""
+        statement = (
+            update(UpdateJob)
+            .where(
+                UpdateJob.id == job_id,
+                UpdateJob.worker_id == worker_id,
+                UpdateJob.lease_token == lease_token,
+                UpdateJob.fencing_token == fencing_token,
+                UpdateJob.attempt == attempt,
+                UpdateJob.lease_expires_at > now,
+                UpdateJob.status.in_([UpdateJobStatus.claimed, UpdateJobStatus.running]),
+            )
+            .values(
+                status=UpdateJobStatus.building,
+                candidate_generation_id=candidate_generation_id,
+                started_at=now,
+                current_stage="building_candidate",
+                heartbeat_at=now,
+                updated_at=now,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        changed = await self._session.execute(statement)
+        await self._session.commit()
+        return changed.rowcount == 1
+
     async def mark_ready(self, job_id: str, result: dict | None = None) -> UpdateJob | None:
         values: dict[str, Any] = {
             "status": UpdateJobStatus.ready,
@@ -401,3 +544,53 @@ class UpdateJobRepository:
             sanitized_error_message=sanitized_error_message,
             finished_at=datetime.now(tz=UTC),
         )
+
+    async def mark_failed_fenced(
+        self,
+        job_id: str,
+        *,
+        knowledge_base_id: str,
+        worker_id: str,
+        lease_token: str,
+        fencing_token: int,
+        attempt: int,
+        error_code: str | None,
+        sanitized_error_message: str | None,
+        now: datetime,
+    ) -> bool:
+        """Persist failure only while the exact job claimant still owns the KB lease."""
+        current_lease = exists(
+            select(KBOperationLease.knowledge_base_id).where(
+                KBOperationLease.knowledge_base_id == knowledge_base_id,
+                KBOperationLease.lock_owner == worker_id,
+                KBOperationLease.lease_token == lease_token,
+                KBOperationLease.fencing_token == fencing_token,
+                KBOperationLease.expires_at > now,
+            )
+        )
+        statement = (
+            update(UpdateJob)
+            .where(
+                UpdateJob.id == job_id,
+                UpdateJob.knowledge_base_id == knowledge_base_id,
+                UpdateJob.worker_id == worker_id,
+                UpdateJob.lease_token == lease_token,
+                UpdateJob.fencing_token == fencing_token,
+                UpdateJob.attempt == attempt,
+                UpdateJob.lease_expires_at > now,
+                current_lease,
+            )
+            .values(
+                status=UpdateJobStatus.failed,
+                current_stage="failed",
+                error_code=error_code,
+                sanitized_error_message=sanitized_error_message,
+                finished_at=now,
+                heartbeat_at=now,
+                updated_at=now,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        changed = await self._session.execute(statement)
+        await self._session.commit()
+        return changed.rowcount == 1

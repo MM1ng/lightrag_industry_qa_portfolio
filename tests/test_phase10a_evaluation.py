@@ -61,7 +61,15 @@ def _case(
                 for rank, (chunk, page) in enumerate(retrieved, start=1)
             ],
             "final_selected_chunks": [
-                {"final_rank": rank, "chunk_id": chunk}
+                {
+                    "final_rank": rank,
+                    "chunk_id": chunk,
+                    "document_name": "manual.pdf",
+                    "page_number": next(
+                        (page for candidate, page in retrieved if candidate == chunk),
+                        1,
+                    ),
+                }
                 for rank, chunk in enumerate(selected, start=1)
             ],
             "retrieval_ms": 10.0,
@@ -125,6 +133,30 @@ def test_metrics_freeze_positive_denominators_multi_evidence_and_graded_rank() -
         "numerator": 0,
         "denominator": 0,
         "value": None,
+    }
+
+
+def test_evidence_identity_survives_generation_chunk_id_change() -> None:
+    case = _case(
+        "cross-generation",
+        expected=[_evidence("e1", "old-generation-id", 7)],
+        retrieved=[("new-generation-id", 7)],
+        selected=[],
+        status="success",
+        cited=[("new-generation-id", 7)],
+    )
+
+    overall = evaluate_retrieval([case])["overall"]
+
+    assert overall["chunk_recall_at_1"] == {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1.0,
+    }
+    assert overall["question_level_citation_accuracy"] == {
+        "numerator": 1,
+        "denominator": 1,
+        "value": 1.0,
     }
 
 

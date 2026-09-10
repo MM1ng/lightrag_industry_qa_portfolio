@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from industrial_rag.db.models import Document, DocumentStatus
+from industrial_rag.db.models import Document, DocumentStatus, KBOperationLease, UpdateJob
 
 
 class DocumentRepository:
@@ -64,8 +64,8 @@ class DocumentRepository:
         stmt = select(Document).where(
             Document.knowledge_base_id == kb_id,
             Document.file_hash == file_hash,
-            Document.is_active == True,  # noqa: E712
-        )
+            Document.status != DocumentStatus.deleted,
+        ).order_by(Document.created_at.desc())
         result = await self._session.execute(stmt)
         return result.scalars().first()
 
@@ -79,6 +79,65 @@ class DocumentRepository:
         doc.updated_at = datetime.now(tz=UTC)
         await self._session.flush()
         return doc
+
+    async def mark_parsed_fenced(
+        self,
+        doc_id: str,
+        *,
+        job_id: str,
+        knowledge_base_id: str,
+        worker_id: str,
+        lease_token: str,
+        fencing_token: int,
+        attempt: int,
+        page_count: int,
+        parent_chunk_count: int,
+        child_chunk_count: int,
+        now: datetime,
+    ) -> bool:
+        """Persist parse metadata only while the registering claimant remains current."""
+        current_job = exists(
+            select(UpdateJob.id).where(
+                UpdateJob.id == job_id,
+                UpdateJob.knowledge_base_id == knowledge_base_id,
+                UpdateJob.worker_id == worker_id,
+                UpdateJob.lease_token == lease_token,
+                UpdateJob.fencing_token == fencing_token,
+                UpdateJob.attempt == attempt,
+                UpdateJob.lease_expires_at > now,
+            )
+        )
+        current_lease = exists(
+            select(KBOperationLease.knowledge_base_id).where(
+                KBOperationLease.knowledge_base_id == knowledge_base_id,
+                KBOperationLease.lock_owner == worker_id,
+                KBOperationLease.lease_token == lease_token,
+                KBOperationLease.fencing_token == fencing_token,
+                KBOperationLease.expires_at > now,
+            )
+        )
+        statement = (
+            update(Document)
+            .where(
+                Document.id == doc_id,
+                Document.knowledge_base_id == knowledge_base_id,
+                current_job,
+                current_lease,
+            )
+            .values(
+                page_count=page_count,
+                parent_chunk_count=parent_chunk_count,
+                child_chunk_count=child_chunk_count,
+                parse_status="done",
+                status=DocumentStatus.parsed,
+                parser_version="1.28.0",
+                updated_at=now,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        result = await self._session.execute(statement)
+        await self._session.commit()
+        return result.rowcount == 1
 
     async def soft_delete(self, doc_id: str) -> Document | None:
         doc = await self.get(doc_id)

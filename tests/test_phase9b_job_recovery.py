@@ -9,12 +9,14 @@ import pytest
 import pytest_asyncio
 from industrial_rag.db.models import (
     Base,
+    KBOperationLease,
     KnowledgeBase,
     UpdateJob,
     UpdateJobStatus,
     UpdateOperation,
 )
 from industrial_rag.repositories.update_job_repository import UpdateJobRepository
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 
@@ -94,9 +96,11 @@ async def test_stale_worker_cannot_checkpoint_or_finish_job(job_factory) -> None
         assert (
             await repository.save_checkpoint(
                 job.id,
+                knowledge_base_id=job.knowledge_base_id,
                 worker_id="worker-old",
                 lease_token="token-old",
                 fencing_token=9,
+                attempt=job.attempt,
                 checkpoint={"stage": "qdrant_written"},
                 status=UpdateJobStatus.running,
                 now=now,
@@ -106,9 +110,11 @@ async def test_stale_worker_cannot_checkpoint_or_finish_job(job_factory) -> None
         assert (
             await repository.mark_succeeded_fenced(
                 job.id,
+                knowledge_base_id=job.knowledge_base_id,
                 worker_id="worker-old",
                 lease_token="token-old",
                 fencing_token=9,
+                attempt=job.attempt,
                 result={"candidate_generation_id": "c" * 32},
                 now=now,
             )
@@ -132,11 +138,23 @@ async def test_expired_job_becomes_recoverable_and_success_is_not_reclaimed(job_
             lease_expires_at=started + timedelta(seconds=1),
         )
         assert job is not None
+        session.add(
+            KBOperationLease(
+                knowledge_base_id=job.knowledge_base_id,
+                lock_owner="worker-a",
+                lease_token="token-a",
+                fencing_token=1,
+                expires_at=started + timedelta(seconds=1),
+            )
+        )
+        await session.commit()
         assert await repository.save_checkpoint(
             job.id,
+            knowledge_base_id=job.knowledge_base_id,
             worker_id="worker-a",
             lease_token="token-a",
             fencing_token=1,
+            attempt=job.attempt,
             checkpoint={"stage": "parsed", "document_id": "d" * 32},
             status=UpdateJobStatus.building,
             now=started,
@@ -158,11 +176,24 @@ async def test_expired_job_becomes_recoverable_and_success_is_not_reclaimed(job_
         assert recovered.id == job.id
         assert recovered.attempt == 2
         assert recovered.checkpoint == {"stage": "parsed", "document_id": "d" * 32}
+        await session.execute(
+            update(KBOperationLease)
+            .where(KBOperationLease.knowledge_base_id == recovered.knowledge_base_id)
+            .values(
+                lock_owner="worker-b",
+                lease_token="token-b",
+                fencing_token=2,
+                expires_at=after_expiry + timedelta(seconds=30),
+            )
+        )
+        await session.commit()
         assert await repository.mark_succeeded_fenced(
             recovered.id,
+            knowledge_base_id=recovered.knowledge_base_id,
             worker_id="worker-b",
             lease_token="token-b",
             fencing_token=2,
+            attempt=recovered.attempt,
             result={"candidate_generation_id": "c" * 32},
             now=after_expiry,
         )

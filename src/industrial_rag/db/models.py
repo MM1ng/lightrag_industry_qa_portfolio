@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import enum
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -169,6 +170,60 @@ class CandidateAttemptReference:
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
+class ParsedArtifactReference:
+    """C1B runtime contract for one parsed artifact owned by one job attempt."""
+
+    job_id: str
+    knowledge_base_id: str
+    attempt: int
+    document_id: str
+    artifact_path: str
+    artifact_digest: str | None = None
+
+    def __post_init__(self) -> None:
+        for value in (
+            self.job_id,
+            self.knowledge_base_id,
+            self.document_id,
+            self.artifact_path,
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("parsed artifact identity must be non-empty")
+        if type(self.attempt) is not int or self.attempt < 1:
+            raise ValueError("parsed artifact attempt must be a positive integer")
+        if self.artifact_digest is not None and (
+            not isinstance(self.artifact_digest, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", self.artifact_digest)
+        ):
+            raise ValueError("parsed artifact digest must be a SHA-256 hex digest")
+
+    def to_checkpoint(self) -> dict[str, object]:
+        return {
+            "job_id": self.job_id,
+            "knowledge_base_id": self.knowledge_base_id,
+            "attempt": self.attempt,
+            "document_id": self.document_id,
+            "artifact_path": self.artifact_path,
+            "artifact_digest": self.artifact_digest,
+        }
+
+    @classmethod
+    def from_checkpoint(cls, value: object) -> ParsedArtifactReference | None:
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            raise ValueError("parsed artifact reference checkpoint must be an object")
+        return cls(
+            job_id=value.get("job_id"),
+            knowledge_base_id=value.get("knowledge_base_id"),
+            attempt=value.get("attempt"),
+            document_id=value.get("document_id"),
+            artifact_path=value.get("artifact_path"),
+            artifact_digest=value.get("artifact_digest"),
+        )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ClaimedExecutionContext:
     """Carry an already acquired claim; construction does not authorize execution.
 
@@ -184,6 +239,7 @@ class ClaimedExecutionContext:
     fencing_token: int
     lease_expires_at: datetime
     candidate_reference: CandidateAttemptReference | None = None
+    parsed_artifact_reference: ParsedArtifactReference | None = None
 
     def __post_init__(self) -> None:
         for value in (self.job_id, self.knowledge_base_id, self.worker_id, self.lease_token):
@@ -204,6 +260,17 @@ class ClaimedExecutionContext:
             != (self.job_id, self.knowledge_base_id, self.attempt)
         ):
             raise ValueError("candidate must belong to this job, KB, and attempt")
+        parsed_reference = self.parsed_artifact_reference
+        if parsed_reference is not None and (
+            not isinstance(parsed_reference, ParsedArtifactReference)
+            or (
+                parsed_reference.job_id,
+                parsed_reference.knowledge_base_id,
+                parsed_reference.attempt,
+            )
+            != (self.job_id, self.knowledge_base_id, self.attempt)
+        ):
+            raise ValueError("parsed artifact must belong to this job, KB, and attempt")
 
 
 class ValidationRunStatus(enum.StrEnum):
