@@ -40,6 +40,7 @@ from industrial_rag.routers import (
     admin_diagnostics,
     documents,
     feedback,
+    evaluation,
     generation_gc,
     generations,
     graph,
@@ -1265,6 +1266,7 @@ def create_app(
 
     application.include_router(admin_diagnostics.router)
     application.include_router(feedback.router)
+    application.include_router(evaluation.router)
     application.include_router(feedback.compat_router)
     application.include_router(graph.router)
     application.include_router(knowledge_bases.router)

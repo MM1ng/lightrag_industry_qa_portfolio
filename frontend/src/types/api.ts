@@ -170,3 +170,56 @@ export interface ApiErrorShape {
   message: string
   retryable: boolean
 }
+
+export interface EvaluationGeneration {
+  id: string
+  generation: string
+  status: string
+  backend: string
+  created_at?: string | null
+  activated_at?: string | null
+}
+
+export interface EvaluationQuestion {
+  id?: string
+  question_id?: string
+  query?: string
+  question?: string
+  expects_evidence?: boolean
+  answer?: string
+  answer_status?: string
+  citation_match?: boolean
+  citation_trace?: Array<{ document_name?: string; page?: number; document_id?: string; chunk_id?: string; generation_id?: string }>
+  negative_case_passed?: boolean
+  trace_complete?: boolean
+  latency_ms?: number
+  failure_reason?: string | null
+  [key: string]: unknown
+}
+
+export interface EvaluationResult {
+  status: string
+  passed?: boolean | null
+  validation_run_id?: string | null
+  finished_at?: string | null
+  source?: { artifact_name?: string; schema?: string; path_available?: boolean }
+  metrics: Record<string, number | boolean>
+  gates: Record<string, boolean>
+  questions: EvaluationQuestion[]
+}
+
+export interface EvaluationComparison {
+  status: 'comparable' | 'not_comparable'
+  reason?: string | null
+  metrics: Record<string, number>
+  questions: Array<{ id: string; changed: boolean; before: EvaluationQuestion; after: EvaluationQuestion }>
+}
+
+export interface EvaluationDashboard {
+  knowledge_base: { id: string; name: string; active_generation_id?: string | null }
+  active_generation: EvaluationGeneration | null
+  comparison_generation: EvaluationGeneration | null
+  current: EvaluationResult | null
+  comparison: EvaluationComparison
+  available_generations: EvaluationGeneration[]
+}

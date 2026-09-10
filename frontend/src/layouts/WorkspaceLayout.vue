@@ -38,7 +38,10 @@ async function loadReadiness() {
   try {
     const items = await apiClient.listKnowledgeBases()
     session.setReadiness({ knowledgeBases: items, knowledgeBaseListState: items.length ? 'success' : 'empty', knowledgeBaseError: '' })
-    if (!session.activeKnowledgeBaseId && items[0]) session.selectKnowledgeBase(items[0].id)
+    if (!session.activeKnowledgeBaseId && items[0]) {
+      const readyKnowledgeBase = items.find((item) => (item.active_document_count ?? item.document_count) > 0)
+      session.selectKnowledgeBase((readyKnowledgeBase ?? items[0]).id)
+    }
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : '知识库列表暂不可用，请稍后重试。'
     session.setReadiness({ knowledgeBaseListState: 'error', knowledgeBaseError: message, knowledgeBases: [] })
@@ -69,6 +72,7 @@ function leaveAdmin() { session.leaveAdminMode(); router.push('/chat') }
         <RouterLink v-if="session.hasAdminAccess" to="/admin/documents"><span>文</span>文档与更新</RouterLink>
         <RouterLink v-if="session.hasAdminAccess" to="/admin/jobs"><span>任</span>更新任务</RouterLink>
         <RouterLink v-if="session.hasAdminAccess" to="/admin/generations"><span>代</span>Generations</RouterLink>
+        <RouterLink v-if="session.hasAdminAccess" to="/admin/evaluation"><span>评</span>评估中心</RouterLink>
       </nav>
       <div class="rail-footer">
         <RouterLink v-if="!session.hasAdminAccess" class="admin-entry" to="/admin/login"><span>锁</span>管理员入口</RouterLink>

@@ -10,6 +10,7 @@ import type {
   KnowledgeBaseDetail,
   QueryResult,
   UpdateJob,
+  EvaluationDashboard,
 } from '../types/api'
 
 export class ApiClientError extends Error {
@@ -114,6 +115,14 @@ export class ApiClient {
   async promoteGeneration(kbId: string, generationId: string): Promise<unknown> { return this.request(`/v1/knowledge-bases/${encodeURIComponent(kbId)}/generations/${encodeURIComponent(generationId)}/promote`, { method: 'POST' }) }
   async rollbackGeneration(kbId: string, generationId: string): Promise<unknown> { return this.request(`/v1/knowledge-bases/${encodeURIComponent(kbId)}/generations/${encodeURIComponent(generationId)}/rollback`, { method: 'POST' }) }
   async diffGeneration(kbId: string, generationId: string): Promise<unknown> { return this.request(`/v1/knowledge-bases/${encodeURIComponent(kbId)}/generations/${encodeURIComponent(generationId)}/diff`) }
+
+  async getEvaluationDashboard(kbId: string, generationId?: string, compareGenerationId?: string): Promise<EvaluationDashboard> {
+    const params = new URLSearchParams()
+    if (generationId) params.set('generation_id', generationId)
+    if (compareGenerationId) params.set('compare_generation_id', compareGenerationId)
+    const suffix = params.toString() ? `?${params.toString()}` : ''
+    return this.request<EvaluationDashboard>(`/v1/admin/evaluation/knowledge-bases/${encodeURIComponent(kbId)}${suffix}`)
+  }
 
   async getGraphOverview(limit = 50): Promise<GraphPayload> {
     return this.request<GraphPayload>(`/v1/graph/overview?limit=${limit}`)
