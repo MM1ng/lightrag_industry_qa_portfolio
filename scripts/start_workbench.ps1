@@ -25,11 +25,11 @@ function Import-IraEnvFile {
     }
 }
 
-Write-Output "[1/5] Starting Qdrant dependencies..."
-& (Join-Path $PSScriptRoot "start_phase9b_qdrant.ps1")
-
-Write-Output "[2/5] Loading local staging environment..."
+Write-Output "[1/5] Loading local staging environment..."
 Import-IraEnvFile (Join-Path $repo ".env.local_staging")
+
+Write-Output "[2/5] Starting Qdrant dependencies..."
+& (Join-Path $PSScriptRoot "start_phase9b_qdrant.ps1")
 
 Write-Output "[3/5] Starting FastAPI..."
 & (Join-Path $PSScriptRoot "start_api.ps1") -Port $ApiPort
