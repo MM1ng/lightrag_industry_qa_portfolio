@@ -42,6 +42,24 @@ Exceeding a budget returns `429` with `code=RATE_LIMITED` and a `Retry-After` he
 
 Only enable `IRA_TRUST_PROXY_HEADERS` behind a proxy that overwrites `X-Forwarded-For`; without one, any client can forge its own identity and bypass the limit. The limiter is per process — a multi-replica deployment should also enforce a shared limit at the ingress.
 
+#### The server rewrites client addresses too
+
+`IRA_TRUST_PROXY_HEADERS` only controls whether the *application* parses `X-Forwarded-For`. The ASGI server can rewrite `request.client` from the same header **before the app runs**, which defeats the application flag entirely.
+
+uvicorn does this by default: `--proxy-headers` is on and `--forwarded-allow-ips` defaults to `127.0.0.1`. A caller that can reach uvicorn directly from a trusted peer (the common local-workbench case) can therefore send a fresh `X-Forwarded-For` per request and obtain a fresh 30/min budget every time.
+
+Verified on 2026-10-29: with the default launch, 31 requests each carrying a different `X-Forwarded-For` were all admitted; with `--no-proxy-headers`, the 31st returned `429`.
+
+`scripts/start_api.ps1` therefore passes `--no-proxy-headers` unless you explicitly opt in:
+
+```powershell
+# Behind a proxy that overwrites X-Forwarded-For with the real peer address:
+.\scripts\start_api.ps1 -ForwardedAllowIps "10.0.0.10"
+```
+
+Any other launcher (docker `CMD`, systemd unit, `uvicorn` on the command line) must make the same choice. The startup log reports `proxy headers mode=TRUSTED` at WARNING level, because trusting the header is the risky state. The safe `mode=IGNORED` line is logged at INFO and therefore only appears when the `industrial_rag` logger is configured to emit INFO.
+
+
 ## Audit fields
 
 Every request should be diagnosable with:

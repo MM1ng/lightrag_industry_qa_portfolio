@@ -1,6 +1,12 @@
 param(
     [string]$Port = "8000",
-    [string]$EnvFile = ""
+    [string]$EnvFile = "",
+    # Uvicorn rewrites request.client from X-Forwarded-For for peers in its
+    # --forwarded-allow-ips list (127.0.0.1 by default). That happens before the
+    # app runs, so it silently hands every local caller a fresh rate-limit bucket
+    # and defeats IRA_TRUST_PROXY_HEADERS=false. Disabled by default; set this to
+    # the reverse proxy addresses only when the proxy sanitises the header.
+    [string]$ForwardedAllowIps = ""
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
@@ -49,7 +55,13 @@ try {
 } catch {
     Write-Output "QDRANT_NOT_READY"; exit 1
 }
-$proc = Start-Process -FilePath $python -ArgumentList @("-m", "uvicorn", "industrial_rag.api:app", "--host", "127.0.0.1", "--port", $Port) -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runDir "api.out.log") -RedirectStandardError (Join-Path $runDir "api.err.log")
+$uvicornArgs = @("-m", "uvicorn", "industrial_rag.api:app", "--host", "127.0.0.1", "--port", $Port)
+if ($ForwardedAllowIps) {
+    $uvicornArgs += @("--forwarded-allow-ips", $ForwardedAllowIps)
+} else {
+    $uvicornArgs += "--no-proxy-headers"
+}
+$proc = Start-Process -FilePath $python -ArgumentList $uvicornArgs -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runDir "api.out.log") -RedirectStandardError (Join-Path $runDir "api.err.log")
 Set-Content -Path $pidFile -Value $proc.Id
 for ($i = 0; $i -lt 60; $i++) {
     Start-Sleep -Seconds 2

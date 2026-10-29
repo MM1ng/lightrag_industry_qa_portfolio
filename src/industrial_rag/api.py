@@ -674,6 +674,7 @@ def _rate_limited_response(
 ) -> JSONResponse:
     retry_after = max(1, limiter.retry_after(client_key, bucket=bucket))
     operational_metrics.increment("rate_limited_total")
+    _record_response_status(429)
     _log_result(request_id=request_id, status="RATE_LIMITED", latency_ms=0)
     return _error_response(
         "RATE_LIMITED",
@@ -775,6 +776,43 @@ def _log_auth_mode(settings: Settings, *, insecure_local_dev: bool) -> None:
         )
 
 
+def _log_proxy_header_mode(settings: Settings) -> None:
+    """Record whether client addresses may come from ``X-Forwarded-For``.
+
+    The application layer can only choose whether *it* parses the header.  When
+    the ASGI server rewrites ``request.client`` from ``X-Forwarded-For`` (uvicorn
+    does this by default for peers listed in ``--forwarded-allow-ips``, which
+    defaults to ``127.0.0.1``), a client can hand itself a fresh rate-limit
+    bucket.  That rewrite happens before the app runs, so the only reliable
+    control is the server launch flag; log the expectation so a mismatched
+    deployment is visible at startup instead of only under abuse.
+    """
+
+    if settings.trust_proxy_headers:
+        logger.warning(
+            "proxy headers mode=TRUSTED: anonymous rate limiting keys on X-Forwarded-For; "
+            "only safe when a proxy overwrites that header with the real peer address"
+        )
+    else:
+        logger.info(
+            "proxy headers mode=IGNORED: anonymous rate limiting keys on the socket peer; "
+            "start uvicorn with --no-proxy-headers (or set --forwarded-allow-ips "
+            "explicitly) so the server does not rewrite client addresses"
+        )
+
+
+def _record_response_status(status_code: int) -> None:
+    """Count a request that short-circuits before the metrics middleware runs.
+
+    Responses produced inside the authentication middleware never reach
+    ``collect_operational_metrics``, so their status codes must be recorded
+    here or ``http_status_401_total`` / ``http_status_429_total`` stay at zero.
+    """
+
+    operational_metrics.increment("http_request_total")
+    operational_metrics.increment(f"http_status_{status_code}_total")
+
+
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
@@ -819,6 +857,7 @@ def create_app(
                 resolved_settings,
                 insecure_local_dev=application.state.allow_insecure_local_dev,
             )
+            _log_proxy_header_mode(resolved_settings)
             if (
                 resolved_settings.deployment_environment
                 in {"local_staging", "staging", "production"}
@@ -946,8 +985,7 @@ def create_app(
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         response = await call_next(request)
-        operational_metrics.increment("http_request_total")
-        operational_metrics.increment(f"http_status_{response.status_code}_total")
+        _record_response_status(response.status_code)
         return response
 
     # ------------------------------------------------------------------
@@ -973,6 +1011,7 @@ def create_app(
             # administrator rights. Local development opts in explicitly.
             if not getattr(request.app.state, "allow_insecure_local_dev", False):
                 _log_result(request_id=request_id, status="UNAUTHORIZED", latency_ms=0)
+                _record_response_status(401)
                 return _error_response(
                     "UNAUTHORIZED", request_id=request_id, trace_id=trace_id
                 )
