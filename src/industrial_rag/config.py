@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -12,6 +13,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from industrial_rag.vector_collections import VectorBackend
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BAILIAN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -30,6 +33,54 @@ DEFAULT_LLM_MODELS = (
     "qwen-plus",
     "qwen3.5-flash-2026-02-23",
 )
+
+# Minimum bearer-token length for ``SERVICE_API_KEY`` / ``ADMIN_API_KEY``.
+# 32 characters matches the 256-bit entropy produced by
+# ``secrets.token_urlsafe(32)`` and is the smallest value that keeps a
+# brute-force/length-extension resistant token in every deployed environment.
+API_KEY_MIN_LENGTH = 32
+
+# Environments where a too-short key refuses to start.  ``local_dev`` is
+# intentionally excluded: it only warns so that local iteration and the
+# existing short-key test fixtures keep working.
+KEY_LENGTH_ENFORCED_ENVIRONMENTS = frozenset({"local_staging", "staging", "production"})
+
+
+def validate_api_key_length(name: str, value: str | None, environment: str) -> None:
+    """Enforce the minimum API key length policy.
+
+    ``None`` never participates in the length check: an absent key is a
+    fail-closed condition handled by the API authentication middleware, not a
+    "weak secret" condition.  Enforced environments raise, ``local_dev`` only
+    logs a warning so local development stays frictionless.
+
+    Args:
+        name: Environment variable name, used in the error/log message.
+        value: Configured key value, or ``None`` when unset.
+        environment: ``IRA_DEPLOYMENT_ENVIRONMENT`` value.
+
+    Raises:
+        ValueError: If the key is shorter than ``API_KEY_MIN_LENGTH`` and the
+            deployment environment requires a strong key.
+    """
+    if value is None:
+        return
+    if len(value) >= API_KEY_MIN_LENGTH:
+        return
+    if environment in KEY_LENGTH_ENFORCED_ENVIRONMENTS:
+        raise ValueError(
+            f"{name} 长度必须不少于 {API_KEY_MIN_LENGTH} 个字符"
+            f"（当前长度 {len(value)}，IRA_DEPLOYMENT_ENVIRONMENT={environment}）；"
+            '可用 python -c "import secrets;print(secrets.token_urlsafe(32))" 生成'
+        )
+    logger.warning(
+        "%s is shorter than the recommended %d characters (current length %d); "
+        "allowed only when IRA_DEPLOYMENT_ENVIRONMENT=%s",
+        name,
+        API_KEY_MIN_LENGTH,
+        len(value),
+        environment,
+    )
 
 
 class StorageCompatibilityError(RuntimeError):
@@ -117,6 +168,10 @@ class Settings:
             self.service_api_key is None or self.admin_api_key is None
         ):
             raise ValueError("staging/production 必须同时配置 SERVICE_API_KEY 和 ADMIN_API_KEY")
+        validate_api_key_length(
+            "SERVICE_API_KEY", self.service_api_key, self.deployment_environment
+        )
+        validate_api_key_length("ADMIN_API_KEY", self.admin_api_key, self.deployment_environment)
         if not isinstance(self.vector_backend, VectorBackend):
             object.__setattr__(self, "vector_backend", VectorBackend(self.vector_backend))
         if self.vector_backend is VectorBackend.qdrant and not self.qdrant_url:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 from industrial_rag.config import Settings
 
@@ -75,3 +77,69 @@ def test_direct_settings_constructor_applies_the_same_default_model_chain() -> N
 def test_model_chain_rejects_empty_or_duplicate_entries(fallbacks: str, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         Settings.from_mapping({**_valid_values(), "LLM_FALLBACK_MODELS": fallbacks})
+
+
+# ---------------------------------------------------------------------------
+# API key minimum length policy
+# ---------------------------------------------------------------------------
+
+_STRONG_SERVICE_KEY = "s" * 32
+_STRONG_ADMIN_KEY = "a" * 32
+
+
+def test_staging_rejects_short_service_api_key() -> None:
+    with pytest.raises(ValueError, match=r"SERVICE_API_KEY 长度必须不少于 32"):
+        Settings(
+            api_key="test-only-key",
+            deployment_environment="staging",
+            service_api_key="too-short",
+            admin_api_key=_STRONG_ADMIN_KEY,
+        )
+
+
+def test_production_rejects_short_admin_api_key() -> None:
+    with pytest.raises(ValueError, match=r"ADMIN_API_KEY 长度必须不少于 32"):
+        Settings(
+            api_key="test-only-key",
+            deployment_environment="production",
+            service_api_key=_STRONG_SERVICE_KEY,
+            admin_api_key="short",
+        )
+
+
+def test_local_dev_short_key_only_warns(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.WARNING, logger="industrial_rag.config")
+
+    settings = Settings(
+        api_key="test-only-key",
+        deployment_environment="local_dev",
+        service_api_key="short",
+        admin_api_key="also-short",
+    )
+
+    assert settings.service_api_key == "short"
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("SERVICE_API_KEY" in message for message in messages)
+    assert any("ADMIN_API_KEY" in message for message in messages)
+
+
+def test_length_check_ignores_absent_key() -> None:
+    # An absent key is exempt: fail-closed behaviour is the middleware's job.
+    settings = Settings(
+        api_key="test-only-key",
+        deployment_environment="local_dev",
+        service_api_key=None,
+        admin_api_key=None,
+    )
+    assert settings.service_api_key is None
+    assert settings.admin_api_key is None
+
+    # In enforced environments the absence is reported by the presence check,
+    # never as a length violation.
+    with pytest.raises(ValueError, match="必须同时配置"):
+        Settings(
+            api_key="test-only-key",
+            deployment_environment="staging",
+            service_api_key=_STRONG_SERVICE_KEY,
+            admin_api_key=None,
+        )

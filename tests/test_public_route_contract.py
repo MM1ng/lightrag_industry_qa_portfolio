@@ -159,11 +159,13 @@ def test_insecure_local_dev_flag_restores_uncredentialed_access(
 
 def test_insecure_flag_is_ignored_outside_local_dev(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("IRA_DEV_INSECURE", "1")
+    # local_staging enforces the >=32 character API key policy; only the length
+    # matters here, the assertion below is about IRA_DEV_INSECURE being ignored.
     settings = Settings(
         api_key="offline-test-key",
         deployment_environment="local_staging",
-        service_api_key="service-secret",
-        admin_api_key="admin-secret",
+        service_api_key="service-secret-0123456789abcdef0123",
+        admin_api_key="admin-secret-0123456789abcdef012345",
     )
     app = create_app(settings=settings, runtime_factory=lambda _: _NoRuntime())
 

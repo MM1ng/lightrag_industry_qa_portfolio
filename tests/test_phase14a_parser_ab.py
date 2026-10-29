@@ -1,20 +1,45 @@
 import copy
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 from scripts.phase14a_parser_ab import (
     DATASET,
+    GENERATION,
     canonical_parser_record,
     classify_evidence_match,
     compare_evidence,
     evaluate,
     exact_numeric_tokens,
+    load,
     normalize_text,
     parser_artifact_fingerprint,
     table_cells,
     validate_records,
     verify_pdf,
+)
+
+
+def _protected_source_manuals_present() -> bool:
+    """Return whether every manifest-referenced source manual exists on disk.
+
+    The original PDFs are protected assets: only ``data/manuals/README.md`` is
+    distributed, so the SHA256/page-count identity checks cannot run in a fresh
+    clone.  Assets are located through ``source_manifest.json`` exactly like
+    ``scripts.phase14a_parser_ab.identity`` does, so the check stays accurate
+    when the PDFs are present and the tests still execute for real.
+    """
+    try:
+        sources = load(GENERATION / "source_manifest.json")
+    except (OSError, ValueError, KeyError):
+        return False
+    return bool(sources) and all(Path(str(item["path"])).is_file() for item in sources)
+
+
+requires_source_manuals = pytest.mark.skipif(
+    not _protected_source_manuals_present(),
+    reason="protected source manuals are not distributed",
 )
 
 
@@ -122,6 +147,7 @@ def test_fingerprint_stable_order_sensitive():
     assert parser_artifact_fingerprint(rows) != parser_artifact_fingerprint(rows[::-1])
 
 
+@requires_source_manuals
 def test_identity_roundtrips_without_type_drift():
     from scripts.phase14a_parser_ab import identity
 
@@ -146,6 +172,7 @@ def test_order_check_keeps_missing_step_in_denominator():
     assert len(check["anchor_offsets"]) == 3 and check["anchor_offsets"][1] is None
 
 
+@requires_source_manuals
 def test_saved_artifact_full_offline_replay_and_same_report_semantics():
     from scripts.phase14a_parser_ab import ARTIFACT, compute, identity, load
     from scripts.phase14a_parser_report import gate, render, structure_checks

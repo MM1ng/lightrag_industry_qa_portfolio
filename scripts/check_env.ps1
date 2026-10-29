@@ -19,8 +19,8 @@ $required = @{
     "EMBEDDING_DIM" = "must be 1024"
     "QDRANT_URL" = "must be configured"
     "QDRANT_COLLECTION_PREFIX" = "must be configured"
-    "SERVICE_API_KEY" = "must be configured"
-    "ADMIN_API_KEY" = "must be configured and differ from SERVICE_API_KEY"
+    "SERVICE_API_KEY" = "must be configured and at least 32 characters"
+    "ADMIN_API_KEY" = "must be configured, at least 32 characters, and differ from SERVICE_API_KEY"
     "IRA_DEPLOYMENT_ENVIRONMENT" = "must be local_staging"
     "VALIDATION_BASE_URL" = "must be configured"
     "VALIDATION_ARTIFACT_DIR" = "must be configured"
@@ -35,6 +35,14 @@ if (
 ) {
     Write-Output "invalid: SERVICE_API_KEY and ADMIN_API_KEY must differ"
     $fail += "SERVICE_API_KEY_ADMIN_API_KEY_EQUAL"
+}
+foreach ($name in @("SERVICE_API_KEY", "ADMIN_API_KEY")) {
+    $value = [System.Environment]::GetEnvironmentVariable($name, "Process")
+    if ($value -and $value.Length -lt 32) {
+        Write-Output ("invalid: " + $name + " must be at least 32 characters " +
+            "(generate with: python -c ""import secrets;print(secrets.token_urlsafe(32))"")")
+        $fail += ($name + "_TOO_SHORT")
+    }
 }
 foreach ($name in $required.Keys) {
     $value = [System.Environment]::GetEnvironmentVariable($name, "Process")

@@ -271,6 +271,10 @@ SERVICE_API_KEY=
 ADMIN_API_KEY=
 ```
 
+`SERVICE_API_KEY` 与 `ADMIN_API_KEY` 必须为 **≥32 字符**，可用 `python -c "import secrets;print(secrets.token_urlsafe(32))"` 生成。在 `local_staging` / `staging` / `production` 下，密钥短于 32 字符会直接拒绝启动（`ValueError`）；`local_dev` 下仅打印 warning。
+
+> **升级提示**：本次加固后，已有部署需要重新生成两个 ≥32 字符的密钥。仓库内 `.env.local_staging` 仍是旧值（`SERVICE_API_KEY` 26 字符、`ADMIN_API_KEY` 6 字符），因此升级后以 `local_staging` 启动会拒绝启动，请先替换密钥再运行 `.\scripts\check_env.ps1 -EnvFile .env.local_staging`。
+
 认证默认 fail-closed：缺少 `SERVICE_API_KEY` / `ADMIN_API_KEY` 时，除健康检查外的所有接口返回 401。本地开发若确实不想配置密钥，可额外设置 `IRA_DEV_INSECURE=1`（仅在 `IRA_DEPLOYMENT_ENVIRONMENT=local_dev` 时生效）。启动日志会打印当前认证模式。
 
 保持空占位符的 `.env.example` 可以提交；真实 `.env`、Token 和 Provider Key 不得进入 Git。
