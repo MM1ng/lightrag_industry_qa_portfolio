@@ -287,3 +287,34 @@ async def test_broken_retry_write_does_not_leave_task_running(
     finally:
         await executor.stop()
         await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_identity_read_failure_does_not_leave_task_running(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failing identity read must still land on a terminal status.
+
+    ``_load_knowledge_base_id`` runs before the execution session, so an
+    exception raised there used to escape every guard and leave the row in
+    ``running`` until the next process start ran stale-task recovery.
+    """
+    engine, factory = await _make_engine(tmp_path)
+    task_ids = await _seed_tasks(factory, count=1)
+    executor = LifecycleTaskExecutor(factory, settings=_settings(), poll_interval=60.0)
+
+    async def _broken_identity_read(task_id: str) -> str | None:
+        raise RuntimeError("transient DB failure on the identity read")
+
+    monkeypatch.setattr(executor, "_load_knowledge_base_id", _broken_identity_read)
+
+    try:
+        await executor._poll_once()
+        await _wait_until(lambda: not executor._active_tasks)
+
+        statuses = await _statuses(factory, task_ids)
+        assert statuses[task_ids[0]] != TaskStatus.running
+        assert statuses[task_ids[0]] == TaskStatus.retrying
+    finally:
+        await executor.stop()
+        await engine.dispose()

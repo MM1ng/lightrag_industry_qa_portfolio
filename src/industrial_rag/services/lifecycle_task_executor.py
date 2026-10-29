@@ -190,6 +190,14 @@ class LifecycleTaskExecutor:
             lock = self._acquire_kb_lock(kb_id)
             async with self._semaphore, lock:
                 await self._run_task_in_session(task_id)
+        except Exception:
+            # The identity read and the semaphore/lock acquisition sit *outside*
+            # ``_run_task_in_session``'s guard, so a failure there would escape
+            # every recovery path and leave the row in ``running`` until the
+            # next process start.  ``_ensure_terminal_status`` is idempotent and
+            # only rewrites rows that are still ``running``.
+            logger.exception("Task %s failed before execution could start", task_id)
+            await self._ensure_terminal_status(task_id)
         finally:
             self._active_tasks.discard(task_id)
 

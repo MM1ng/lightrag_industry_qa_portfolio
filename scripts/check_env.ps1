@@ -63,6 +63,11 @@ foreach ($name in $required.Keys) {
     if (-not $ok) {
         Write-Output ("invalid: " + $name)
         $fail += $name
+    } elseif ($fail -contains ($name + "_TOO_SHORT")) {
+        # Already reported by the minimum-length check above; do not claim it is
+        # "configured" as well, which reads as contradictory to an operator.
+        Write-Output ("invalid: " + $name + " (shorter than 32 characters)")
+        $fail += $name
     } else {
         Write-Output ("configured: " + $name)
     }

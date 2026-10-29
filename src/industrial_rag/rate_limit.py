@@ -2,7 +2,14 @@
 
 The public workbench surface (graph reads, document source lookups, KB query,
 feedback) is reachable without a Bearer token, so it needs its own admission
-control.  Bearer-authenticated traffic is never rate limited here.
+control.
+
+Note the exact scope. The public-route allowlist is evaluated *before* the
+Bearer token is authenticated, so a request to a public path always takes the
+anonymous branch: a caller who happens to send ``Authorization: Bearer ...`` to
+a public route still consumes the anonymous bucket, because the token cannot be
+validated without revealing whether it is genuine. Requests to non-public paths
+are authenticated first and are therefore never rate limited here.
 
 The limiter is deliberately in-process and dependency free: it is an abuse
 brake, not a distributed quota.  For a multi-replica deployment put a shared
