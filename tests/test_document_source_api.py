@@ -54,10 +54,23 @@ async def _client() -> AsyncClient:
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
+def _write_pdf(path, *, pages: int) -> None:
+    import fitz
+
+    document = fitz.open()
+    try:
+        for index in range(pages):
+            page = document.new_page()
+            page.insert_text((72, 72), f"page {index + 1}")
+        document.save(path)
+    finally:
+        document.close()
+
+
 async def _seed_source(tmp_path, *, page_count: int | None = 3, file_exists: bool = True):
     source_path = tmp_path / "manual.pdf"
     if file_exists:
-        source_path.write_bytes(b"%PDF-1.4\n% test\n")
+        _write_pdf(source_path, pages=page_count or 3)
     async with get_session_factory()() as session:
         kb = KnowledgeBase(
             id="kb-source",
@@ -131,7 +144,7 @@ def test_document_source_returns_public_metadata_and_source_url(tmp_path):
     _run(_test())
 
 
-def test_document_source_file_returns_pdf(tmp_path):
+def test_document_source_file_returns_only_the_requested_page(tmp_path):
     async def _test():
         ids = await _seed_source(tmp_path)
         async with await _client() as client:
@@ -141,6 +154,15 @@ def test_document_source_file_returns_pdf(tmp_path):
             )
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("application/pdf")
+
+        import fitz
+
+        pdf = fitz.open(stream=response.content, filetype="pdf")
+        try:
+            assert pdf.page_count == 1
+            assert "page 2" in pdf.load_page(0).get_text()
+        finally:
+            pdf.close()
 
     _run(_test())
 

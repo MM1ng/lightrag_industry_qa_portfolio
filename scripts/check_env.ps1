@@ -13,7 +13,7 @@ if ($EnvFile -and (Test-Path $EnvFile)) {
 }
 $required = @{
     "DASHSCOPE_API_KEY" = "must be configured"
-    "LLM_MODEL" = "must be qwen-plus-2025-07-28"
+    "LLM_MODEL" = "must be qwen3.8-flash"
     "MODEL_FALLBACK_ENABLED" = "must be false"
     "EMBEDDING_MODEL" = "must be text-embedding-v4"
     "EMBEDDING_DIM" = "must be 1024"
@@ -44,7 +44,7 @@ foreach ($name in $required.Keys) {
         continue
     }
     $ok = switch ($name) {
-        "LLM_MODEL" { $value -eq "qwen-plus-2025-07-28" }
+        "LLM_MODEL" { $value -eq "qwen3.8-flash" }
         "MODEL_FALLBACK_ENABLED" { $value.ToLower() -eq "false" }
         "EMBEDDING_MODEL" { $value -eq "text-embedding-v4" }
         "EMBEDDING_DIM" { $value -eq "1024" }

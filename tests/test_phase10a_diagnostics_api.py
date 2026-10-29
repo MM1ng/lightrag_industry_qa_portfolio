@@ -18,6 +18,7 @@ from industrial_rag.db.models import (
 from industrial_rag.db.session import get_session_factory, init_db, reset_for_testing
 from industrial_rag.lightrag_service import QueryResult
 from industrial_rag.operational_metrics import operational_metrics
+from industrial_rag.parser_models import ChildChunk
 from industrial_rag.repositories.retrieval_trace_repository import (
     RetrievalTraceRepository,
 )
@@ -27,6 +28,7 @@ from industrial_rag.retrieval_trace import (
     RetrievalTraceItem,
     SelectedEvidenceTrace,
 )
+from industrial_rag.services.generation_artifacts import freeze_generation_child_chunks
 from industrial_rag.services.runtime_manager import KnowledgeBaseRuntimeManager
 
 SERVICE_KEY = "phase10a-service-test-credential"
@@ -94,6 +96,9 @@ class DiagnosticRuntime:
     async def close(self) -> None:
         self.initialized = False
 
+    def bind_chunk_registry(self, _registry) -> None:
+        return None
+
     async def query(self, question: str, *, mode: str) -> QueryResult:
         type(self).query_calls += 1
         return QueryResult(
@@ -119,6 +124,37 @@ async def diagnostic_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     reset_for_testing()
     await init_db()
     factory = get_session_factory()
+    workspace = tmp_path / "workspace"
+    document_id = "c" * 32
+    artifact_document = type(
+        "ArtifactDocument",
+        (),
+        {
+            "id": document_id,
+            "version": 1,
+            "file_hash": "5" * 64,
+            "original_file_name": "manual.pdf",
+        },
+    )()
+    manifest = freeze_generation_child_chunks(
+        workspace,
+        generation_id="g-phase10a",
+        document_children=[
+            (
+                artifact_document,
+                ChildChunk(
+                    chunk_id="chunk-7",
+                    parent_chunk_id="parent-7",
+                    document_id=document_id,
+                    document_name="manual.pdf",
+                    page_start=7,
+                    page_end=7,
+                    content="轴承润滑检查。",
+                    embedding_content="轴承润滑检查。",
+                ),
+            )
+        ],
+    )
     async with factory() as session:
         session.add_all(
             [
@@ -126,7 +162,7 @@ async def diagnostic_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                     id=KB_ID,
                     name="diagnostics",
                     status="ready",
-                    workspace_path=str(tmp_path / "workspace"),
+                    workspace_path=str(workspace),
                     upload_path=str(tmp_path / "uploads"),
                     parsed_path=str(tmp_path / "parsed"),
                     vector_backend="qdrant",
@@ -139,15 +175,15 @@ async def diagnostic_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                     backend="qdrant",
                     generation="g-phase10a",
                     status=VectorIndexGenerationStatus.active,
-                    workspace_path=str(tmp_path / "workspace"),
+                    workspace_path=str(workspace),
                     collections={"chunks": "phase10a_chunks"},
                     document_manifest_hash="1" * 64,
-                    child_chunks_manifest_hash="2" * 64,
+                    child_chunks_manifest_hash=manifest.child_manifest_hash,
                     embedding_config_hash="3" * 64,
                     chunking_config_hash="4" * 64,
                 ),
                 Document(
-                    id="c" * 32,
+                    id=document_id,
                     knowledge_base_id=KB_ID,
                     original_file_name="manual.pdf",
                     logical_name="manual.pdf",

@@ -63,3 +63,26 @@ def test_compare_rejects_different_question_identity(tmp_path: Path) -> None:
 
     assert comparison["status"] == "not_comparable"
     assert "identity" in comparison["reason"]
+
+
+def test_g1_blocked_header_is_not_a_negative_question_or_a_pass(tmp_path):
+    service = _service(tmp_path)
+    payload = service._artifact_payload([{"schema": "g1-validation-v1", "summary": {
+        "outcome": "BLOCKED", "run": {"measurement_status": "NOT_MEASURED"},
+        "policy_snapshot": {"questions": [], "effective_questions_sha256": "a" * 64}
+    }}], tmp_path / "blocked.jsonl", None, "blocked")
+    assert payload["questions"] == [] and payload["metrics"]["question_count"] == 0
+    assert payload["gates"]["citation"] is None and payload["gates"]["trace"] is None
+    assert service._compare(payload, payload)["status"] == "not_comparable"
+
+
+def test_g1_same_id_different_question_hash_is_not_comparable(tmp_path):
+    service = _service(tmp_path)
+    payload = service._artifact_payload([_row("Q1", positive=True)], tmp_path / "one.jsonl", None, "available")
+    other = {**payload, "effective_questions_sha256": "changed"}
+    assert service._compare(payload, other)["status"] == "not_comparable"
+
+
+def test_zero_positive_legacy_artifact_never_passes_positive_gates(tmp_path):
+    payload = _service(tmp_path)._artifact_payload([_row("N1", positive=False)], tmp_path / "negative.jsonl", None, "available")
+    assert payload["gates"]["citation"] is False and payload["gates"]["trace"] is False

@@ -39,8 +39,8 @@ from industrial_rag.operational_metrics import operational_metrics
 from industrial_rag.routers import (
     admin_diagnostics,
     documents,
-    feedback,
     evaluation,
+    feedback,
     generation_gc,
     generations,
     graph,
@@ -527,32 +527,101 @@ def _query_schema(history: list[dict[str, str]]) -> dict[str, object]:
     }
 
 
+_PUBLIC_EXACT_ROUTES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("GET", "/v1/knowledge-bases"),
+        ("POST", "/v1/feedback"),
+    }
+)
+
+_PUBLIC_DOCUMENT_SOURCE_SUFFIXES: tuple[str, ...] = ("/source", "/source-file")
+
+_KB_ROUTE_PREFIX = "/v1/knowledge-bases/"
+_GRAPH_ROUTE_PREFIX = "/v1/graph/"
+
+# Reachable without credentials even when no API keys are configured, so that
+# container/platform health probes keep working in a fail-closed deployment.
+_HEALTH_PATHS: frozenset[str] = frozenset(
+    {"/readyz", "/healthz", "/ready", "/health", "/version"}
+)
+
+_INSECURE_LOCAL_DEV_FLAG = "IRA_DEV_INSECURE"
+_INSECURE_LOCAL_DEV_TRUE = frozenset({"1", "true", "yes", "on"})
+
+
+def _is_public_kb_query_path(path: str) -> bool:
+    """Match exactly ``/v1/knowledge-bases/{kb_id}/query`` with a non-empty id."""
+
+    if not path.startswith(_KB_ROUTE_PREFIX) or not path.endswith("/query"):
+        return False
+    remainder = path[len(_KB_ROUTE_PREFIX) :]
+    segments = [segment for segment in remainder.split("/") if segment]
+    return len(segments) == 2 and segments[1] == "query"
+
+
 def _is_public_browser_request(request: Request) -> bool:
     """Allow the browser's ordinary-user surface without exposing service keys.
 
     The legacy ``/v1/query`` endpoint remains service-authenticated. The Vue
     workbench uses only the explicitly public, read-only/query paths below;
     every management mutation and admin diagnostic stays behind Bearer auth.
+
+    The anonymous surface is an explicit allowlist rather than a pattern
+    inferred from path shape, so a new route cannot become public by accident.
+    See ``tests/test_public_route_contract.py`` for the pinned boundary.
     """
+
+    method = request.method
     path = request.url.path
-    if request.method == "GET" and path == "/v1/knowledge-bases":
+    if (method, path) in _PUBLIC_EXACT_ROUTES:
+        return True
+    if method == "GET" and path.startswith(_GRAPH_ROUTE_PREFIX):
         return True
     if (
-        request.method == "GET"
-        and path.startswith("/v1/knowledge-bases/")
-        and (path.endswith("/source") or path.endswith("/source-file"))
+        method == "GET"
+        and path.startswith(_KB_ROUTE_PREFIX)
+        and path.endswith(_PUBLIC_DOCUMENT_SOURCE_SUFFIXES)
     ):
         return True
-    if path.startswith("/v1/graph/") and request.method == "GET":
-        return True
-    if path == "/v1/feedback" and request.method == "POST":
-        return True
-    return (
-        request.method == "POST"
-        and len(path.strip("/").split("/")) == 4
-        and path.startswith("/v1/knowledge-bases/")
-        and path.endswith("/query")
+    return method == "POST" and _is_public_kb_query_path(path)
+
+
+def _insecure_local_dev_enabled(settings: Settings | None) -> bool:
+    """Uncredentialed admin access requires an explicit local-only opt-in.
+
+    A missing credential fails closed by default: management endpoints stay
+    unreachable instead of silently granting administrator rights. Both
+    ``local_dev`` and a truthy ``IRA_DEV_INSECURE`` are required.
+    """
+
+    environment = (
+        settings.deployment_environment
+        if settings is not None
+        else (os.environ.get("IRA_DEPLOYMENT_ENVIRONMENT") or "local_dev")
     )
+    if str(environment).strip().lower() != "local_dev":
+        return False
+    flag = (os.environ.get(_INSECURE_LOCAL_DEV_FLAG) or "").strip().lower()
+    return flag in _INSECURE_LOCAL_DEV_TRUE
+
+
+def _log_auth_mode(settings: Settings, *, insecure_local_dev: bool) -> None:
+    """Record the effective authentication mode so it is visible in startup logs."""
+
+    if insecure_local_dev:
+        logger.warning(
+            "authentication mode=INSECURE_LOCAL_DEV: requests without credentials are treated as admin"
+        )
+    elif settings.service_api_key is None and settings.admin_api_key is None:
+        logger.error(
+            "authentication mode=FAIL_CLOSED: no API keys configured; "
+            "every non-health endpoint returns 401"
+        )
+    else:
+        logger.info(
+            "authentication mode=bearer environment=%s",
+            settings.deployment_environment,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -589,6 +658,13 @@ def create_app(
             application.state.resolved_settings = resolved_settings
             application.state.service_api_key = resolved_settings.service_api_key
             application.state.admin_api_key = resolved_settings.admin_api_key
+            application.state.allow_insecure_local_dev = _insecure_local_dev_enabled(
+                resolved_settings
+            )
+            _log_auth_mode(
+                resolved_settings,
+                insecure_local_dev=application.state.allow_insecure_local_dev,
+            )
             if (
                 resolved_settings.deployment_environment
                 in {"local_staging", "staging", "production"}
@@ -705,6 +781,9 @@ def create_app(
             application.state.resolved_settings = None
 
     application = FastAPI(lifespan=lifespan)
+    # Computed eagerly so tests and non-lifespan clients observe the same
+    # fail-closed default; lifespan recomputes it from resolved settings.
+    application.state.allow_insecure_local_dev = _insecure_local_dev_enabled(settings)
 
     @application.middleware("http")
     async def collect_operational_metrics(
@@ -731,11 +810,18 @@ def create_app(
             request.app.state, "service_api_key", None
         )
         admin_api_key: str | None = getattr(request.app.state, "admin_api_key", None)
-        if service_api_key is None and admin_api_key is None:
-            request.state.authenticated_actor = local_development_actor()
-            return await call_next(request)
         path = request.url.path
-        if path in {"/readyz", "/healthz", "/ready", "/health", "/version"}:
+        if path in _HEALTH_PATHS:
+            return await call_next(request)
+        if service_api_key is None and admin_api_key is None:
+            # Fail closed: an unconfigured deployment must not silently grant
+            # administrator rights. Local development opts in explicitly.
+            if not getattr(request.app.state, "allow_insecure_local_dev", False):
+                _log_result(request_id=request_id, status="UNAUTHORIZED", latency_ms=0)
+                return _error_response(
+                    "UNAUTHORIZED", request_id=request_id, trace_id=trace_id
+                )
+            request.state.authenticated_actor = local_development_actor()
             return await call_next(request)
         if _is_public_browser_request(request):
             request.state.authenticated_actor = AuthenticatedActor(

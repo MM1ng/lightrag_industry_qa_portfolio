@@ -11,7 +11,7 @@ from typing import Any
 from industrial_rag.config import PROJECT_ROOT
 
 GOLDEN_SET_VERSION = "phase9b-canonical-20-v1"
-RUNNER_VERSION = "phase9b-fastapi-candidate-v1"
+RUNNER_VERSION = "g1-fastapi-candidate-v2"
 CANONICAL_QUESTION_IDS = (
     "S001", "S002", "S003", "S004", "S005", "S007", "S009", "S011",
     "S012", "S014", "S015", "S016", "S017", "D003", "D005", "C001",
@@ -35,6 +35,8 @@ def load_canonical_policy(
 ) -> GoldenSetPolicy:
     raw = path.read_bytes()
     rows = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()]
+    if len(rows) != len({row.get("id") for row in rows}):
+        raise ValueError("golden source must contain unique question IDs")
     by_id = {str(row.get("id")): row for row in rows}
     selected_ids = tuple(by_id) if question_ids is None else question_ids
     missing = [question_id for question_id in selected_ids if question_id not in by_id]

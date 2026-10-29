@@ -107,6 +107,7 @@ class _CandidateBuildQdrant:
 
     def __init__(self) -> None:
         self._collections: set[str] = set()
+        self._counts: dict[str, int] = {}
 
     async def collection_exists(self, name: str) -> bool:
         return name in self._collections
@@ -115,7 +116,7 @@ class _CandidateBuildQdrant:
         self._collections.add(collection_name)
 
     async def count(self, _name: str, **_kwargs) -> SimpleNamespace:
-        return SimpleNamespace(count=0)
+        return SimpleNamespace(count=self._counts.get(_name, 0))
 
     async def scroll(self, **_kwargs) -> tuple[list[SimpleNamespace], None]:
         return [], None
@@ -190,7 +191,10 @@ async def _service_with_active_snapshot(
     await session.commit()
 
     async def no_external_ingest(*_args, **_kwargs) -> int:
-        return 0
+        collection = _args[1].collections["chunks"]
+        added = len(_kwargs["children"])
+        client._counts[collection] = client._counts.get(collection, 0) + added
+        return added
 
     async def no_external_remove(*_args, **_kwargs) -> list[str]:
         return []
@@ -673,6 +677,11 @@ async def test_reindex_candidate_preserves_active_until_promote(
 
     monkeypatch.setattr(service, "_parse_document_pymupdf", parser_called)
 
+    async def inherit_called(*_args, **_kwargs):
+        raise AssertionError("reindex must rebuild vectors, not copy the broken active index")
+
+    monkeypatch.setattr(service, "_inherit_active", inherit_called)
+
     result = await service.execute_job(kb.id, job.id)
 
     candidate = await service._generation_repo.get(result["candidate_generation_id"])
@@ -684,6 +693,44 @@ async def test_reindex_candidate_preserves_active_until_promote(
     assert current_active is not None
     assert current_active.id == active.id
     assert kb.active_vector_generation_id == active.id
+    assert result["metrics"]["chunk_stats"]["added_chunks"] > 0
+    assert job.current_stage == "awaiting_validation"
+
+
+@pytest.mark.asyncio
+async def test_reindex_rejects_missing_vectors(update_job_session, tmp_path, monkeypatch):
+    session, kb, document = update_job_session
+    service, active = await _service_with_active_snapshot(session, kb, document, tmp_path, monkeypatch)
+    job = await UpdateJobRepository(session).create(
+        knowledge_base_id=kb.id, base_generation_id=active.id,
+        operation=UpdateOperation.reindex, document_id=None, created_by="test",
+    )
+    await session.commit()
+
+    async def dropped_write(*args, **kwargs):
+        return len(kwargs["children"])
+
+    monkeypatch.setattr(service, "_ingest_document", dropped_write)
+    with pytest.raises(RuntimeError, match="point count mismatch"):
+        await service.execute_job(kb.id, job.id)
+    assert kb.active_vector_generation_id == active.id
+
+
+@pytest.mark.asyncio
+async def test_incomplete_candidate_cannot_report_idempotent_success(update_job_session, tmp_path, monkeypatch):
+    session, kb, document = update_job_session
+    service, active = await _service_with_active_snapshot(session, kb, document, tmp_path, monkeypatch)
+    job = await UpdateJobRepository(session).create(
+        knowledge_base_id=kb.id, base_generation_id=active.id,
+        operation=UpdateOperation.reindex, document_id=None, created_by="test",
+    )
+    await session.commit()
+    await service.execute_job(kb.id, job.id)
+    await session.refresh(job)
+    job.current_stage = "building_candidate"
+    await session.commit()
+    with pytest.raises(Exception, match="construction is incomplete"):
+        await service.execute_job(kb.id, job.id)
 
 
 @pytest.mark.asyncio
@@ -764,13 +811,14 @@ async def _passing_golden_runner(_kb_id: str, _generation) -> dict[str, object]:
         "fabricated_citation": 0,
         "secret_leak": 0,
         "old_document_references": 0,
-        "results": [{"id": "phase15b", "status_code": 200}],
+        "results": __import__("g1_test_support").passing_records(_generation.id),
     }
 
 
 async def _failing_golden_runner(kb_id: str, generation) -> dict[str, object]:
     report = await _passing_golden_runner(kb_id, generation)
     report["no_5xx"] = False
+    report["results"][0]["status_code"] = 500
     return report
 
 
@@ -917,7 +965,7 @@ async def test_promote_syncs_knowledge_base_readiness_metadata(
     monkeypatch,
 ) -> None:
     session, kb, document = update_job_session
-    service, _active, candidate, job = await _build_document_lifecycle_candidate(
+    service, _active, candidate, _job = await _build_document_lifecycle_candidate(
         session,
         kb,
         document,

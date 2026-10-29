@@ -278,6 +278,7 @@ class ValidationRunStatus(enum.StrEnum):
     passed = "passed"
     failed = "failed"
     abandoned = "abandoned"
+    blocked = "blocked"
 
 
 class GCPlanStatus(enum.StrEnum):
@@ -438,6 +439,7 @@ class VectorIndexGeneration(Base):
     validated_fingerprint: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )
+    accepted_policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     knowledge_base: Mapped[KnowledgeBase] = relationship(
         "KnowledgeBase", back_populates="vector_generations", foreign_keys=[knowledge_base_id]
@@ -718,7 +720,10 @@ class ValidationRun(Base):
     configured_model: Mapped[str] = mapped_column(String(100), nullable=False)
     strategy_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     generation_manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    qdrant_content_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    qdrant_content_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    validation_policy_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    effective_questions_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     document_registry_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     generation_content_epoch: Mapped[int] = mapped_column(Integer, nullable=False)
     metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True)

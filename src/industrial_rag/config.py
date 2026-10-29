@@ -86,6 +86,7 @@ class Settings:
     rrf_k: int = 60
     reranker_enabled: bool = False
     reranker_timeout_seconds: float = 2.0
+    qa_request_timeout_seconds: float = 180.0
     validation_base_url: str | None = None
     validation_artifact_dir: Path = PROJECT_ROOT / "artifacts" / "validation-runs"
     validation_max_age_seconds: int = 3600
@@ -138,6 +139,8 @@ class Settings:
             raise ValueError("LLM_FALLBACK_MODELS 不能包含空模型名")
         if len(set(self.llm_models)) != len(self.llm_models):
             raise ValueError("LLM_MODEL 与 LLM_FALLBACK_MODELS 不能重复")
+        if self.qa_request_timeout_seconds <= 0:
+            raise ValueError("qa_request_timeout_seconds 必须为正数")
 
     @property
     def llm_models(self) -> tuple[str, ...]:
@@ -271,6 +274,14 @@ class Settings:
             raise ValueError("PHASE10B_TOP_K 和 PHASE10B_CHUNK_TOP_K 配置无效")
         if sparse_top_k <= 0 or rrf_k < 0 or reranker_timeout_seconds <= 0:
             raise ValueError("Sparse/RRF/Reranker 配置必须为有效正数")
+        try:
+            qa_request_timeout_seconds = float(
+                values.get("QA_REQUEST_TIMEOUT_SECONDS") or "180"
+            )
+        except ValueError as error:
+            raise ValueError("QA_REQUEST_TIMEOUT_SECONDS 必须是数字") from error
+        if qa_request_timeout_seconds <= 0:
+            raise ValueError("QA_REQUEST_TIMEOUT_SECONDS 必须为正数")
         validation_base_url = (
             values.get("VALIDATION_BASE_URL") or ""
         ).strip().rstrip("/") or None
@@ -377,6 +388,7 @@ class Settings:
             rrf_k=rrf_k,
             reranker_enabled=reranker_enabled,
             reranker_timeout_seconds=reranker_timeout_seconds,
+            qa_request_timeout_seconds=qa_request_timeout_seconds,
             validation_base_url=validation_base_url,
             validation_artifact_dir=validation_artifact_dir.resolve(),
             validation_max_age_seconds=validation_max_age_seconds,

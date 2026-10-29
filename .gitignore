@@ -31,6 +31,7 @@ pytest_gate*.txt
 
 # Virtual environments
 .venv/
+.venv_*/
 venv/
 env/
 
@@ -93,7 +94,13 @@ desktop.ini
 # Local workbench and evaluation artifacts
 runtime/**
 evaluation/**
+!evaluation/bootstrap_suites/
+!evaluation/bootstrap_suites/README.md
+!evaluation/bootstrap_suites/approved_suites.json
 reports/**
+artifacts/**
+data/db/**
+data/knowledge_bases/**
 frontend/node_modules/
 frontend/dist/
 frontend/test-results/

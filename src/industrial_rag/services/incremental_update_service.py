@@ -503,6 +503,8 @@ class IncrementalUpdateService:
         *,
         approved_by: str | None = None,
         golden_runner: Any = None,
+        suite_id: str | None = None,
+        suite_sha256: str | None = None,
     ) -> dict[str, Any]:
         async with self._writer_lease(
             kb_id,
@@ -515,6 +517,8 @@ class IncrementalUpdateService:
                 generation_id,
                 approved_by=approved_by,
                 golden_runner=golden_runner,
+                suite_id=suite_id,
+                suite_sha256=suite_sha256,
             )
 
     async def _validate_generation_under_lease(
@@ -524,6 +528,8 @@ class IncrementalUpdateService:
         *,
         approved_by: str | None = None,
         golden_runner: Any = None,
+        suite_id: str | None = None,
+        suite_sha256: str | None = None,
     ) -> dict[str, Any]:
         await self._require_kb(kb_id)
         generation = await self._generation_repo.get(generation_id)
@@ -542,6 +548,8 @@ class IncrementalUpdateService:
                 status_code=409,
             )
         generation.status = VectorIndexGenerationStatus.validating
+        generation.validated_fingerprint = None
+        generation.accepted_policy_snapshot = None
         await self._session.flush()
 
         from industrial_rag.services.generation_validation_service import (
@@ -559,21 +567,33 @@ class IncrementalUpdateService:
             generation,
             golden_runner=golden_runner,
             approved_by=approved_by,
+            suite_id=suite_id,
+            suite_sha256=suite_sha256,
         )
         operational_metrics.increment("validation_run_total")
         operational_metrics.increment(
-            "validation_pass_total" if report["passed"] else "validation_fail_total"
+            "validation_blocked_total" if report["outcome"] == "BLOCKED" else "validation_pass_total" if report["passed"] else "validation_fail_total"
         )
         job = await self._job_repo.find_by_candidate(generation_id)
-        if report["passed"]:
+        if report["outcome"] == "BLOCKED":
+            generation.status = VectorIndexGenerationStatus.building
+            generation.validated_fingerprint = None
+            generation.accepted_policy_snapshot = None
+            generation.last_error = "validation blocked: " + "; ".join(report["reason_codes"])
+            if job is not None:
+                job.result = {**(job.result or {}), "validation": report}
+                job.status = UpdateJobStatus.building
+                job.current_stage = "awaiting_validation"
+        elif report["passed"]:
             generation.status = VectorIndexGenerationStatus.ready
+            generation.last_error = None
             if job is not None:
                 job.result = {**(job.result or {}), "validation": report}
                 await self._job_repo.mark_ready(job.id)
         else:
             generation.status = VectorIndexGenerationStatus.failed
             generation.last_error = "validation failed: " + "; ".join(
-                gate for gate, ok in report["gates"].items() if not ok
+                gate for gate, ok in report["gates"].items() if ok.get("status") != "PASS"
             )
             if job is not None:
                 await self._job_repo.mark_failed(
@@ -591,6 +611,9 @@ class IncrementalUpdateService:
             "generation_id": generation_id,
             "knowledge_base_id": kb_id,
             "passed": report["passed"],
+            "outcome": report["outcome"],
+            "applicability": report["applicability"],
+            "admission": report["admission"],
             "gates": report["gates"],
             "report": report,
         }
@@ -854,6 +877,15 @@ class IncrementalUpdateService:
                 VectorIndexGenerationStatus.ready,
                 VectorIndexGenerationStatus.active,
             }:
+                if (
+                    candidate.status == VectorIndexGenerationStatus.building
+                    and job.current_stage != "awaiting_validation"
+                ):
+                    raise AppError(
+                        AppErrorCode.invalid_state_transition,
+                        "Candidate construction is incomplete; inspect or resume the job before reporting success.",
+                        status_code=409,
+                    )
                 return {
                     "status": "candidate_built",
                     "idempotent": True,
@@ -1127,7 +1159,7 @@ class IncrementalUpdateService:
             t_parse = t_embed = t_graph = 0.0
 
             # 1. Inherit unchanged content from the active generation.
-            if active is not None:
+            if active is not None and job.operation != UpdateOperation.reindex:
                 t0 = time.perf_counter()
                 reused = await self._inherit_active(
                     kb_id, active, generation, candidate_workspace
@@ -1239,6 +1271,19 @@ class IncrementalUpdateService:
                 expected_child_manifest_hash=generation.child_chunks_manifest_hash,
             )
 
+            # Reindex must recreate vectors from the frozen input, including
+            # when the active vector store has disappeared. Copying an empty
+            # active collection is not a rebuild.
+            if job.operation == UpdateOperation.reindex:
+                t0 = time.perf_counter()
+                documents = {document.id: document for document, _child in snapshot_pairs}
+                for document in documents.values():
+                    stats["added_chunks"] += await self._ingest_document(
+                        kb, generation, candidate_workspace, document,
+                        children=[child for child in frozen_children if child.document_id == document.id],
+                    )
+                t_embed += time.perf_counter() - t0
+
             if job.operation == UpdateOperation.reparse and old_doc is not None:
                 t0 = time.perf_counter()
                 removed_internal_ids = await self._remove_document_points(
@@ -1292,6 +1337,12 @@ class IncrementalUpdateService:
             entity_relation_delta = await self._count_delta(
                 kb_id, active, generation
             )
+            if job.operation == UpdateOperation.reindex:
+                actual = entity_relation_delta["candidate"]["chunks"]
+                if actual != len(frozen_children):
+                    raise RuntimeError(
+                        f"Reindex candidate point count mismatch: expected {len(frozen_children)}, got {actual}"
+                    )
             metrics = {
                 "replaced_document_id": old_doc.id
                 if job.operation == UpdateOperation.replace and old_doc is not None
@@ -1311,6 +1362,7 @@ class IncrementalUpdateService:
                 "documents": await self._document_state_snapshot(kb_id, job),
                 "candidate_generation": token,
             }
+            job.current_stage = "awaiting_validation"
             await self._session.flush()
             return {
                 "status": "candidate_built",

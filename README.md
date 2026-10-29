@@ -6,13 +6,15 @@
 
 > 项目只回答文档知识问题，不执行设备控制，也不把实验能力描述为生产能力。
 
-## Demo Release Candidate
+## 实习公司内部工具
 
-当前工作区作为本地 Demo Release Candidate 交付，核心 RAG、Generation lifecycle 和 validation contract 已冻结。本次交付使用 Qdrant 后端，当前 Knowledge Base 已激活双文档 Generation：
+这是一个面向实习公司内部技术人员和设备运维人员的工业手册知识问答与知识库运维工具。系统将手册导入、解析、检索、证据核验和知识库版本更新串成一条可审计链路，核心 RAG、Generation lifecycle 和 validation contract 已冻结。本仓库提供脱敏后的代码、测试和运行说明，内部工具本身不等于公开生产数据或真实公司知识库。
+
+当前受控验证环境使用 Qdrant 后端，Knowledge Base 已激活双文档 Generation：
 
 | 项目 | 当前结果 |
 | --- | --- |
-| Active Knowledge Base | `Demo Bootstrap KB 2` |
+| Active Knowledge Base | `Internal QA Bootstrap KB` |
 | Active Generation | `g9b05e83c30b45eb7da1c5224` |
 | 文档数 | **2** |
 | Child chunks | **453** |
@@ -23,7 +25,7 @@
 
 Final smoke 的唯一已知失败是 D005：DESMI 手册中“维护、检查或安装前泵组必须处于停止状态”的证据位于 `t1739cn.pdf` 第 12 页，但当前 dense/mix 配置下该正确 chunk 未进入 initial top-20，因此请求返回 `insufficient_evidence`。这属于已知 retrieval recall edge case，不应解读为 citation 伪造、Generation lifecycle 或 validation threshold 问题。其余第一份手册、第二份手册、跨文档和 negative 场景均通过。
 
-## Demo
+## 内部工具工作流
 
 ### 问答与原文核验
 
@@ -42,6 +44,8 @@ Vue 管理工作台提供知识库、文档更新任务和 Generation 生命周�
 图谱页面读取当前知识库 Generation 生成的 GraphML，并通过项目内的 PyVis 渲染器展示实体、关系和邻域。
 
 ![LightRAG 知识图谱](docs/assets/knowledge-graph.png)
+
+内部工具的典型操作流程、验证问题和限制说明见 [`docs/demo/demo-script.md`](docs/demo/demo-script.md)；这份文档现在作为内部工具 walkthrough 使用，审计记录见 [`docs/demo/readiness-audit.md`](docs/demo/readiness-audit.md)。
 
 ## 为什么做这个项目
 
@@ -187,6 +191,19 @@ as the labeled development dataset; it is intentionally separate from validation
 and holdout artifacts. Call `evaluate_rankings(cases, rankings_by_system)` from a
 development script to compare LightRAG, Sparse/RRF, and reranked outputs.
 
+### Frozen Development A2 snapshot
+
+以下指标来自冻结的 Development scope artifact `evaluation/retrieval_foundation/formal_development_effectiveness_2026-09-03.json`，不是 production benchmark：
+
+| Metric | Frozen A2 |
+| --- | ---: |
+| Recall@5 | **0.818** |
+| MRR@5 | **0.894** |
+| Question Hit@5 | **1.000** |
+| Complete Evidence Coverage@5 | **0.750** |
+
+Phase16 不修改 Retrieval Foundation 算法、golden questions、Development dataset、阈值或评测口径。
+
 ## Project Structure
 
 ```text
@@ -254,11 +271,13 @@ SERVICE_API_KEY=
 ADMIN_API_KEY=
 ```
 
+认证默认 fail-closed：缺少 `SERVICE_API_KEY` / `ADMIN_API_KEY` 时，除健康检查外的所有接口返回 401。本地开发若确实不想配置密钥，可额外设置 `IRA_DEV_INSECURE=1`（仅在 `IRA_DEPLOYMENT_ENVIRONMENT=local_dev` 时生效）。启动日志会打印当前认证模式。
+
 保持空占位符的 `.env.example` 可以提交；真实 `.env`、Token 和 Provider Key 不得进入 Git。
 
 ### 3. Initialize and start the API
 
-本地 staging Demo 的标准启动方式是使用工作台脚本。脚本会读取 `.env.local_staging`、检查并启动项目使用的 Qdrant Docker 容器、执行数据库迁移、启动 API 和 Vue 前端，并检查 `/readyz` 与 `/chat`。请先确保 Docker Desktop 已运行：
+内部工具受控验证环境的标准启动方式是使用工作台脚本。脚本会读取 `.env.local_staging`、检查并启动项目使用的 Qdrant Docker 容器、执行数据库迁移、启动 API 和 Vue 前端，并检查 `/readyz` 与 `/chat`。请先确保 Docker Desktop 已运行：
 
 ```powershell
 .\scripts\start_workbench.ps1 -NoBrowser
@@ -311,11 +330,16 @@ npm --prefix frontend run build
 
 ## Current Boundaries
 
+## Phase16 Known Limitations
+
+- **D005 — Candidate recall edge case：** 正确证据存在于 `t1739cn.pdf` 第 12 页，但当前 initial candidate pool 未包含该 chunk，因而该问题可能返回 `insufficient_evidence`。这不是 citation 伪造、Generation lifecycle 或 validation threshold 故障。
+- **Sparse runtime technical debt：** 当前 Active Generation 缺少 runtime sparse retrieval 所需的 generation chunk registry。Phase16 记录该技术债，不在本阶段修复。
+
 - 已实现面向文档证据的问答、引用、知识库管理、图谱和离线评测。
 - 当前默认配置不启用 Rerank 或 Parent Expansion。
 - Ragas 语义结果属于 Development 实验，不等同于最终 Holdout 认证。
 - 项目没有执行生产部署，也不控制真实工业设备。
-- 多 Agent、LangGraph 编排、工单审批和通用工业运维平台不在当前作品集范围内。
+- 多 Agent、LangGraph 编排、工单审批和通用工业运维平台不在当前内部工具范围内。
 - 原始厂商手册、运行数据库、模型缓存、向量索引和真实密钥不会随仓库分发。
 
 ## Further Reading
@@ -325,6 +349,11 @@ npm --prefix frontend run build
 - [`docs/architecture-audit.md`](docs/architecture-audit.md) — 架构审计
 - [`docs/phase-6-production-readiness-report.md`](docs/phase-6-production-readiness-report.md) — 50 题官方入口评测
 - [`docs/phase-8-staging-deployment-report.md`](docs/phase-8-staging-deployment-report.md) — 本地 Staging 验收
+- [`docs/operations/deployment.md`](docs/operations/deployment.md) — 干净环境部署与验收
+- [`docs/operations/degradation.md`](docs/operations/degradation.md) — 外部服务失败与降级矩阵
+- [`docs/operations/security-audit.md`](docs/operations/security-audit.md) — 权限、审计与运维说明
+- [`docs/operations/performance.md`](docs/operations/performance.md) — 并发基线与生产验证方法
+- [`docs/operations/quality-gate.md`](docs/operations/quality-gate.md) — 当前测试证据、失败分类与发布门禁
 
 ## License and Data
 

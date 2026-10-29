@@ -8,7 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from industrial_rag.auth import AuthenticatedActor, require_admin_actor
 from industrial_rag.db.session import get_session
 from industrial_rag.errors import AppError
-from industrial_rag.services.evaluation_center_service import EvaluationCenterError, EvaluationCenterService
+from industrial_rag.services.evaluation_center_service import (
+    EvaluationCenterError,
+    EvaluationCenterService,
+)
 
 router = APIRouter(prefix="/v1/admin/evaluation", tags=["evaluation"])
 
@@ -50,6 +53,7 @@ def _artifact_dir():
     # may be started for diagnostics before a full Settings object is resolved.
     import os
     from pathlib import Path
+
     from industrial_rag.config import PROJECT_ROOT
 
     raw = os.environ.get("VALIDATION_ARTIFACT_DIR")

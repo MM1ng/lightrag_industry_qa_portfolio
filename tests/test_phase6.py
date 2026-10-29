@@ -25,6 +25,22 @@ from industrial_rag.shadow_audit import CitationShadowAudit
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _isolated_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from industrial_rag.db.session import reset_for_testing
+
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{(tmp_path / 'phase6.db').as_posix()}")
+    reset_for_testing()
+    yield
+    reset_for_testing()
+
+
+def test_api_queries_use_a_temporary_database(tmp_path: Path) -> None:
+    from industrial_rag.db.session import get_engine
+
+    assert Path(get_engine().url.database).resolve() == (tmp_path / "phase6.db").resolve()
+
+
 def test_phase6_frozen_strategy_file() -> None:
     frozen = json.loads(
         (PHASE6_ROOT / "frozen_strategy.json").read_text(encoding="utf-8")

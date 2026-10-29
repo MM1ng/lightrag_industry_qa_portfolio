@@ -44,10 +44,10 @@ class GenerationEvidenceFingerprint:
     app_git_commit: str
     strategy_fingerprint: str
     generation_manifest_hash: str
-    qdrant_content_fingerprint: str
+    qdrant_content_fingerprint: str | None
     document_registry_fingerprint: str
     generation_content_epoch: int
-    qdrant_point_count: int
+    qdrant_point_count: int | None
 
 
 class GenerationContentFingerprintService:
@@ -63,6 +63,7 @@ class GenerationContentFingerprintService:
         generation: Any,
         *,
         require_frozen_artifact: bool = True,
+        measure_qdrant: bool = True,
     ) -> GenerationEvidenceFingerprint:
         from industrial_rag.services.generation_artifacts import generation_artifact_evidence
 
@@ -118,7 +119,10 @@ class GenerationContentFingerprintService:
                 for doc in docs
             ]
         registry_hash = stable_hash(sorted(snapshot, key=lambda item: str(item.get("document_id"))))
-        qdrant_hash, point_count = await self._qdrant_fingerprint(generation.collections or {})
+        qdrant_hash, point_count = (
+            await self._qdrant_fingerprint(generation.collections or {})
+            if measure_qdrant else (None, None)
+        )
         return GenerationEvidenceFingerprint(
             app_git_commit=app_git_commit(),
             strategy_fingerprint=strategy_hash,

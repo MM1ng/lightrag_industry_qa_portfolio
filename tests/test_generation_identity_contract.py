@@ -99,7 +99,7 @@ def test_doc_registration_uses_frozen_manifest_membership_for_reparse_candidate(
 def test_canonical_runner_counts_retrieved_frozen_evidence_for_stable_identity() -> None:
     from industrial_rag.services.canonical_validation_runner import CanonicalValidationRunner
 
-    runner = CanonicalValidationRunner.__new__(CanonicalValidationRunner)
+    CanonicalValidationRunner.__new__(CanonicalValidationRunner)
     expected = {("manual.pdf", 7)}
     actual = set()
     retrieved = {("manual.pdf", 7)}

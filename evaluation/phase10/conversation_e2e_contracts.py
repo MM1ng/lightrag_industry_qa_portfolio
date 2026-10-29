@@ -74,13 +74,19 @@ def _load_rows(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def portable_file_sha256(path: Path) -> str:
+    """Hash text artifacts independently of the checkout's newline policy."""
+    payload = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def fingerprint_dataset(path: Path) -> DatasetFingerprint:
     path = path.resolve()
     rows = _load_rows(path)
     canonical = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return DatasetFingerprint(
         source_path=str(path.relative_to(PROJECT_ROOT)),
-        raw_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        raw_sha256=portable_file_sha256(path),
         semantic_sha256=hashlib.sha256(canonical).hexdigest(),
         case_count=len(rows),
         case_ids=tuple(str(row["case_id"]) for row in rows),

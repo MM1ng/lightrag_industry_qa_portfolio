@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -37,6 +38,43 @@ class GenerationQueryResult:
     generation_epoch: int
     result: QueryResult
     citation_document_ids: dict[str, str]
+
+
+async def _run_query_with_timeout(
+    runtime,
+    question: str,
+    *,
+    mode: str,
+    top_k: int,
+    chunk_top_k: int,
+    timeout_seconds: float,
+) -> QueryResult:
+    """Execute one runtime query under a hard deadline.
+
+    Without a deadline a stalled upstream model call holds the runtime query
+    lock indefinitely and serialises every later request in the same process.
+    """
+
+    try:
+        async with asyncio.timeout(timeout_seconds):
+            try:
+                return await runtime.query(
+                    question,
+                    mode=mode,
+                    top_k=top_k,
+                    chunk_top_k=chunk_top_k,
+                )
+            except TypeError as error:
+                if "unexpected keyword argument" not in str(error):
+                    raise
+                return await runtime.query(question, mode=mode)
+    except TimeoutError as error:
+        raise AppError(
+            AppErrorCode.qa_timeout,
+            "问答请求超时，请稍后重试。",
+            status_code=504,
+            details={"timeout_seconds": timeout_seconds},
+        ) from error
 
 
 class QueryApplicationService:
@@ -185,20 +223,14 @@ class QueryApplicationService:
             chunk_registry=chunk_registry,
         )
         operational_metrics.set(f"active_generation.{kb.id}", generation.id)
-        try:
-            result = await runtime.query(
-                retrieval_question,
-                mode=self._base_settings.phase10b_query_mode,  # type: ignore[arg-type]
-                top_k=self._base_settings.phase10b_top_k,
-                chunk_top_k=self._base_settings.phase10b_chunk_top_k,
-            )
-        except TypeError as error:
-            if "unexpected keyword argument" not in str(error):
-                raise
-            result = await runtime.query(
-                retrieval_question,
-                mode=self._base_settings.phase10b_query_mode,  # type: ignore[arg-type]
-            )
+        result = await _run_query_with_timeout(
+            runtime,
+            retrieval_question,
+            mode=self._base_settings.phase10b_query_mode,
+            top_k=self._base_settings.phase10b_top_k,
+            chunk_top_k=self._base_settings.phase10b_chunk_top_k,
+            timeout_seconds=self._base_settings.qa_request_timeout_seconds,
+        )
         document_ids = await self._citation_document_ids(
             kb.id, generation, snapshot_ids=citation_document_ids
         )

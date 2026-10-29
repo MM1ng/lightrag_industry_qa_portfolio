@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import os
 import uuid
 from pathlib import Path
@@ -97,11 +98,19 @@ class FakeQdrant:
 class FakeLightRAGService:
     """Records ainsert calls and stores chunk points in the fake Qdrant."""
 
-    def __init__(self, qdrant: FakeQdrant, names: dict[str, str], kb_id: str, generation: str) -> None:
+    def __init__(
+        self,
+        qdrant: FakeQdrant,
+        names: dict[str, str],
+        kb_id: str,
+        generation: str,
+        storage_root: Path,
+    ) -> None:
         self.qdrant = qdrant
         self.names = names
         self.kb_id = kb_id
         self.generation = generation
+        self.storage_root = storage_root
         self._backend = FakeBackend(self)
         self.calls: list[dict] = []
 
@@ -128,10 +137,24 @@ class FakeBackend:
             {"input": input, "ids": ids, "file_paths": file_paths}
         )
         doc_token = ids[0]
-        for i, part in enumerate(input[0].split(split_by_character)):
-            part = part.strip()
-            if not part:
-                continue
+        parts = [part.strip() for part in input[0].split(split_by_character) if part.strip()]
+        status_path = self.service.storage_root / "kv_store_doc_status.json"
+        self.service.storage_root.mkdir(parents=True, exist_ok=True)
+        status = (
+            json.loads(status_path.read_text(encoding="utf-8"))
+            if status_path.is_file()
+            else {}
+        )
+        status[doc_token] = {
+            "status": "processing",
+            "chunks_count": len(parts),
+            "chunks_list": [f"{doc_token}-chunk-{i:03d}" for i in range(len(parts))],
+        }
+        status_path.write_text(
+            json.dumps(status),
+            encoding="utf-8",
+        )
+        for i, part in enumerate(parts):
             chunk_id = f"{doc_token}-chunk-{i:03d}"
             point_id = _point_id(chunk_id)
             payload = {
@@ -148,6 +171,9 @@ class FakeBackend:
                 [models.PointStruct(id=point_id, vector=[0.1] * 1024, payload=payload)],
                 wait=True,
             )
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+        status[doc_token]["status"] = "processed"
+        status_path.write_text(json.dumps(status), encoding="utf-8")
 
 
 def _write_pdf(path: Path, text: str) -> str:
@@ -185,7 +211,9 @@ def _isolated_env(tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
-def _fresh_db(tmp_path):
+def _fresh_db(tmp_path, monkeypatch):
+    from g1_test_support import stub_lifecycle_policy
+    stub_lifecycle_policy(monkeypatch)
     reset_for_testing()
 
     async def _init():
@@ -216,11 +244,15 @@ class Phase9Ctx:
                 kb_id=candidate_settings.qdrant_kb_id,
                 generation=candidate_settings.qdrant_generation,
             )
+            storage_root = Path(candidate_settings.working_dir)
+            if candidate_settings.vector_workspace:
+                storage_root = storage_root / candidate_settings.vector_workspace
             return FakeLightRAGService(
                 self.qdrant,
                 resolved,
                 candidate_settings.qdrant_kb_id,
                 candidate_settings.qdrant_generation,
+                storage_root,
             )
 
         return IncrementalUpdateService(
@@ -258,6 +290,7 @@ class Phase9Ctx:
     async def validate(self, kb_id: str, generation_id: str, runner=None) -> dict:
         async def passing_runner(kb, generation):
             return {
+                "results": __import__("g1_test_support").passing_records(generation.id),
                 "http_success_rate": 1.0,
                 "trace_complete_rate": 1.0,
                 "negative_unsupported_answer_rate": 0.0,
@@ -353,6 +386,10 @@ def test_lightrag_insert_timeout_requires_durable_candidate_chunks(
 
     async def durable_then_hanging_insert(self, *args, **kwargs) -> None:
         await original_insert(self, *args, **kwargs)
+        status_path = self.service.storage_root / "kv_store_doc_status.json"
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+        status[kwargs["ids"][0]]["status"] = "processing"
+        status_path.write_text(json.dumps(status), encoding="utf-8")
         await asyncio.Event().wait()
 
     monkeypatch.setattr(FakeBackend, "ainsert", durable_then_hanging_insert)
@@ -594,6 +631,7 @@ def test_11_validation_failure_blocks_promote(ctx: Phase9Ctx):
                 "secret_leak": 0,
                 "old_document_references": 1,
                 "citation_traceability": False,
+                "results": [{**r, "status_code": 500} for r in __import__("g1_test_support").passing_records(generation.id)],
                 "golden_subset_regression": False,
                 "add_specific": False,
                 "replace_specific": True,

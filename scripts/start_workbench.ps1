@@ -44,6 +44,11 @@ $ready = Invoke-RestMethod "http://127.0.0.1:$ApiPort/readyz" -TimeoutSec 10
 $page = Invoke-WebRequest "http://127.0.0.1:$FrontendPort/chat" -UseBasicParsing -TimeoutSec 10
 if ($ready.status -ne "ready") { throw "API is not ready: $($ready | ConvertTo-Json -Compress)" }
 if ($page.StatusCode -ne 200) { throw "Frontend returned HTTP $($page.StatusCode)." }
+$env:PYTHONPATH = Join-Path $repo "src"
+$checkPython = Join-Path $repo ".venv\Scripts\python.exe"
+if (-not (Test-Path -LiteralPath $checkPython)) { $checkPython = (Get-Command python).Source }
+& $checkPython (Join-Path $PSScriptRoot "check_active_indexes.py")
+if ($LASTEXITCODE -ne 0) { throw "Active Qdrant index integrity check failed." }
 
 $url = "http://127.0.0.1:$FrontendPort/chat"
 Write-Output "WORKBENCH_READY api=http://127.0.0.1:$ApiPort frontend=$url graph=http://127.0.0.1:$FrontendPort/graph"

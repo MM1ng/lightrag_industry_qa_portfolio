@@ -85,6 +85,13 @@ async def validation_state(tmp_path):
                     upload_path=str(tmp_path / "uploads"),
                     parsed_path=str(tmp_path / "parsed"),
                     vector_backend="qdrant",
+                    active_vector_generation_id="c" * 32,
+                ),
+                VectorIndexGeneration(
+                    id="c" * 32, knowledge_base_id=kb_id, backend="qdrant", generation="g0",
+                    status=VectorIndexGenerationStatus.active, workspace_path=str(tmp_path / "workspace"),
+                    document_manifest_hash="1" * 64, child_chunks_manifest_hash="2" * 64,
+                    embedding_config_hash="3" * 64, chunking_config_hash="4" * 64,
                 ),
                 VectorIndexGeneration(
                     id=generation_id,
@@ -282,12 +289,26 @@ async def _record_valid_run(state) -> Path:
     artifact.write_text('{"id":"S001","status_code":200}\n', encoding="utf-8")
     async with factory() as session:
         generation = await session.get(VectorIndexGeneration, generation_id)
+        from industrial_rag.services.canonical_validation_runner import write_validation_artifact
+        from industrial_rag.services.validation_policy import (
+            REQUIRED_GATES,
+            resolve_validation_policy,
+        )
+
+        from g1_test_support import passing_records
+        resolved = await resolve_validation_policy(session, kb_id, generation)
+        generation.accepted_policy_snapshot = resolved.snapshot
+        records = passing_records(generation_id)
+        summary = {"passed": True, "outcome": "PASSED", "policy_snapshot": resolved.snapshot,
+                   "gates": {name: {"status": "PASS", "passed": True} for name in REQUIRED_GATES}}
+        write_validation_artifact(artifact, [{"schema": "g1-validation-v1", "summary": summary}, *records])
         evidence = await GenerationContentFingerprintService(
             session,
             settings=settings,
             qdrant_client_factory=lambda: qdrant,
         ).calculate(kb_id, generation)
         fingerprint_payload = {
+            "validation_policy": resolved.fingerprint,
             "app_git_commit": evidence.app_git_commit,
             "strategy": evidence.strategy_fingerprint,
             "generation_manifest": evidence.generation_manifest_hash,
@@ -304,6 +325,9 @@ async def _record_valid_run(state) -> Path:
             golden_set_version=policy.version,
             golden_set_sha256=policy.source_sha256,
             runner_version=RUNNER_VERSION,
+            policy_snapshot=resolved.snapshot,
+            validation_policy_fingerprint=resolved.fingerprint,
+            effective_questions_sha256=resolved.snapshot["effective_questions_sha256"],
             app_git_commit=evidence.app_git_commit,
             configured_model=settings.llm_model,
             strategy_fingerprint=evidence.strategy_fingerprint,
@@ -400,7 +424,7 @@ async def test_golden_policy_change_invalidates_previous_run(validation_state, m
         questions=original.questions,
     )
     monkeypatch.setattr(
-        "industrial_rag.services.validation_gate_service.load_canonical_policy",
+        "industrial_rag.services.validation_policy.load_canonical_policy",
         lambda: changed,
     )
     async with factory() as session:
@@ -411,4 +435,4 @@ async def test_golden_policy_change_invalidates_previous_run(validation_state, m
                 settings=settings,
                 qdrant_client_factory=lambda: qdrant,
             ).require_eligible(kb_id, generation)
-    assert caught.value.code == AppErrorCode.generation_validation_required
+    assert caught.value.code == AppErrorCode.generation_validation_stale

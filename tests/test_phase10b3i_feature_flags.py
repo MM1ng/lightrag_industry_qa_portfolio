@@ -29,6 +29,8 @@ def test_phase10b3i_flags_default_false_and_digest_is_stable() -> None:
         "QA_COVERAGE_AWARE_SELECTION_ENABLED": False,
         "QA_PARTIAL_GENERATION_ENABLED": False,
         "QA_STRUCTURED_CITATION_OUTPUT_ENABLED": False,
+        "QA_RERANKER_ENABLED": False,
+        "QA_SPARSE_RETRIEVAL_ENABLED": False,
     }
     assert len(settings.phase10b3i_config_sha256) == 64
     assert settings.phase10b3i_config_sha256 == Settings.from_mapping(_values()).phase10b3i_config_sha256

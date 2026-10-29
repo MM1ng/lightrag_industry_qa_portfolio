@@ -33,11 +33,33 @@ class ValidationRunRepository:
         artifact_path: str,
         artifact_sha256: str,
         finished_at: datetime,
+        blocked: bool = False,
     ) -> ValidationRun | None:
         run = await self.get(run_id)
         if run is None or run.status is not ValidationRunStatus.running:
             return None
-        run.status = ValidationRunStatus.passed if passed else ValidationRunStatus.failed
+        if passed and blocked:
+            raise ValueError("blocked validation cannot pass")
+        from industrial_rag.services.generation_content_fingerprint import stable_hash
+        from industrial_rag.services.golden_set_policy import RUNNER_VERSION
+
+        if passed and run.runner_version == RUNNER_VERSION:
+            snapshot = run.policy_snapshot or {}
+            if (
+                snapshot.get("admission") != "ADMITTED"
+                or len(snapshot.get("questions", [])) != 20
+                or run.validation_policy_fingerprint != stable_hash(snapshot)
+                or run.effective_questions_sha256 != stable_hash(snapshot.get("questions"))
+                or not run.qdrant_content_fingerprint
+            ):
+                raise ValueError("passing G1 run requires complete policy and measured content evidence")
+        run.status = (
+            ValidationRunStatus.blocked
+            if blocked
+            else ValidationRunStatus.passed
+            if passed
+            else ValidationRunStatus.failed
+        )
         run.passed = passed
         run.metrics = metrics
         run.result_artifact_path = artifact_path
@@ -53,6 +75,7 @@ class ValidationRunRepository:
         golden_set_version: str,
         golden_set_sha256: str,
         now: datetime,
+        validation_policy_fingerprint: str | None = None,
     ) -> ValidationRun | None:
         statement = (
             select(ValidationRun)
@@ -67,6 +90,9 @@ class ValidationRunRepository:
             .order_by(ValidationRun.finished_at.desc())
             .limit(1)
         )
+        if validation_policy_fingerprint is not None:
+            statement = statement.where(
+                ValidationRun.validation_policy_fingerprint == validation_policy_fingerprint
+            )
         result = await self._session.execute(statement)
         return result.scalars().first()
-

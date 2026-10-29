@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { ApiClient } from '../../api/client'
 import { useSessionStore } from '../../app/stores/session'
+import LifecycleTimeline from '../../components/admin/LifecycleTimeline.vue'
 import GenerationsView from './GenerationsView.vue'
 
 const generations = [{ id: 'g-1', knowledge_base_id: 'kb-1', generation: 'gen-001', status: 'ready', backend: 'nano', created_at: '2026-08-10T00:00:00Z' }]
@@ -35,5 +36,15 @@ describe('admin views', () => {
     confirmButton?.click()
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3))
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'POST' })
+  })
+
+  it('visualizes the guarded Generation lifecycle and failed validation state', () => {
+    const wrapper = mount(LifecycleTimeline, {
+      props: { generation: { ...generations[0], status: 'failed' } },
+    })
+    expect(wrapper.text()).toContain('Candidate')
+    expect(wrapper.text()).toContain('Validation')
+    expect(wrapper.find('.timeline-step--failed').text()).toContain('Validation')
+    expect(wrapper.find('[aria-label="Generation 生命周期阶段"]').element.tagName).toBe('OL')
   })
 })

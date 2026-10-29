@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -11,8 +10,12 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from industrial_rag.db.models import KnowledgeBase, ValidationRun, ValidationRunStatus, VectorIndexGeneration
-from industrial_rag.services.canonical_evaluation_artifact_v2 import validate_canonical_artifact_v2
+from industrial_rag.db.models import (
+    KnowledgeBase,
+    ValidationRun,
+    ValidationRunStatus,
+    VectorIndexGeneration,
+)
 
 
 class EvaluationCenterError(RuntimeError):
@@ -78,7 +81,7 @@ class EvaluationCenterService:
             select(ValidationRun).where(
                 ValidationRun.knowledge_base_id == kb_id,
                 ValidationRun.generation_id == generation.id,
-                ValidationRun.status.in_([ValidationRunStatus.passed, ValidationRunStatus.failed]),
+                ValidationRun.status.in_([ValidationRunStatus.passed, ValidationRunStatus.failed, ValidationRunStatus.blocked]),
                 ValidationRun.finished_at.is_not(None),
             ).order_by(ValidationRun.finished_at.desc())
         )
@@ -91,7 +94,7 @@ class EvaluationCenterService:
             payload = self._read_jsonl(path)
             if payload is None:
                 continue
-            status = "passed" if run and run.passed else "failed" if run else "available"
+            status = run.status.value if run else "available"
             return self._artifact_payload(payload, path, run, status)
         return None
 
@@ -105,7 +108,12 @@ class EvaluationCenterService:
         return rows if all(isinstance(row, dict) for row in rows) else None
 
     def _artifact_payload(self, rows: list[dict[str, Any]], path: Path, run: ValidationRun | None, status: str) -> dict[str, Any]:
-        labels = self._question_labels()
+        header = rows[0] if rows and rows[0].get("schema") == "g1-validation-v1" else None
+        summary = header.get("summary", {}) if header else {}
+        policy = summary.get("policy_snapshot", {})
+        labels = {q["id"]: {"question": q["question"], "expects_evidence": q["expects_evidence"]}
+                  for q in policy.get("questions", [])} if header else self._question_labels()
+        rows = rows[1:] if header else [r for r in rows if r.get("id") or r.get("question_id")]
         rows = [{**row, **labels.get(str(row.get("id") or row.get("question_id")), {})} for row in rows]
         positive = [r for r in rows if r.get("expects_evidence")]
         negative = [r for r in rows if not r.get("expects_evidence")]
@@ -118,17 +126,22 @@ class EvaluationCenterService:
             "positive_question_count": len(positive),
             "negative_passed_count": negative_passed,
             "negative_question_count": len(negative),
-            "citation_gate": positive_hit == len(positive) and len(rows) > 0,
-            "trace_gate": trace_complete == len(positive),
-            "negative_unsupported_gate": negative_passed == len(negative),
+            "citation_gate": bool(positive) and positive_hit == len(positive),
+            "trace_gate": bool(positive) and trace_complete == len(positive),
+            "negative_unsupported_gate": bool(negative) and negative_passed == len(negative),
             "latency_ms": round(sum(float(r.get("latency_ms") or 0) for r in rows) / len(rows)) if rows else 0,
         }
+        if header and summary.get("outcome") == "BLOCKED":
+            metrics.update({"citation_gate": None, "trace_gate": None, "negative_unsupported_gate": None})
         return {
             "status": status,
+            "measurement_status": summary.get("run", {}).get("measurement_status", "MEASURED" if rows else "NOT_MEASURED"),
+            "validation_policy_fingerprint": summary.get("validation_policy_fingerprint"),
+            "effective_questions_sha256": policy.get("effective_questions_sha256"),
             "passed": run.passed if run else None,
             "validation_run_id": run.id if run else None,
             "finished_at": run.finished_at.isoformat() if run and run.finished_at else datetime.fromtimestamp(path.stat().st_mtime).isoformat() if path.exists() else None,
-            "source": {"artifact_name": path.name, "schema": "legacy-canonical-jsonl", "path_available": True},
+            "source": {"artifact_name": path.name, "schema": "g1-validation-v1" if header else "legacy-canonical-jsonl", "path_available": True},
             "metrics": metrics,
             "gates": {"citation": metrics["citation_gate"], "trace": metrics["trace_gate"], "negative_unsupported": metrics["negative_unsupported_gate"]},
             "questions": rows,
@@ -156,11 +169,14 @@ class EvaluationCenterService:
             return {"status": "not_comparable", "reason": "缺少两侧完整的正式 validation artifact。", "metrics": {}, "questions": []}
         current_ids = [r.get("id") or r.get("question_id") for r in current["questions"]]
         previous_ids = [r.get("id") or r.get("question_id") for r in previous["questions"]]
-        if current_ids != previous_ids:
+        if (current_ids != previous_ids
+            or current.get("effective_questions_sha256") != previous.get("effective_questions_sha256")
+            or current.get("measurement_status") == "NOT_MEASURED"
+            or previous.get("measurement_status") == "NOT_MEASURED"):
             return {"status": "not_comparable", "reason": "两侧 canonical question identity 不一致。", "metrics": {}, "questions": []}
         metric_delta = {key: current["metrics"].get(key, 0) - previous["metrics"].get(key, 0) for key in current["metrics"] if isinstance(current["metrics"].get(key), (int, float)) and isinstance(previous["metrics"].get(key), (int, float))}
         rows = []
-        for before, after in zip(previous["questions"], current["questions"]):
+        for before, after in zip(previous["questions"], current["questions"], strict=True):
             changed = any(before.get(key) != after.get(key) for key in ("answer_status", "citation_match", "negative_case_passed", "trace_complete", "citation_trace"))
             rows.append({"id": after.get("id") or after.get("question_id"), "before": before, "after": after, "changed": changed})
         return {"status": "comparable", "reason": None, "metrics": metric_delta, "questions": rows}
