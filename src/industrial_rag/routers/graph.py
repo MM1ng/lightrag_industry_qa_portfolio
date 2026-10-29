@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections import OrderedDict
 from typing import Any
 
 import networkx as nx
@@ -14,6 +16,14 @@ from industrial_rag.errors import AppError
 from industrial_rag.graph_display_mapping import map_type_zh
 
 router = APIRouter(prefix="/v1/graph", tags=["graph"])
+
+# Layout is deterministic because ``spring_layout`` is seeded, so the result can
+# be memoised per (graph fingerprint, subgraph shape, seed).  Bounded to keep
+# long-running processes from accumulating positions for stale generations.
+_LAYOUT_SEED = 17
+_LAYOUT_SCALE = 280
+_LAYOUT_CACHE_MAX_ENTRIES = 32
+_layout_cache: OrderedDict[tuple[Any, ...], dict[Any, tuple[float, float]]] = OrderedDict()
 
 
 class GraphNodeResponse(BaseModel):
@@ -60,22 +70,56 @@ def _graph_path(request: Request):
     return graph_path
 
 
-def _load_graph(request: Request) -> nx.Graph:
+async def _load_graph(request: Request) -> tuple[nx.Graph, str]:
+    """Load the graph off the event loop and return it with its file identity.
+
+    ``nx.read_graphml`` is a synchronous, CPU/IO bound call that costs hundreds
+    of milliseconds on a production graph, so it runs in a worker thread and is
+    memoised by ``(path, mtime, size)`` in :mod:`industrial_rag.graph_visualizer`.
+    """
     graph_path = _graph_path(request)
     try:
-        return graph_tools.load_graph(graph_path)
+        fingerprint = await asyncio.to_thread(graph_tools.graph_file_fingerprint, graph_path)
+        graph = await asyncio.to_thread(graph_tools.load_graph_cached, graph_path)
     except FileNotFoundError:
         raise AppError("graph_not_found", "当前知识库没有可用的知识图谱。", status_code=404) from None
     except Exception as error:
         raise AppError("graph_unreadable", "知识图谱暂时无法读取。", status_code=503) from error
+    return graph, fingerprint
 
 
-def _serialize_graph(graph: nx.Graph, *, mode: str, query: str | None) -> GraphResponse:
+def _positions_for(
+    graph: nx.Graph,
+    *,
+    fingerprint: str,
+    kind: str,
+    limit: int,
+    hops: int,
+    center: str | None,
+) -> dict[Any, tuple[float, float]]:
+    """Return cached ``spring_layout`` positions for one subgraph shape."""
     if graph.number_of_nodes() == 0:
-        positions: dict[Any, tuple[float, float]] = {}
-    else:
-        positions = nx.spring_layout(graph, seed=17, dim=2, scale=280)
+        return {}
+    key = (fingerprint, kind, limit, hops, center, _LAYOUT_SEED)
+    cached = _layout_cache.get(key)
+    if cached is not None:
+        _layout_cache.move_to_end(key)
+        return cached
 
+    positions = nx.spring_layout(graph, seed=_LAYOUT_SEED, dim=2, scale=_LAYOUT_SCALE)
+    _layout_cache[key] = positions
+    while len(_layout_cache) > _LAYOUT_CACHE_MAX_ENTRIES:
+        _layout_cache.popitem(last=False)
+    return positions
+
+
+def _serialize_graph(
+    graph: nx.Graph,
+    *,
+    mode: str,
+    query: str | None,
+    positions: dict[Any, tuple[float, float]],
+) -> GraphResponse:
     nodes = []
     for node_id, attrs in graph.nodes(data=True):
         identifier = str(node_id)
@@ -106,6 +150,41 @@ def _serialize_graph(graph: nx.Graph, *, mode: str, query: str | None) -> GraphR
     )
 
 
+def _render_graph_payload(
+    graph: nx.Graph,
+    *,
+    fingerprint: str,
+    kind: str,
+    limit: int = 0,
+    hops: int = 0,
+    center: str | None = None,
+    mode: str,
+    query: str | None,
+) -> GraphResponse:
+    """Subgraph + layout + serialisation, executed in one worker thread."""
+    positions = _positions_for(
+        graph, fingerprint=fingerprint, kind=kind, limit=limit, hops=hops, center=center
+    )
+    return _serialize_graph(graph, mode=mode, query=query, positions=positions)
+
+
+def _render_native_html(
+    graph: nx.Graph,
+    *,
+    show_edge_labels: bool,
+    show_node_labels: bool,
+) -> str:
+    """PyVis rendering, executed in a worker thread."""
+    return graph_tools.render_pyvis_html(
+        graph,
+        show_edge_labels=show_edge_labels,
+        show_all_labels=False,
+        label_top_n=15 if show_node_labels else 0,
+        height="700px",
+        width="100%",
+    )
+
+
 def _edge_response(source: Any, target: Any, attrs: dict[str, Any], index: int) -> GraphEdgeResponse:
     source_id, target_id = str(source), str(target)
     return GraphEdgeResponse(
@@ -118,8 +197,17 @@ def _edge_response(source: Any, target: Any, attrs: dict[str, Any], index: int) 
 
 @router.get("/overview", response_model=GraphResponse)
 async def graph_overview(request: Request, limit: int = Query(50, ge=1, le=150)) -> GraphResponse:
-    graph = _load_graph(request)
-    return _serialize_graph(graph_tools.build_overview_subgraph(graph, limit=limit), mode="overview", query=None)
+    graph, fingerprint = await _load_graph(request)
+    subgraph = await asyncio.to_thread(graph_tools.build_overview_subgraph, graph, limit=limit)
+    return await asyncio.to_thread(
+        _render_graph_payload,
+        subgraph,
+        fingerprint=fingerprint,
+        kind="overview",
+        limit=limit,
+        mode="overview",
+        query=None,
+    )
 
 
 @router.get("/neighborhood", response_model=GraphResponse)
@@ -128,10 +216,32 @@ async def graph_neighborhood(
     query: str = Query(min_length=1, max_length=200),
     hops: int = Query(1, ge=1, le=2),
 ) -> GraphResponse:
-    graph = _load_graph(request)
+    graph, fingerprint = await _load_graph(request)
+    subgraph, center = await asyncio.to_thread(
+        _build_neighborhood, graph, query=query, hops=hops
+    )
+    return await asyncio.to_thread(
+        _render_graph_payload,
+        subgraph,
+        fingerprint=fingerprint,
+        kind="neighborhood",
+        hops=hops,
+        center=center,
+        mode="neighborhood",
+        query=query,
+    )
+
+
+def _build_neighborhood(
+    graph: nx.Graph, *, query: str, hops: int
+) -> tuple[nx.Graph, str | None]:
     matches = graph_tools.find_matching_nodes(graph, query)
-    subgraph = graph_tools.build_neighborhood_subgraph(graph, matches[0], hops=hops) if matches else graph.__class__()
-    return _serialize_graph(subgraph, mode="neighborhood", query=query)
+    if not matches:
+        return graph.__class__(), None
+    return (
+        graph_tools.build_neighborhood_subgraph(graph, matches[0], hops=hops),
+        str(matches[0]),
+    )
 
 
 @router.get("/native", response_class=HTMLResponse)
@@ -143,25 +253,23 @@ async def graph_native(
     show_node_labels: bool = Query(True),
     show_edge_labels: bool = Query(False),
 ) -> HTMLResponse:
-    graph = _load_graph(request)
+    graph, _fingerprint = await _load_graph(request)
     if query:
-        matches = graph_tools.find_matching_nodes(graph, query)
-        graph = (
-            graph_tools.build_neighborhood_subgraph(graph, matches[0], hops=hops)
-            if matches
-            else graph.__class__()
+        subgraph, _center = await asyncio.to_thread(
+            _build_neighborhood, graph, query=query, hops=hops
         )
     else:
-        graph = graph_tools.build_overview_subgraph(graph, limit=limit)
+        subgraph = await asyncio.to_thread(
+            graph_tools.build_overview_subgraph, graph, limit=limit
+        )
     try:
-        html = graph_tools.render_pyvis_html(
-            graph,
+        html = await asyncio.to_thread(
+            _render_native_html,
+            subgraph,
             show_edge_labels=show_edge_labels,
-            show_all_labels=False,
-            label_top_n=15 if show_node_labels else 0,
-            height="700px",
-            width="100%",
+            show_node_labels=show_node_labels,
         )
     except Exception as error:
         raise AppError("graph_unreadable", "知识图谱暂时无法读取。", status_code=503) from error
     return HTMLResponse(content=html)
+

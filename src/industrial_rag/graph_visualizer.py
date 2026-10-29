@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -64,6 +65,52 @@ def load_graph(graphml_path: Path | str) -> nx.Graph:
     if not path.is_file():
         raise FileNotFoundError(f"GraphML 文件不存在: {path}")
     return nx.read_graphml(path)
+
+
+# Parsing the production GraphML (thousands of nodes) costs hundreds of
+# milliseconds, so the parsed graph is memoised per file fingerprint.  The
+# cache is bounded: only the newest ``_GRAPH_CACHE_MAX_ENTRIES`` generations are
+# kept, which is enough for the active generation plus a couple of switches.
+_GRAPH_CACHE_MAX_ENTRIES = 4
+_graph_cache: OrderedDict[str, nx.Graph] = OrderedDict()
+
+
+def graph_file_fingerprint(graphml_path: Path | str) -> str:
+    """Return a cheap identity token for a GraphML file.
+
+    The token changes whenever the file is rewritten (mtime or size), so a
+    rebuilt graph is never served from a stale cache entry.
+    """
+    path = Path(graphml_path)
+    stat = path.stat()
+    return f"{path.resolve()}|{stat.st_mtime_ns}|{stat.st_size}"
+
+
+def load_graph_cached(graphml_path: Path | str) -> nx.Graph:
+    """Parse a GraphML file at most once per ``(path, mtime, size)`` identity."""
+    path = Path(graphml_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"GraphML 文件不存在: {path}")
+    try:
+        key = graph_file_fingerprint(path)
+    except OSError as error:  # pragma: no cover - stat raced with a removal
+        raise FileNotFoundError(f"GraphML 文件不存在: {path}") from error
+
+    cached = _graph_cache.get(key)
+    if cached is not None:
+        _graph_cache.move_to_end(key)
+        return cached
+
+    graph = nx.read_graphml(path)
+    _graph_cache[key] = graph
+    while len(_graph_cache) > _GRAPH_CACHE_MAX_ENTRIES:
+        _graph_cache.popitem(last=False)
+    return graph
+
+
+def clear_graph_cache() -> None:
+    """Drop every memoised graph (used by tests and by generation switches)."""
+    _graph_cache.clear()
 
 
 def get_graph_statistics(graph: nx.Graph) -> dict[str, Any]:

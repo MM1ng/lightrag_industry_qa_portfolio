@@ -605,6 +605,85 @@ def _insecure_local_dev_enabled(settings: Settings | None) -> bool:
     return flag in _INSECURE_LOCAL_DEV_TRUE
 
 
+_READY_PROBE_TIMEOUT_SECONDS = 2.0
+_READY_CACHE_TTL_SECONDS = 5.0
+_READY_PROBE_CACHE_ATTR = "ready_probe_cache"
+
+
+async def _db_reachable() -> bool:
+    """Return whether a database session can be acquired within the timeout.
+
+    Shared by ``/healthz`` and ``/ready`` so both report the same thing.  The
+    ``asyncio.timeout`` guard is mandatory: these probes now run on the event
+    loop instead of a worker thread, so an unresponsive database must not be
+    able to block the loop.
+    """
+    try:
+        async with asyncio.timeout(_READY_PROBE_TIMEOUT_SECONDS):
+            async for _ in get_session():
+                break
+        return True
+    except Exception:
+        return False
+
+
+async def _qdrant_reachable(settings: Settings) -> bool:
+    """Return whether the configured Qdrant answers a collection listing."""
+    try:
+        from qdrant_client import AsyncQdrantClient
+    except Exception:
+        return False
+    client = AsyncQdrantClient(
+        url=settings.qdrant_url, timeout=_READY_PROBE_TIMEOUT_SECONDS
+    )
+    try:
+        async with asyncio.timeout(_READY_PROBE_TIMEOUT_SECONDS):
+            await client.get_collections()
+        return True
+    except Exception:
+        return False
+    finally:
+        try:
+            await client.close()
+        except Exception:  # pragma: no cover - close must never mask the probe
+            pass
+
+
+def _ready_probe_cache(application: FastAPI) -> dict[str, tuple[float, bool]]:
+    """Per-app readiness cache so parallel probes do not stampede."""
+    cache = getattr(application.state, _READY_PROBE_CACHE_ATTR, None)
+    if cache is None:
+        cache = {}
+        application.state.ready_probe_cache = cache
+    return cache
+
+
+async def _cached_probe(
+    cache: dict[str, tuple[float, bool]],
+    key: str,
+    probe: Callable[[], Awaitable[bool]],
+    *,
+    timeout: float = _READY_PROBE_TIMEOUT_SECONDS,
+) -> bool:
+    """Run ``probe`` at most once per TTL per ``key``, bounded by ``timeout``.
+
+    The bound is enforced here as well as inside the individual probes: the
+    readiness probes execute on the event loop, so *no* probe implementation
+    (including a replaced or hung one) may be allowed to stall the loop.
+    """
+    loop = asyncio.get_running_loop()
+    entry = cache.get(key)
+    if entry is not None and entry[0] > loop.time():
+        return entry[1]
+    try:
+        async with asyncio.timeout(timeout):
+            value = await probe()
+    except Exception:
+        value = False
+    cache[key] = (loop.time() + _READY_CACHE_TTL_SECONDS, value)
+    return value
+
+
 def _log_auth_mode(settings: Settings, *, insecure_local_dev: bool) -> None:
     """Record the effective authentication mode so it is visible in startup logs."""
 
@@ -904,10 +983,7 @@ def create_app(
 
     @application.get("/healthz")
     async def healthz(request: Request) -> dict[str, str]:
-        try:
-            async for _ in get_session():
-                break  # DB available
-        except Exception:
+        if not await _db_reachable():
             return {"status": "degraded", "db": "unavailable"}
         return {"status": "ok", "db": "available"}
 
@@ -955,13 +1031,19 @@ def create_app(
         return operational_metrics.snapshot()
 
     @application.get("/ready", response_model=None)
-    def ready(request: Request) -> dict[str, object] | JSONResponse:
-        """Readiness: config legal, DB reachable, Qdrant reachable (when used)."""
+    async def ready(request: Request) -> dict[str, object] | JSONResponse:
+        """Readiness: config legal, DB reachable, Qdrant reachable (when used).
+
+        This handler runs on the event loop, so every probe is bounded by
+        ``_READY_PROBE_TIMEOUT_SECONDS`` and memoised for
+        ``_READY_CACHE_TTL_SECONDS`` on the app state.  Without both, a hung
+        dependency would stall the loop and repeated probes would keep building
+        ``AsyncQdrantClient`` instances.
+        """
         components: dict[str, str] = {"config": "unknown", "db": "unknown", "qdrant": "n/a"}
         resolved = getattr(request.app.state, "resolved_settings", None)
         if resolved is None:
             components["config"] = "not_loaded"
-            components["db"] = "unknown"
             return JSONResponse(
                 status_code=503,
                 content={
@@ -971,39 +1053,29 @@ def create_app(
                 },
             )
         components["config"] = "ok"
-        try:
-            import asyncio
+        cache = _ready_probe_cache(request.app)
 
-            async def _db_ok() -> None:
-                async for _ in get_session():
-                    break
-
-            asyncio.run(_db_ok())
-            components["db"] = "ok"
-        except Exception:
-            components["db"] = "unavailable"
+        components["db"] = (
+            "ok" if await _cached_probe(cache, "db", _db_reachable) else "unavailable"
+        )
         if resolved.vector_backend.value == "qdrant":
-            try:
-                import asyncio
-
-                from qdrant_client import AsyncQdrantClient
-
-                async def _qdrant_ok() -> bool:
-                    client = AsyncQdrantClient(url=resolved.qdrant_url, timeout=5)
-                    try:
-                        await client.get_collections()
-                        return True
-                    finally:
-                        await client.close()
-
-                components["qdrant"] = "ok" if asyncio.run(_qdrant_ok()) else "unavailable"
-            except Exception:
-                components["qdrant"] = "unavailable"
+            # The key carries backend identity so a generation switch cannot
+            # reuse the previous backend's verdict.
+            qdrant_key = (
+                f"qdrant:{resolved.qdrant_url}:{resolved.qdrant_collection_prefix}"
+                f":{resolved.qdrant_generation}"
+            )
+            qdrant_ok = await _cached_probe(
+                cache, qdrant_key, lambda: _qdrant_reachable(resolved)
+            )
+            components["qdrant"] = "ok" if qdrant_ok else "unavailable"
         ready_status = components.get("db") == "ok" and components.get("qdrant") in {"ok", "n/a"}
-        return {
-            "status": "ready" if ready_status else "not_ready",
-            "components": components,
-        }
+        if ready_status:
+            return {"status": "ready", "components": components}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "components": components},
+        )
 
     # ------------------------------------------------------------------
     # Legacy query (backward compatible)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import threading
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -301,3 +302,32 @@ def test_document_source_preserves_excerpt_when_file_unavailable(tmp_path):
         assert body["unavailable_reason"] == "当前无法打开原文，已保留引用摘录供核验。"
 
     _run(_test())
+
+
+def test_page_context_reads_pdf_off_event_loop_thread(tmp_path, monkeypatch):
+    """``fitz.open`` for the page excerpt must not run on the event loop."""
+    from industrial_rag.routers import documents as documents_router
+
+    observed = []
+    original = documents_router._pdf_page_text
+
+    def _recording(path, page):
+        observed.append(threading.current_thread())
+        return original(path, page)
+
+    monkeypatch.setattr(documents_router, "_pdf_page_text", _recording)
+
+    async def _test():
+        ids = await _seed_source(tmp_path)
+        async with await _client() as client:
+            return await client.get(
+                f"/v1/knowledge-bases/{ids['kb_id']}/documents/{ids['doc_id']}/source",
+                params={"page": 2},
+            )
+
+    response = _run(_test())
+
+    assert response.status_code == 200
+    assert "page 2" in response.json()["page_context"]
+    assert observed, "_pdf_page_text was never called"
+    assert [thread.name for thread in observed if thread is threading.main_thread()] == []

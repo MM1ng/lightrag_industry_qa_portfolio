@@ -101,17 +101,34 @@ async def _require_source_document(
     return doc
 
 
-def _validate_page(doc, page: int) -> JSONResponse | None:
+def _pdf_page_count(path: Path) -> int:
+    """Open a PDF and return its page count (synchronous, runs in a thread)."""
+    import fitz  # type: ignore[import-not-found]
+
+    with fitz.open(path) as pdf:
+        return pdf.page_count
+
+
+def _pdf_page_text(path: Path, page: int) -> str:
+    """Extract normalised text for one page (synchronous, runs in a thread)."""
+    import fitz  # type: ignore[import-not-found]
+
+    with fitz.open(path) as pdf:
+        if page > pdf.page_count:
+            return ""
+        text = pdf.load_page(page - 1).get_text("text").strip()
+        return " ".join(text.split())[:1200]
+
+
+async def _validate_page(doc, page: int) -> JSONResponse | None:
     if page < 1:
         return _source_error("SOURCE_PAGE_INVALID", "页码不存在，请检查引用页码。", 422)
     page_count = doc.page_count
     if page_count is None:
         path = Path(doc.file_path)
         try:
-            import fitz  # type: ignore[import-not-found]
-
-            with fitz.open(path) as pdf:
-                page_count = pdf.page_count
+            # fitz.open blocks for the whole document parse; keep it off the loop.
+            page_count = await asyncio.to_thread(_pdf_page_count, path)
         except Exception:
             return _source_error(
                 "SOURCE_DOCUMENT_UNAVAILABLE", "当前无法读取原文，请稍后重试。", 404
@@ -121,18 +138,12 @@ def _validate_page(doc, page: int) -> JSONResponse | None:
     return None
 
 
-def _page_context(doc, page: int) -> str:
+async def _page_context(doc, page: int) -> str:
     path = Path(doc.file_path)
     if not path.exists():
         return ""
     try:
-        import fitz  # type: ignore[import-not-found]
-
-        with fitz.open(path) as pdf:
-            if page > pdf.page_count:
-                return ""
-            text = pdf.load_page(page - 1).get_text("text").strip()
-            return " ".join(text.split())[:1200]
+        return await asyncio.to_thread(_pdf_page_text, path, page)
     except Exception:
         return ""
 
@@ -299,7 +310,7 @@ async def get_document_source(
     if isinstance(doc_or_error, JSONResponse):
         return doc_or_error
     doc = doc_or_error
-    page_error = _validate_page(doc, page)
+    page_error = await _validate_page(doc, page)
     if page_error is not None:
         return page_error
     file_path = Path(doc.file_path)
@@ -323,7 +334,7 @@ async def get_document_source(
         page=page,
         page_count=doc.page_count,
         excerpt=excerpt,
-        page_context=_page_context(doc, page) if source_available else "",
+        page_context=await _page_context(doc, page) if source_available else "",
         source_available=source_available,
         source_url=source_url,
         unavailable_reason=None if source_available else "当前无法打开原文，已保留引用摘录供核验。",
@@ -344,7 +355,7 @@ async def get_document_source_file(
     if isinstance(doc_or_error, JSONResponse):
         return doc_or_error
     doc = doc_or_error
-    page_error = _validate_page(doc, page)
+    page_error = await _validate_page(doc, page)
     if page_error is not None:
         return page_error
     file_path = Path(doc.file_path)
