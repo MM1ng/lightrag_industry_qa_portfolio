@@ -53,6 +53,10 @@ class LifecycleTaskExecutor:
 
         self._kb_locks: dict[str, asyncio.Lock] = {}
         self._active_tasks: set[str] = set()
+        # Strong references to the running runner coroutines so ``stop()`` can
+        # cancel them and so their exceptions are retrieved instead of being
+        # reported as "Task exception was never retrieved".
+        self._task_handles: set[asyncio.Task[None]] = set()
         self._running = False
         self._poll_task: asyncio.Task[None] | None = None
         self._semaphore = asyncio.Semaphore(max_concurrency)
@@ -73,26 +77,53 @@ class LifecycleTaskExecutor:
         )
 
     async def stop(self) -> None:
-        """Gracefully stop the executor.  Called during FastAPI shutdown."""
+        """Gracefully stop the executor.  Called during FastAPI shutdown.
+
+        Order matters: the poll loop stops claiming new work first, then every
+        in-flight runner is cancelled and drained, and only afterwards do we
+        fall back to waiting on ``_active_tasks`` for runners that registered
+        themselves after the snapshot was taken.  The whole sequence is bounded
+        by ``shutdown_timeout``.
+        """
         self._running = False
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._shutdown_timeout
+
         if self._poll_task is not None:
             self._poll_task.cancel()
             try:
                 await asyncio.wait_for(self._poll_task, timeout=2.0)
             except (TimeoutError, asyncio.CancelledError):
                 pass
+            self._poll_task = None
 
-        # Wait for running tasks
-        timeout = self._shutdown_timeout
-        deadline = asyncio.get_event_loop().time() + timeout
-        while self._active_tasks and asyncio.get_event_loop().time() < deadline:
-            await asyncio.sleep(0.5)
+        # Cancel and drain the runners so every ``finally`` block runs and no
+        # task is left half-written.
+        handles = tuple(self._task_handles)
+        for handle in handles:
+            handle.cancel()
+        if handles:
+            remaining = max(deadline - loop.time(), 0.05)
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*handles, return_exceptions=True), timeout=remaining
+                )
+            except TimeoutError:
+                logger.warning(
+                    "Shutdown: %d task(s) did not stop within %.0fs",
+                    len(handles),
+                    self._shutdown_timeout,
+                )
+
+        # Fallback for runners that were not in the snapshot above.
+        while self._active_tasks and loop.time() < deadline:
+            await asyncio.sleep(0.05)
 
         if self._active_tasks:
             logger.warning(
                 "Shutdown: %d tasks still running after %.0fs, abandoning",
                 len(self._active_tasks),
-                timeout,
+                self._shutdown_timeout,
             )
         logger.info("Task executor stopped")
 
@@ -120,15 +151,58 @@ class LifecycleTaskExecutor:
                 claimed = await task_repo.mark_running(task.id)
                 if claimed is None:
                     continue
+                task_id = claimed.id
                 await session.commit()
-                asyncio.create_task(self._execute_task(task.id))
+                handle = asyncio.create_task(
+                    self._execute_task(task_id), name=f"task-runner:{task_id}"
+                )
+                self._task_handles.add(handle)
+                handle.add_done_callback(self._on_task_done)
+
+    def _on_task_done(self, handle: asyncio.Task[None]) -> None:
+        """Drop the finished handle and retrieve any escaped exception."""
+        self._task_handles.discard(handle)
+        if handle.cancelled():
+            return
+        error = handle.exception()
+        if error is not None:
+            logger.error("Task runner crashed", exc_info=error)
 
     # ------------------------------------------------------------------
     # Task execution
     # ------------------------------------------------------------------
 
     async def _execute_task(self, task_id: str) -> None:
+        """Run one task outside the poll loop.
+
+        Two separate, short-lived sessions are used on purpose.  The first one
+        only resolves the knowledge-base identity and closes immediately, so a
+        runner queued behind ``self._semaphore`` holds **no** pooled connection
+        while it waits.  The second session is opened only after the semaphore
+        and the per-KB lock are acquired, and is the one the handler writes in.
+        """
         self._active_tasks.add(task_id)
+        try:
+            kb_id = await self._load_knowledge_base_id(task_id)
+            if kb_id is None:
+                return
+
+            lock = self._acquire_kb_lock(kb_id)
+            async with self._semaphore, lock:
+                await self._run_task_in_session(task_id)
+        finally:
+            self._active_tasks.discard(task_id)
+
+    async def _load_knowledge_base_id(self, task_id: str) -> str | None:
+        """Read the owning KB id in a throwaway session, then close it."""
+        async with self._session_factory() as session:
+            task = await TaskRepository(session).get(task_id)
+            if task is None:
+                return None
+            return str(task.knowledge_base_id)
+
+    async def _run_task_in_session(self, task_id: str) -> None:
+        """Execute the handler and commit its outcome in a dedicated session."""
         try:
             async with self._session_factory() as session:
                 task_repo = TaskRepository(session)
@@ -139,16 +213,14 @@ class LifecycleTaskExecutor:
                 if task is None:
                     return
 
-                # Acquire KB lock
-                kb_id = task.knowledge_base_id
-                lock = self._acquire_kb_lock(kb_id)
-                async with self._semaphore, lock:
-                    await self._run_handler(task, kb_repo, doc_repo, task_repo)
-                    await session.commit()
+                await self._run_handler(task, kb_repo, doc_repo, task_repo)
+                await session.commit()
         except Exception:
+            # The session above has rolled back, so any status the handler
+            # wrote is gone.  Re-record it in a fresh session: the task must
+            # never stay ``running`` until the next restart recovery.
             logger.exception("Task %s execution failed", task_id)
-        finally:
-            self._active_tasks.discard(task_id)
+            await self._ensure_terminal_status(task_id)
 
     async def _run_handler(
         self,
@@ -198,6 +270,46 @@ class LifecycleTaskExecutor:
                     error_code="handler_exception",
                     error_message="Handler raised an unhandled exception",
                 )
+
+    async def _ensure_terminal_status(self, task_id: str) -> None:
+        """Guarantee the task leaves ``running`` even if the main write failed."""
+        if await self._write_terminal_status(task_id, retry=True):
+            return
+        await self._write_terminal_status(task_id, retry=False)
+
+    async def _write_terminal_status(self, task_id: str, *, retry: bool) -> bool:
+        """Best-effort terminal status write in a brand-new session.
+
+        Args:
+            task_id: Task to resolve.
+            retry: When ``True`` and the attempt budget allows it, the task is
+                moved back to ``retrying``; otherwise it becomes ``failed``.
+
+        Returns:
+            ``True`` when the task is already resolved (or gone) or the write
+            committed; ``False`` when the write itself raised.
+        """
+        try:
+            async with self._session_factory() as session:
+                task_repo = TaskRepository(session)
+                task = await task_repo.get(task_id)
+                if task is None or task.status is not TaskStatus.running:
+                    return True
+                if retry and task.attempt < task.max_attempts:
+                    await task_repo.mark_retrying(task_id)
+                else:
+                    await task_repo.mark_failed(
+                        task_id,
+                        error_code="executor_failure",
+                        error_message=(
+                            "Task execution failed before a terminal status was committed"
+                        ),
+                    )
+                await session.commit()
+                return True
+        except Exception:
+            logger.exception("Failed to record task %s status (retry=%s)", task_id, retry)
+            return False
 
     # ------------------------------------------------------------------
     # KB locks
