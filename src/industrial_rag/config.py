@@ -45,6 +45,12 @@ API_KEY_MIN_LENGTH = 32
 # existing short-key test fixtures keep working.
 KEY_LENGTH_ENFORCED_ENVIRONMENTS = frozenset({"local_staging", "staging", "production"})
 
+# Anonymous (uncredentialed) browser surface rate limits, per client IP per
+# minute.  0 disables the corresponding bucket.  Feedback gets a tighter budget
+# because it writes rows; the rest of the anonymous surface shares one bucket.
+DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE = 30
+DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE = 5
+
 
 def validate_api_key_length(name: str, value: str | None, environment: str) -> None:
     """Enforce the minimum API key length policy.
@@ -142,6 +148,12 @@ class Settings:
     validation_artifact_dir: Path = PROJECT_ROOT / "artifacts" / "validation-runs"
     validation_max_age_seconds: int = 3600
     retrieval_trace_ttl_seconds: int = 86_400
+    # Anonymous browser surface limits (requests/minute/client, 0 disables).
+    public_rate_limit_per_minute: int = DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE
+    feedback_rate_limit_per_minute: int = DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE
+    # Off by default: trusting ``X-Forwarded-For`` without a sanitising proxy in
+    # front of the API lets a client forge its own rate-limit identity.
+    trust_proxy_headers: bool = False
     # LightRAG per-generation isolation token. Derived per knowledge base by
     # settings_for_knowledge_base(); None keeps the legacy layout (workspace="")
     # used by pre-generation knowledge bases.
@@ -196,6 +208,10 @@ class Settings:
             raise ValueError("LLM_MODEL 与 LLM_FALLBACK_MODELS 不能重复")
         if self.qa_request_timeout_seconds <= 0:
             raise ValueError("qa_request_timeout_seconds 必须为正数")
+        if self.public_rate_limit_per_minute < 0:
+            raise ValueError("IRA_PUBLIC_RATE_LIMIT_PER_MINUTE 不能为负数")
+        if self.feedback_rate_limit_per_minute < 0:
+            raise ValueError("IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE 不能为负数")
 
     @property
     def llm_models(self) -> tuple[str, ...]:
@@ -366,6 +382,27 @@ class Settings:
             raise ValueError(
                 "RETRIEVAL_TRACE_TTL_SECONDS 必须在 60 到 604800 之间"
             )
+        try:
+            public_rate_limit_per_minute = int(
+                values.get("IRA_PUBLIC_RATE_LIMIT_PER_MINUTE")
+                or str(DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE)
+            )
+        except ValueError as error:
+            raise ValueError("IRA_PUBLIC_RATE_LIMIT_PER_MINUTE 必须是整数") from error
+        if public_rate_limit_per_minute < 0:
+            raise ValueError("IRA_PUBLIC_RATE_LIMIT_PER_MINUTE 不能为负数")
+        try:
+            feedback_rate_limit_per_minute = int(
+                values.get("IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE")
+                or str(DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE)
+            )
+        except ValueError as error:
+            raise ValueError("IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE 必须是整数") from error
+        if feedback_rate_limit_per_minute < 0:
+            raise ValueError("IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE 不能为负数")
+        trust_proxy_headers = (
+            values.get("IRA_TRUST_PROXY_HEADERS") or ""
+        ).strip().lower() in {"1", "true", "yes", "on"}
 
         if not api_key:
             raise ValueError("必须通过环境变量 DASHSCOPE_API_KEY 提供百炼密钥")
@@ -448,6 +485,9 @@ class Settings:
             validation_artifact_dir=validation_artifact_dir.resolve(),
             validation_max_age_seconds=validation_max_age_seconds,
             retrieval_trace_ttl_seconds=retrieval_trace_ttl_seconds,
+            public_rate_limit_per_minute=public_rate_limit_per_minute,
+            feedback_rate_limit_per_minute=feedback_rate_limit_per_minute,
+            trust_proxy_headers=trust_proxy_headers,
             mineru_enabled=mineru_enabled,
             mineru_api_base_url=mineru_api_base_url,
             mineru_api_key=mineru_api_key,

@@ -37,6 +37,7 @@ class AppErrorCode:
     query_rewrite_ambiguous = "QUERY_REWRITE_AMBIGUOUS"
     query_rewrite_failed = "QUERY_REWRITE_FAILED"
     qa_timeout = "QA_TIMEOUT"
+    rate_limited = "RATE_LIMITED"
 
 
 HTTP_STATUS_MAP: dict[str, int] = {
@@ -70,6 +71,7 @@ HTTP_STATUS_MAP: dict[str, int] = {
     AppErrorCode.query_rewrite_ambiguous: 422,
     AppErrorCode.query_rewrite_failed: 422,
     AppErrorCode.qa_timeout: 504,
+    AppErrorCode.rate_limited: 429,
 }
 
 

@@ -143,3 +143,38 @@ def test_length_check_ignores_absent_key() -> None:
             service_api_key=_STRONG_SERVICE_KEY,
             admin_api_key=None,
         )
+
+
+# ---------------------------------------------------------------------------
+# Anonymous surface rate-limit configuration
+# ---------------------------------------------------------------------------
+
+
+def test_rate_limit_defaults_are_30_and_5_per_minute() -> None:
+    settings = Settings.from_mapping(_valid_values())
+
+    assert settings.public_rate_limit_per_minute == 30
+    assert settings.feedback_rate_limit_per_minute == 5
+    assert settings.trust_proxy_headers is False
+
+
+def test_rate_limit_rejects_negative_values() -> None:
+    with pytest.raises(ValueError, match="IRA_PUBLIC_RATE_LIMIT_PER_MINUTE 不能为负数"):
+        Settings.from_mapping({**_valid_values(), "IRA_PUBLIC_RATE_LIMIT_PER_MINUTE": "-1"})
+    with pytest.raises(ValueError, match="IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE 不能为负数"):
+        Settings.from_mapping({**_valid_values(), "IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE": "-1"})
+
+
+def test_rate_limit_zero_disables_and_proxy_headers_opt_in() -> None:
+    settings = Settings.from_mapping(
+        {
+            **_valid_values(),
+            "IRA_PUBLIC_RATE_LIMIT_PER_MINUTE": "0",
+            "IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE": "0",
+            "IRA_TRUST_PROXY_HEADERS": "true",
+        }
+    )
+
+    assert settings.public_rate_limit_per_minute == 0
+    assert settings.feedback_rate_limit_per_minute == 0
+    assert settings.trust_proxy_headers is True

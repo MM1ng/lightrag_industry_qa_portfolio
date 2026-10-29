@@ -31,11 +31,20 @@ from industrial_rag.citation_formatter import (
 )
 from industrial_rag.citation_selection import select_runtime_citations
 from industrial_rag.claim_citation_pruning import prune_claim_citations
-from industrial_rag.config import Settings
+from industrial_rag.config import (
+    DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE,
+    DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE,
+    Settings,
+)
 from industrial_rag.db.session import close_db, get_session, init_db
 from industrial_rag.errors import AppError
 from industrial_rag.lightrag_service import INSUFFICIENT_EVIDENCE_MESSAGE, QueryResult
 from industrial_rag.operational_metrics import operational_metrics
+from industrial_rag.rate_limit import (
+    BUCKET_DEFAULT,
+    BUCKET_FEEDBACK,
+    AnonymousRateLimiter,
+)
 from industrial_rag.routers import (
     admin_diagnostics,
     documents,
@@ -161,6 +170,7 @@ _ERRORS: dict[str, tuple[int, str, bool]] = {
     "QUERY_REWRITE_AMBIGUOUS": (422, "当前问题存在多个可能的指代对象，请明确设备或对象后重试。", False),
     "QUERY_REWRITE_FAILED": (422, "当前问题依赖会话上下文，但无法安全改写，请补充明确的设备或对象。", False),
     "CITATION_AUDIT_WARNING": (200, "引用审计发现警告，请人工复核。", False),
+    "RATE_LIMITED": (429, "请求过于频繁，请稍后重试。", True),
     "INTERNAL_ERROR": (500, "系统内部错误，请稍后重试。", False),
 }
 
@@ -548,6 +558,9 @@ _HEALTH_PATHS: frozenset[str] = frozenset(
 _INSECURE_LOCAL_DEV_FLAG = "IRA_DEV_INSECURE"
 _INSECURE_LOCAL_DEV_TRUE = frozenset({"1", "true", "yes", "on"})
 
+# Feedback writes get their own tighter budget on the anonymous surface.
+_FEEDBACK_PATH = "/v1/feedback"
+
 
 def _is_public_kb_query_path(path: str) -> bool:
     """Match exactly ``/v1/knowledge-bases/{kb_id}/query`` with a non-empty id."""
@@ -609,6 +622,65 @@ _READY_PROBE_TIMEOUT_SECONDS = 2.0
 _READY_CACHE_TTL_SECONDS = 5.0
 _READY_PROBE_CACHE_ATTR = "ready_probe_cache"
 
+
+def _build_anonymous_rate_limiter(settings: Settings | None) -> AnonymousRateLimiter:
+    """Create the per-app limiter for the unauthenticated browser surface."""
+    return AnonymousRateLimiter(
+        default_limit=(
+            settings.public_rate_limit_per_minute
+            if settings is not None
+            else DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE
+        ),
+        feedback_limit=(
+            settings.feedback_rate_limit_per_minute
+            if settings is not None
+            else DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE
+        ),
+        window_seconds=60.0,
+    )
+
+
+def _anonymous_rate_limit_bucket(request: Request) -> str:
+    """Return the bucket an anonymous request draws from."""
+    if request.method == "POST" and request.url.path == _FEEDBACK_PATH:
+        return BUCKET_FEEDBACK
+    return BUCKET_DEFAULT
+
+
+def _anonymous_client_key(request: Request, *, trust_proxy_headers: bool) -> str:
+    """Identify the anonymous caller.
+
+    ``X-Forwarded-For`` is only honoured when the deployment explicitly declares
+    a sanitising proxy in front of the API (``IRA_TRUST_PROXY_HEADERS``);
+    otherwise any client could forge its own budget by setting the header.
+    """
+    if trust_proxy_headers:
+        forwarded = request.headers.get("x-forwarded-for") or ""
+        first_hop = forwarded.split(",")[0].strip()
+        if first_hop:
+            return first_hop
+    client = request.client
+    host = getattr(client, "host", None)
+    return host or "unknown"
+
+
+def _rate_limited_response(
+    *,
+    limiter: AnonymousRateLimiter,
+    client_key: str,
+    bucket: str,
+    request_id: str,
+    trace_id: str,
+) -> JSONResponse:
+    retry_after = max(1, limiter.retry_after(client_key, bucket=bucket))
+    operational_metrics.increment("rate_limited_total")
+    _log_result(request_id=request_id, status="RATE_LIMITED", latency_ms=0)
+    return _error_response(
+        "RATE_LIMITED",
+        request_id=request_id,
+        trace_id=trace_id,
+        headers={"Retry-After": str(retry_after)},
+    )
 
 async def _db_reachable() -> bool:
     """Return whether a database session can be acquired within the timeout.
@@ -740,6 +812,9 @@ def create_app(
             application.state.allow_insecure_local_dev = _insecure_local_dev_enabled(
                 resolved_settings
             )
+            application.state.anonymous_rate_limiter = _build_anonymous_rate_limiter(
+                resolved_settings
+            )
             _log_auth_mode(
                 resolved_settings,
                 insecure_local_dev=application.state.allow_insecure_local_dev,
@@ -863,6 +938,7 @@ def create_app(
     # Computed eagerly so tests and non-lifespan clients observe the same
     # fail-closed default; lifespan recomputes it from resolved settings.
     application.state.allow_insecure_local_dev = _insecure_local_dev_enabled(settings)
+    application.state.anonymous_rate_limiter = _build_anonymous_rate_limiter(settings)
 
     @application.middleware("http")
     async def collect_operational_metrics(
@@ -906,6 +982,29 @@ def create_app(
             request.state.authenticated_actor = AuthenticatedActor(
                 role="service", actor="public-browser", credential_type="anonymous"
             )
+            # Rate limiting belongs *inside* the anonymous branch, after the
+            # credential_type is set and before the route runs.  Bearer and
+            # local_dev actors return earlier and are never limited.
+            limiter: AnonymousRateLimiter | None = getattr(
+                request.app.state, "anonymous_rate_limiter", None
+            )
+            if limiter is not None and limiter.enabled:
+                resolved = getattr(request.app.state, "resolved_settings", None)
+                client_key = _anonymous_client_key(
+                    request,
+                    trust_proxy_headers=bool(
+                        resolved is not None and resolved.trust_proxy_headers
+                    ),
+                )
+                bucket = _anonymous_rate_limit_bucket(request)
+                if not limiter.allow(client_key, bucket=bucket):
+                    return _rate_limited_response(
+                        limiter=limiter,
+                        client_key=client_key,
+                        bucket=bucket,
+                        request_id=request_id,
+                        trace_id=trace_id,
+                    )
             return await call_next(request)
         actor = authenticate_bearer(
             request.headers.get("Authorization"),

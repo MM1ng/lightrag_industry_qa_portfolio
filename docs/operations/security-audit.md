@@ -28,6 +28,20 @@ python -c "import secrets;print(secrets.token_urlsafe(32))"
 
 **Migration note.** Existing deployments must regenerate both keys before upgrading. The checked-in `.env.local_staging` still holds legacy short values (service key 26 characters, admin key 6 characters), so starting the workbench in `local_staging` will now fail with `SERVICE_API_KEY 长度必须不少于 32 个字符`. Replace the values, then re-run `.\scripts\check_env.ps1 -EnvFile .env.local_staging`.
 
+### Anonymous surface rate limiting
+
+The uncredentialed browser surface is rate limited in-process, per client, with a sliding 60 second window. Bearer-authenticated and `local_dev` actors are never limited.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `IRA_PUBLIC_RATE_LIMIT_PER_MINUTE` | `30` | Budget for the shared anonymous bucket (graph reads, document source, KB query). `0` disables. |
+| `IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE` | `5` | Budget for `POST /v1/feedback`, which writes rows. `0` disables. |
+| `IRA_TRUST_PROXY_HEADERS` | `false` | When true, the client key is the first hop of `X-Forwarded-For`; otherwise `request.client.host`. |
+
+Exceeding a budget returns `429` with `code=RATE_LIMITED` and a `Retry-After` header, and increments the `rate_limited_total` operational metric. Health probe paths are exempt.
+
+Only enable `IRA_TRUST_PROXY_HEADERS` behind a proxy that overwrites `X-Forwarded-For`; without one, any client can forge its own identity and bypass the limit. The limiter is per process — a multi-replica deployment should also enforce a shared limit at the ingress.
+
 ## Audit fields
 
 Every request should be diagnosable with:
