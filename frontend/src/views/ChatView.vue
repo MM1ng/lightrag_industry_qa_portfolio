@@ -13,7 +13,6 @@ const session = useSessionStore()
 const error = ref('')
 const selectedCitationId = ref<string | null>(null)
 const selectedAssistantId = ref<string | null>(null)
-const composer = ref<InstanceType<typeof ChatComposer> | null>(null)
 const isEmpty = computed(() => session.messages.length === 0)
 const selectedEvidence = computed(() => session.messages.find((message): message is AssistantMessage => message.role === 'assistant' && message.id === selectedAssistantId.value)?.result.evidence ?? [])
 const readinessMessage = computed(() => {
@@ -42,7 +41,8 @@ async function submitQuestion(question: string) {
   } finally { session.chatStatus = 'idle' }
 }
 
-function handlePrompt(question: string) { composer.value?.setQuestion(question); submitQuestion(question) }
+// 提示词只负责提交，不回填输入框：回填会在提交后留下上一轮文本。
+function handlePrompt(question: string) { submitQuestion(question) }
 function selectCitation(messageId: string, citationId: string) { selectedAssistantId.value = messageId; selectedCitationId.value = citationId }
 function handleFeedback(messageId: string, payload: { type: 'helpful' | 'unhelpful'; reason?: string; comment?: string }) {
   const message = session.messages.find((item): item is AssistantMessage => item.id === messageId && item.role === 'assistant')
@@ -58,7 +58,7 @@ function handleFeedback(messageId: string, payload: { type: 'helpful' | 'unhelpf
     <div v-if="isEmpty" class="empty-state"><div class="empty-copy"><span class="empty-index mono">01 / ASK THE MANUAL</span><h2>从一个现场问题开始</h2><p>选择下方高频问题，或描述你看到的设备现象。回答会把结论、操作步骤和注意事项分开呈现。</p></div><HighFrequencyPrompts @submit="handlePrompt" /></div>
     <ChatTimeline v-else :messages="session.messages" @select-citation="selectCitation" @retry="submitQuestion" @feedback="handleFeedback" />
     <div v-if="session.chatStatus === 'loading'" class="loading-row" role="status"><span class="loading-dot" />正在检索当前手册并核对证据…</div>
-    <ChatComposer ref="composer" :disabled="session.chatStatus === 'loading' || !session.canQueryActiveKnowledgeBase" :error="error || readinessMessage" @submit="submitQuestion" />
+    <ChatComposer :disabled="session.chatStatus === 'loading' || !session.canQueryActiveKnowledgeBase" :error="error || readinessMessage" @submit="submitQuestion" />
     <p class="scope-note">当前范围：离心泵知识问答 · 只读图谱 · 管理功能需要单独验证</p>
     <EvidenceDrawer :visible="Boolean(selectedCitationId)" :evidence="selectedEvidence" :selected-citation-id="selectedCitationId" @close="selectedCitationId = null" @select="selectedCitationId = $event" />
   </section>

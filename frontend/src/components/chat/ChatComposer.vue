@@ -4,8 +4,6 @@ defineProps<{ disabled?: boolean; error?: string }>()
 const emit = defineEmits<{ submit: [question: string] }>()
 const question = ref('')
 function submit() { const value = question.value.trim(); if (!value) return; emit('submit', value); question.value = '' }
-function setQuestion(value: string) { question.value = value }
-defineExpose({ setQuestion })
 </script>
 
 <template>

@@ -40,6 +40,24 @@ describe('chat workbench', () => {
     expect(wrapper.text()).toContain('可执行回答')
   })
 
+  it('clears the composer after submitting a high-frequency prompt', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(result), { status: 200 }))
+    readyStore()
+    const wrapper = mount(ChatView)
+    await wrapper.findComponent(HighFrequencyPrompts).get('button').trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('请先停机。'))
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
+  })
+
+  it('clears the typed question after submitting', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(result), { status: 200 }))
+    readyStore()
+    const wrapper = mount(ChatView)
+    await wrapper.get('textarea').setValue('泵为什么振动？')
+    await wrapper.get('form').trigger('submit')
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
+  })
+
   it('renders insufficient evidence and preserves the retry question', async () => {
     const insufficient = { ...result, status: 'insufficient_evidence', answer: '当前手册没有足够证据。' }
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(insufficient), { status: 200 }))
