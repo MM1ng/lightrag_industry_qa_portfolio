@@ -21,9 +21,9 @@ PUBLIC_CASES: tuple[tuple[str, str], ...] = (
     ("GET", "/v1/knowledge-bases"),
     ("GET", "/v1/knowledge-bases/kb-1/documents/doc-1/source"),
     ("GET", "/v1/knowledge-bases/kb-1/documents/doc-1/source-file"),
-    ("GET", "/v1/graph/overview"),
-    ("GET", "/v1/graph/neighborhood"),
-    ("GET", "/v1/graph/native"),
+    ("GET", "/v1/knowledge-bases/kb-1/graph/overview"),
+    ("GET", "/v1/knowledge-bases/kb-1/graph/neighborhood"),
+    ("GET", "/v1/knowledge-bases/kb-1/graph/native"),
     ("POST", "/v1/feedback"),
     ("POST", "/v1/knowledge-bases/kb-1/query"),
 )
@@ -48,6 +48,16 @@ PRIVATE_CASES: tuple[tuple[str, str], ...] = (
     ("GET", "/v1/tasks/task-1"),
     ("GET", "/v1/graph"),
     ("POST", "/v1/graph/overview"),
+    # The legacy unscoped graph routes must stay closed; the KB-scoped shape is
+    # the only anonymous one.
+    ("GET", "/v1/graph/overview"),
+    ("GET", "/v1/graph/neighborhood"),
+    ("GET", "/v1/graph/native"),
+    ("POST", "/v1/knowledge-bases/kb-1/graph/overview"),
+    ("GET", "/v1/knowledge-bases//graph/overview"),
+    ("GET", "/v1/knowledge-bases/kb-1/graph"),
+    ("GET", "/v1/knowledge-bases/kb-1/graph/overview/extra"),
+    ("GET", "/v1/knowledge-bases/kb-1/graph/admin"),
     ("GET", "/v1/feedback"),
     ("GET", "/v1/admin/feedback"),
     ("GET", "/metrics"),
@@ -136,7 +146,7 @@ def test_missing_credentials_fail_closed(monkeypatch: pytest.MonkeyPatch) -> Non
 
     with TestClient(app, raise_server_exceptions=False) as client:
         management = client.get("/v1/knowledge-bases/kb-1/documents")
-        public = client.get("/v1/graph/overview")
+        public = client.get("/v1/knowledge-bases/kb-1/graph/overview")
         health = client.get("/readyz")
 
     assert management.status_code == 401

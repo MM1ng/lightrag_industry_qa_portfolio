@@ -12,7 +12,7 @@ from industrial_rag.api import create_app
 from industrial_rag.config import Settings
 from industrial_rag.rate_limit import AnonymousRateLimiter
 
-_PUBLIC_PATH = "/v1/graph/overview"
+_PUBLIC_PATH = "/v1/knowledge-bases/kb-1/graph/overview"
 _SERVICE_KEY = "s" * 32
 _ADMIN_KEY = "a" * 32
 

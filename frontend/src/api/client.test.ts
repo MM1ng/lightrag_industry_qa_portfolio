@@ -42,7 +42,7 @@ describe('ApiClient', () => {
 
   it('normalizes public 503 errors without exposing the raw body', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('secret traceback', { status: 503 }))
-    await expect(new ApiClient().getGraphOverview()).rejects.toMatchObject({ code: 'http_503', retryable: true, message: '服务暂时不可用，请稍后重试。' } satisfies Partial<ApiClientError>)
+    await expect(new ApiClient().getGraphOverview('kb-1')).rejects.toMatchObject({ code: 'http_503', retryable: true, message: '服务暂时不可用，请稍后重试。' } satisfies Partial<ApiClientError>)
   })
 
   it('submits feedback with the request id', async () => {

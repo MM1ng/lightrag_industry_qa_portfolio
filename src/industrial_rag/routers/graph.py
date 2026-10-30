@@ -10,12 +10,21 @@ import networkx as nx
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from industrial_rag import graph_visualizer as graph_tools
+from industrial_rag.config import Settings
+from industrial_rag.db.models import KBStatus, KnowledgeBase
+from industrial_rag.db.session import get_session_factory
 from industrial_rag.errors import AppError
 from industrial_rag.graph_display_mapping import map_type_zh
+from industrial_rag.kb_runtime_settings import settings_for_knowledge_base
 
-router = APIRouter(prefix="/v1/graph", tags=["graph"])
+# Graph reads are scoped to one knowledge base. The previous application-level
+# routes resolved the workspace from process settings, so every visitor saw the
+# same graph regardless of which knowledge base they were reading.
+router = APIRouter(prefix="/v1/knowledge-bases/{kb_id}/graph", tags=["graph"])
 
 # Layout is deterministic because ``spring_layout`` is seeded, so the result can
 # be memoised per (graph fingerprint, subgraph shape, seed).  Bounded to keep
@@ -55,10 +64,34 @@ class GraphResponse(BaseModel):
     stats: GraphStatsResponse
 
 
-def _graph_path(request: Request):
-    settings = getattr(request.app.state, "resolved_settings", None)
-    if settings is None:
+async def _kb_settings(request: Request, kb_id: str) -> Settings:
+    """Resolve the settings of one knowledge base from its trusted metadata.
+
+    ``active_vector_generation`` is eager loaded because the session is closed
+    before the settings are derived; a lazy relationship would raise
+    ``MissingGreenlet`` at that point.
+    """
+    base = getattr(request.app.state, "resolved_settings", None)
+    if base is None:
         raise AppError("graph_not_ready", "图谱服务尚未就绪。", status_code=503)
+    async with get_session_factory()() as session:
+        statement = (
+            select(KnowledgeBase)
+            .options(selectinload(KnowledgeBase.active_vector_generation))
+            .where(KnowledgeBase.id == kb_id)
+        )
+        knowledge_base = (await session.execute(statement)).scalar_one_or_none()
+        if knowledge_base is None or knowledge_base.status is KBStatus.deleted:
+            raise AppError("knowledge_base_not_found", "知识库不存在。", status_code=404)
+        try:
+            return settings_for_knowledge_base(base, knowledge_base)
+        except RuntimeError as error:
+            raise AppError(
+                "graph_not_ready", "当前知识库尚未完成索引。", status_code=503
+            ) from error
+
+
+def _graph_path(settings: Settings):
     workspace = settings.vector_workspace
     if workspace is None and settings.qdrant_generation:
         workspace = f"{settings.vector_backend.value}-{settings.qdrant_generation}"
@@ -70,14 +103,14 @@ def _graph_path(request: Request):
     return graph_path
 
 
-async def _load_graph(request: Request) -> tuple[nx.Graph, str]:
-    """Load the graph off the event loop and return it with its file identity.
+async def _load_graph(request: Request, kb_id: str) -> tuple[nx.Graph, str]:
+    """Load one knowledge base's graph off the event loop with its file identity.
 
     ``nx.read_graphml`` is a synchronous, CPU/IO bound call that costs hundreds
     of milliseconds on a production graph, so it runs in a worker thread and is
     memoised by ``(path, mtime, size)`` in :mod:`industrial_rag.graph_visualizer`.
     """
-    graph_path = _graph_path(request)
+    graph_path = _graph_path(await _kb_settings(request, kb_id))
     try:
         fingerprint = await asyncio.to_thread(graph_tools.graph_file_fingerprint, graph_path)
         graph = await asyncio.to_thread(graph_tools.load_graph_cached, graph_path)
@@ -196,8 +229,10 @@ def _edge_response(source: Any, target: Any, attrs: dict[str, Any], index: int) 
 
 
 @router.get("/overview", response_model=GraphResponse)
-async def graph_overview(request: Request, limit: int = Query(50, ge=1, le=150)) -> GraphResponse:
-    graph, fingerprint = await _load_graph(request)
+async def graph_overview(
+    request: Request, kb_id: str, limit: int = Query(50, ge=1, le=150)
+) -> GraphResponse:
+    graph, fingerprint = await _load_graph(request, kb_id)
     subgraph = await asyncio.to_thread(graph_tools.build_overview_subgraph, graph, limit=limit)
     return await asyncio.to_thread(
         _render_graph_payload,
@@ -213,10 +248,11 @@ async def graph_overview(request: Request, limit: int = Query(50, ge=1, le=150))
 @router.get("/neighborhood", response_model=GraphResponse)
 async def graph_neighborhood(
     request: Request,
+    kb_id: str,
     query: str = Query(min_length=1, max_length=200),
     hops: int = Query(1, ge=1, le=2),
 ) -> GraphResponse:
-    graph, fingerprint = await _load_graph(request)
+    graph, fingerprint = await _load_graph(request, kb_id)
     subgraph, center = await asyncio.to_thread(
         _build_neighborhood, graph, query=query, hops=hops
     )
@@ -247,13 +283,14 @@ def _build_neighborhood(
 @router.get("/native", response_class=HTMLResponse)
 async def graph_native(
     request: Request,
+    kb_id: str,
     query: str | None = Query(default=None, min_length=1, max_length=200),
     hops: int = Query(1, ge=1, le=2),
     limit: int = Query(50, ge=1, le=150),
     show_node_labels: bool = Query(True),
     show_edge_labels: bool = Query(False),
 ) -> HTMLResponse:
-    graph, _fingerprint = await _load_graph(request)
+    graph, _fingerprint = await _load_graph(request, kb_id)
     if query:
         subgraph, _center = await asyncio.to_thread(
             _build_neighborhood, graph, query=query, hops=hops

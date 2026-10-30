@@ -124,12 +124,12 @@ export class ApiClient {
     return this.request<EvaluationDashboard>(`/v1/admin/evaluation/knowledge-bases/${encodeURIComponent(kbId)}${suffix}`)
   }
 
-  async getGraphOverview(limit = 50): Promise<GraphPayload> {
-    return this.request<GraphPayload>(`/v1/graph/overview?limit=${limit}`)
+  async getGraphOverview(kbId: string, limit = 50): Promise<GraphPayload> {
+    return this.request<GraphPayload>(`/v1/knowledge-bases/${encodeURIComponent(kbId)}/graph/overview?limit=${limit}`)
   }
 
-  async getGraphNeighborhood(query: string, hops: 1 | 2): Promise<GraphPayload> {
-    return this.request<GraphPayload>(`/v1/graph/neighborhood?query=${encodeURIComponent(query)}&hops=${hops}`)
+  async getGraphNeighborhood(kbId: string, query: string, hops: 1 | 2): Promise<GraphPayload> {
+    return this.request<GraphPayload>(`/v1/knowledge-bases/${encodeURIComponent(kbId)}/graph/neighborhood?query=${encodeURIComponent(query)}&hops=${hops}`)
   }
 
   async request<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {

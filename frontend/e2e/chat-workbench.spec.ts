@@ -5,8 +5,8 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/v1/knowledge-bases', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [{ id: 'kb-1', name: '离心泵运行手册', status: 'ready', document_count: 2, active_document_count: 2, chunk_count: 42 }] }) }))
   await page.route('**/v1/knowledge-bases/kb-1/query', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ request_id: 'e2e-request-1', status: 'success', answer: '结论\n\n请确认入口阀门已打开。', citations: [{ citation_id: 'c-1', document_name: '离心泵运行手册.pdf', page: 12, document_id: 'doc-1', generation_id: 'gen-1', evidence_id: 'e-1', chunk_id: 'hidden' }], claims: [], evidence: [{ evidence_id: 'e-1', citation_id: 'c-1', document_name: '离心泵运行手册.pdf', page: 12, document_id: 'doc-1', generation_id: 'gen-1', chunk_id: 'hidden', excerpt: '确认入口阀门已打开。', relevance_label: '核心依据' }], latency_ms: 25 }) }))
   await page.route('**/v1/knowledge-bases/kb-1/documents/doc-1/source**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ document_id: 'doc-1', document_name: '离心泵运行手册.pdf', knowledge_base_id: 'kb-1', generation_id: 'gen-1', document_version: 2, page: 12, page_context: '启动前确认入口阀门已打开。随后观察压力表。', excerpt: '确认入口阀门已打开。', source_available: true, source_url: '/v1/knowledge-bases/kb-1/documents/doc-1/source-file?page=12' }) }))
-  await page.route('**/v1/graph/native**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>native graph</body></html>' }))
-  await page.route('**/v1/graph/overview**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ nodes: [], edges: [], stats: { node_count: 0, edge_count: 0, mode: 'overview', query: null } }) }))
+  await page.route('**/graph/native**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>native graph</body></html>' }))
+  await page.route('**/graph/overview**', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ nodes: [], edges: [], stats: { node_count: 0, edge_count: 0, mode: 'overview', query: null } }) }))
 })
 
 test('ordinary operator can ask, inspect evidence, and reach graph without admin navigation', async ({ page }) => {
@@ -50,7 +50,7 @@ test('ordinary operator gets a clear empty-manual state when no knowledge base i
 })
 
 test('graph service failure renders retry state instead of a blank iframe', async ({ page }) => {
-  await page.route('**/v1/graph/native**', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'GRAPH_UNAVAILABLE', message: '图谱服务暂不可用。' }) }))
+  await page.route('**/graph/native**', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ code: 'GRAPH_UNAVAILABLE', message: '图谱服务暂不可用。' }) }))
 
   await page.goto('/graph')
 

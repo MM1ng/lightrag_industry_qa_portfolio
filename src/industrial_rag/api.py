@@ -547,7 +547,8 @@ _PUBLIC_EXACT_ROUTES: frozenset[tuple[str, str]] = frozenset(
 _PUBLIC_DOCUMENT_SOURCE_SUFFIXES: tuple[str, ...] = ("/source", "/source-file")
 
 _KB_ROUTE_PREFIX = "/v1/knowledge-bases/"
-_GRAPH_ROUTE_PREFIX = "/v1/graph/"
+# Graph reads are knowledge-base scoped: /v1/knowledge-bases/{kb_id}/graph/{leaf}
+_PUBLIC_GRAPH_LEAVES = frozenset({"overview", "neighborhood", "native"})
 
 # Reachable without credentials even when no API keys are configured, so that
 # container/platform health probes keep working in a fail-closed deployment.
@@ -572,6 +573,25 @@ def _is_public_kb_query_path(path: str) -> bool:
     return len(segments) == 2 and segments[1] == "query"
 
 
+def _is_public_kb_graph_path(path: str) -> bool:
+    """Match exactly ``/v1/knowledge-bases/{kb_id}/graph/{leaf}``.
+
+    Graph reads used to live at ``/v1/graph/*`` and resolved their workspace from
+    process settings, so an anonymous visitor saw whichever graph the deployment
+    happened to be configured with. Scoping the path to a knowledge base keeps
+    the read anonymous while making the target explicit.
+    """
+
+    if not path.startswith(_KB_ROUTE_PREFIX):
+        return False
+    segments = [segment for segment in path[len(_KB_ROUTE_PREFIX) :].split("/") if segment]
+    return (
+        len(segments) == 3
+        and segments[1] == "graph"
+        and segments[2] in _PUBLIC_GRAPH_LEAVES
+    )
+
+
 def _is_public_browser_request(request: Request) -> bool:
     """Allow the browser's ordinary-user surface without exposing service keys.
 
@@ -588,7 +608,7 @@ def _is_public_browser_request(request: Request) -> bool:
     path = request.url.path
     if (method, path) in _PUBLIC_EXACT_ROUTES:
         return True
-    if method == "GET" and path.startswith(_GRAPH_ROUTE_PREFIX):
+    if method == "GET" and _is_public_kb_graph_path(path):
         return True
     if (
         method == "GET"
