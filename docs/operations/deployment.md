@@ -43,6 +43,22 @@ npm --prefix frontend run test -- --run
 npm --prefix frontend run build
 ```
 
-## Production boundary
+## Graph availability
 
+Graph reads are scoped to a knowledge base: `GET /v1/knowledge-bases/{kb_id}/graph/{overview,neighborhood,native}`.
+The file is looked up inside that knowledge base's active generation workspace
+(`<workspace>/<backend>-<generation>/graph_chunk_entity_relation.graphml`).
+
+Two consequences worth knowing before a demo:
+
+- A knowledge base whose workspace has no GraphML returns `404 graph_not_found`. The workbench then shows "当前知识库没有可用的知识图谱" instead of an empty canvas.
+- Qdrant-backed knowledge bases keep entities and relations in the Qdrant
+  collections (`..._entities`, `..._relationships`); they only produce a GraphML
+  if the ingestion path exports one. Reading the graph straight from Qdrant is
+  not implemented yet.
+
+Previously the routes were application-scoped and served whichever GraphML sat
+in the process `working_dir`, which could belong to no knowledge base at all.
+
+## Production boundary
 This repository does not claim that the real company environment has already been deployed or has a production SLO. Before internal production use, establish an approved deployment topology, PostgreSQL/backup policy, Qdrant capacity, provider quotas, company authentication, secret rotation, alerting, and a load test against production-equivalent infrastructure.

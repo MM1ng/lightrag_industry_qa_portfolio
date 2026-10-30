@@ -92,3 +92,26 @@ def test_ready_db_probe_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
     assert elapsed < 3.0, f"readiness probe blocked for {elapsed:.2f}s"
     assert response.status_code == 503
     assert response.json()["components"]["db"] != "ok"
+
+
+def test_healthz_db_probe_is_bounded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``/healthz`` must stay bounded even if the probe itself hangs.
+
+    The probe carries its own timeout, but a replacement implementation (or a
+    future refactor) can drop it; the endpoint keeps the guard so the liveness
+    path can never pin the event loop.
+    """
+
+    async def _hanging_probe() -> bool:
+        await asyncio.sleep(10)
+        return True
+
+    monkeypatch.setattr(api_module, "_db_reachable", _hanging_probe)
+    with _client() as client:
+        started = time.monotonic()
+        response = client.get("/healthz")
+        elapsed = time.monotonic() - started
+
+    assert elapsed < 3.0, f"health probe blocked for {elapsed:.2f}s"
+    assert response.status_code == 200
+    assert response.json() == {"status": "degraded", "db": "unavailable"}

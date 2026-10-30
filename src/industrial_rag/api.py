@@ -681,6 +681,9 @@ def _anonymous_client_key(request: Request, *, trust_proxy_headers: bool) -> str
             return first_hop
     client = request.client
     host = getattr(client, "host", None)
+    # ASGI servers normally always report a peer address. When they do not, all
+    # such requests share one bucket: over-restrictive rather than fail-open,
+    # which is the right direction for an abuse brake.
     return host or "unknown"
 
 
@@ -1141,7 +1144,15 @@ def create_app(
 
     @application.get("/healthz")
     async def healthz(request: Request) -> dict[str, str]:
-        if not await _db_reachable():
+        # The probe already carries its own 2 s guard; this outer one keeps the
+        # endpoint bounded even if the probe is replaced by a slower
+        # implementation, mirroring /ready.
+        try:
+            async with asyncio.timeout(_READY_PROBE_TIMEOUT_SECONDS):
+                reachable = await _db_reachable()
+        except TimeoutError:
+            reachable = False
+        if not reachable:
             return {"status": "degraded", "db": "unavailable"}
         return {"status": "ok", "db": "available"}
 

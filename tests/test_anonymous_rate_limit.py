@@ -8,9 +8,10 @@ existing tests (all running as ``local_dev``) behaving exactly as before.
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
-from industrial_rag.api import create_app
+from industrial_rag.api import _anonymous_client_key, create_app
 from industrial_rag.config import Settings
 from industrial_rag.rate_limit import AnonymousRateLimiter
+from starlette.requests import Request
 
 _PUBLIC_PATH = "/v1/knowledge-bases/kb-1/graph/overview"
 _SERVICE_KEY = "s" * 32
@@ -158,3 +159,25 @@ def test_feedback_has_tighter_budget_than_query() -> None:
     assert first_feedback != 429
     assert second_feedback == 429
     assert query != 429
+
+
+def test_missing_peer_address_shares_one_bucket() -> None:
+    """Without a peer address the limiter over-restricts instead of failing open.
+
+    uvicorn always reports a peer, so this only happens under unusual ASGI
+    servers; sharing one bucket is the safe direction for an abuse brake.
+    """
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/v1/knowledge-bases/kb-1/graph/overview",
+            "headers": [(b"x-forwarded-for", b"203.0.113.7")],
+            "client": None,
+        }
+    )
+
+    assert _anonymous_client_key(request, trust_proxy_headers=False) == "unknown"
+    # Even a forged header must not buy a private bucket while trust is off.
+    assert _anonymous_client_key(request, trust_proxy_headers=True) == "203.0.113.7"
