@@ -26,6 +26,7 @@ PUBLIC_CASES: tuple[tuple[str, str], ...] = (
     ("GET", "/v1/knowledge-bases/kb-1/graph/native"),
     ("POST", "/v1/feedback"),
     ("POST", "/v1/knowledge-bases/kb-1/query"),
+    ("POST", "/v1/knowledge-bases/kb-1/query/stream"),
 )
 
 # Routes that must keep requiring credentials. The near-misses are the
@@ -42,6 +43,9 @@ PRIVATE_CASES: tuple[tuple[str, str], ...] = (
     ("GET", "/v1/knowledge-bases/kb-1/generations"),
     ("GET", "/v1/knowledge-bases/kb-1/query"),
     ("POST", "/v1/knowledge-bases/kb-1/query/extra"),
+    ("GET", "/v1/knowledge-bases/kb-1/query/stream"),
+    ("POST", "/v1/knowledge-bases/kb-1/query/stream/extra"),
+    ("POST", "/v1/knowledge-bases/kb-1/query/streaming"),
     ("POST", "/v1/knowledge-bases/kb-1/documents/doc-1/reprocess"),
     ("POST", "/v1/knowledge-bases//query"),
     ("GET", "/v1/tasks"),

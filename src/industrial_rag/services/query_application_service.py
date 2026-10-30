@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -48,6 +49,7 @@ async def _run_query_with_timeout(
     top_k: int,
     chunk_top_k: int,
     timeout_seconds: float,
+    on_delta: Callable[[str], None] | None = None,
 ) -> QueryResult:
     """Execute one runtime query under a hard deadline.
 
@@ -55,15 +57,18 @@ async def _run_query_with_timeout(
     lock indefinitely and serialises every later request in the same process.
     """
 
+    query_kwargs: dict[str, object] = {
+        "mode": mode,
+        "top_k": top_k,
+        "chunk_top_k": chunk_top_k,
+    }
+    if on_delta is not None:
+        # Runtimes that predate streaming keep their original call shape.
+        query_kwargs["on_delta"] = on_delta
     try:
         async with asyncio.timeout(timeout_seconds):
             try:
-                return await runtime.query(
-                    question,
-                    mode=mode,
-                    top_k=top_k,
-                    chunk_top_k=chunk_top_k,
-                )
+                return await runtime.query(question, **query_kwargs)
             except TypeError as error:
                 if "unexpected keyword argument" not in str(error):
                     raise
@@ -105,11 +110,18 @@ class QueryApplicationService:
         question: str,
         *,
         history: list[dict[str, str]] | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> GenerationQueryResult:
         kb = await self._require_kb(kb_id)
         if kb.active_vector_generation_id is None:
             raise AppError(AppErrorCode.index_not_ready, "知识库没有 Active Generation")
-        return await self._query(kb, kb.active_vector_generation_id, question, history=history)
+        return await self._query(
+            kb,
+            kb.active_vector_generation_id,
+            question,
+            history=history,
+            on_delta=on_delta,
+        )
 
     async def query_generation(
         self,
@@ -119,6 +131,7 @@ class QueryApplicationService:
         *,
         history: list[dict[str, str]] | None = None,
         disable_llm_cache: bool = False,
+        on_delta: Callable[[str], None] | None = None,
     ) -> GenerationQueryResult:
         kb = await self._require_kb(kb_id)
         return await self._query(
@@ -127,6 +140,7 @@ class QueryApplicationService:
             question,
             history=history,
             disable_llm_cache=disable_llm_cache,
+            on_delta=on_delta,
         )
 
     async def _query(
@@ -137,6 +151,7 @@ class QueryApplicationService:
         *,
         history: list[dict[str, str]] | None = None,
         disable_llm_cache: bool = False,
+        on_delta: Callable[[str], None] | None = None,
     ) -> GenerationQueryResult:
         generation = await self._generation_repository.get(generation_id)
         if generation is None or generation.knowledge_base_id != kb.id:
@@ -230,6 +245,7 @@ class QueryApplicationService:
             top_k=self._base_settings.phase10b_top_k,
             chunk_top_k=self._base_settings.phase10b_chunk_top_k,
             timeout_seconds=self._base_settings.qa_request_timeout_seconds,
+            on_delta=on_delta,
         )
         document_ids = await self._citation_document_ids(
             kb.id, generation, snapshot_ids=citation_document_ids

@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ApiClientError, apiClient } from '../api/client'
+import { extractAnswerPreview } from '../api/streamPreview'
 import { useSessionStore, type AssistantMessage } from '../app/stores/session'
 import HighFrequencyPrompts from '../components/chat/HighFrequencyPrompts.vue'
 import ChatTimeline from '../components/chat/ChatTimeline.vue'
@@ -13,6 +14,13 @@ const session = useSessionStore()
 const error = ref('')
 const selectedCitationId = ref<string | null>(null)
 const selectedAssistantId = ref<string | null>(null)
+// Unvalidated preview streamed while the answer is generated. It is replaced by
+// the validated result as soon as the final event arrives, so it is styled as a
+// draft rather than an answer.
+const draftRaw = ref('')
+// Structured-citation answers stream as a JSON envelope; show only the text.
+const draft = computed(() => extractAnswerPreview(draftRaw.value))
+const streamStage = ref<'' | 'retrieving' | 'generating'>('')
 const isEmpty = computed(() => session.messages.length === 0)
 const selectedEvidence = computed(() => session.messages.find((message): message is AssistantMessage => message.role === 'assistant' && message.id === selectedAssistantId.value)?.result.evidence ?? [])
 const readinessMessage = computed(() => {
@@ -29,16 +37,24 @@ async function submitQuestion(question: string) {
   if (session.chatStatus === 'loading') return
   if (!session.canQueryActiveKnowledgeBase || !session.activeKnowledgeBaseId) { error.value = readinessMessage.value || '当前知识库尚未就绪。'; return }
   const history = session.historyForQuery()
-  session.addUserMessage(question); session.chatStatus = 'loading'; error.value = ''
+  session.addUserMessage(question); session.chatStatus = 'loading'; error.value = ''; draftRaw.value = ''; streamStage.value = 'retrieving'
   try {
-    const result = await apiClient.queryKnowledgeBase(session.activeKnowledgeBaseId, question, history)
+    const result = await apiClient.queryKnowledgeBaseStream(
+      session.activeKnowledgeBaseId,
+      question,
+      history,
+      {
+        onStage: (stage) => { if (stage === 'generating' || stage === 'retrieving') streamStage.value = stage },
+        onDelta: (text) => { draftRaw.value += text },
+      },
+    )
     session.addAssistantMessage(question, result)
   } catch (cause) {
     const message = cause instanceof ApiClientError ? cause.message : '查询没有完成，请检查服务状态后重试。'
     const failed: QueryResult = { request_id: '', status: 'failed', answer: message, citations: [], claims: [], evidence: [], latency_ms: 0 }
     session.addAssistantMessage(question, failed)
     error.value = cause instanceof ApiClientError && cause.retryable ? message : ''
-  } finally { session.chatStatus = 'idle' }
+  } finally { session.chatStatus = 'idle'; draftRaw.value = ''; streamStage.value = '' }
 }
 
 // 提示词只负责提交，不回填输入框：回填会在提交后留下上一轮文本。
@@ -57,7 +73,8 @@ function handleFeedback(messageId: string, payload: { type: 'helpful' | 'unhelpf
     <div v-if="readinessMessage" class="readiness-panel" :class="{ danger: session.apiReachability === 'unavailable' || session.knowledgeBaseListState === 'error' }"><strong>{{ session.canQueryActiveKnowledgeBase ? '当前手册可查询' : '当前手册不可查询' }}</strong><p>{{ readinessMessage }}</p><RouterLink v-if="session.hasAdminAccess && session.knowledgeBaseListState === 'empty'" to="/admin/knowledge-bases">进入知识库管理</RouterLink></div>
     <div v-if="isEmpty" class="empty-state"><div class="empty-copy"><span class="empty-index mono">01 / ASK THE MANUAL</span><h2>从一个现场问题开始</h2><p>选择下方高频问题，或描述你看到的设备现象。回答会把结论、操作步骤和注意事项分开呈现。</p></div><HighFrequencyPrompts @submit="handlePrompt" /></div>
     <ChatTimeline v-else :messages="session.messages" @select-citation="selectCitation" @retry="submitQuestion" @feedback="handleFeedback" />
-    <div v-if="session.chatStatus === 'loading'" class="loading-row" role="status"><span class="loading-dot" />正在检索当前手册并核对证据…</div>
+    <div v-if="session.chatStatus === 'loading'" class="loading-row" role="status"><span class="loading-dot" />{{ streamStage === 'generating' ? '正在生成回答，完成后核对引用…' : '正在检索当前手册…' }}</div>
+    <div v-if="draft" class="draft-answer" aria-live="polite"><span class="draft-flag">生成中 · 未校验</span><p>{{ draft }}</p></div>
     <ChatComposer :disabled="session.chatStatus === 'loading' || !session.canQueryActiveKnowledgeBase" :error="error || readinessMessage" @submit="submitQuestion" />
     <p class="scope-note">当前范围：离心泵知识问答 · 只读图谱 · 管理功能需要单独验证</p>
     <EvidenceDrawer :visible="Boolean(selectedCitationId)" :evidence="selectedEvidence" :selected-citation-id="selectedCitationId" @close="selectedCitationId = null" @select="selectedCitationId = $event" />
@@ -65,5 +82,5 @@ function handleFeedback(messageId: string, payload: { type: 'helpful' | 'unhelpf
 </template>
 
 <style scoped>
-.chat-view { max-width: 1180px; margin: 0 auto; } .chat-intro { display: flex; justify-content: space-between; align-items: end; gap: 30px; margin-bottom: 28px; } .eyebrow, .empty-index { color: var(--color-cobalt); font: 11px Bahnschrift, monospace; letter-spacing: .12em; } h1 { margin: 10px 0 8px; font-size: clamp(30px, 5vw, 54px); letter-spacing: -.06em; line-height: 1.12; } h1 em { color: var(--color-cobalt); font-style: normal; } .chat-intro p, .empty-copy p { max-width: 570px; margin: 0; color: var(--color-muted); line-height: 1.7; } .intro-mark { display: grid; place-items: center; width: 86px; height: 86px; border: 1px solid #b9cdf3; border-radius: 50%; color: var(--color-cobalt); background: var(--color-cobalt-soft); text-align: center; transform: rotate(-9deg); } .intro-mark span { font-size: 25px; } .intro-mark small { font: 9px Bahnschrift, monospace; letter-spacing: .12em; } .readiness-panel { margin: 0 0 18px; padding: 14px 16px; border: 1px solid #f1d294; border-left: 3px solid var(--color-amber); border-radius: 7px; background: var(--color-amber-soft); line-height: 1.6; } .readiness-panel.danger { border-color: #f4c5bf; border-left-color: var(--color-danger); background: #fff0ee; } .readiness-panel p { margin: 4px 0 0; color: var(--color-muted); } .readiness-panel a { display: inline-flex; margin-top: 9px; color: var(--color-cobalt); font-weight: 700; } .empty-state { margin-bottom: 26px; } .empty-copy { margin-bottom: 22px; } .empty-copy h2 { margin: 7px 0 7px; font-size: 22px; } .loading-row { display: flex; align-items: center; gap: 9px; margin: 13px 0; color: var(--color-cobalt); font-size: 13px; } .loading-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-cobalt); animation: pulse 1s infinite ease-in-out; } .scope-note { color: #8895a1; font-size: 11px; text-align: center; } @keyframes pulse { 50% { opacity: .3; transform: scale(.7); } } @media (max-width: 600px) { .chat-intro { align-items: start; } .intro-mark { width: 66px; height: 66px; flex: 0 0 auto; } }
+.chat-view { max-width: 1180px; margin: 0 auto; } .chat-intro { display: flex; justify-content: space-between; align-items: end; gap: 30px; margin-bottom: 28px; } .eyebrow, .empty-index { color: var(--color-cobalt); font: 11px Bahnschrift, monospace; letter-spacing: .12em; } h1 { margin: 10px 0 8px; font-size: clamp(30px, 5vw, 54px); letter-spacing: -.06em; line-height: 1.12; } h1 em { color: var(--color-cobalt); font-style: normal; } .chat-intro p, .empty-copy p { max-width: 570px; margin: 0; color: var(--color-muted); line-height: 1.7; } .intro-mark { display: grid; place-items: center; width: 86px; height: 86px; border: 1px solid #b9cdf3; border-radius: 50%; color: var(--color-cobalt); background: var(--color-cobalt-soft); text-align: center; transform: rotate(-9deg); } .intro-mark span { font-size: 25px; } .intro-mark small { font: 9px Bahnschrift, monospace; letter-spacing: .12em; } .readiness-panel { margin: 0 0 18px; padding: 14px 16px; border: 1px solid #f1d294; border-left: 3px solid var(--color-amber); border-radius: 7px; background: var(--color-amber-soft); line-height: 1.6; } .readiness-panel.danger { border-color: #f4c5bf; border-left-color: var(--color-danger); background: #fff0ee; } .readiness-panel p { margin: 4px 0 0; color: var(--color-muted); } .readiness-panel a { display: inline-flex; margin-top: 9px; color: var(--color-cobalt); font-weight: 700; } .empty-state { margin-bottom: 26px; } .empty-copy { margin-bottom: 22px; } .empty-copy h2 { margin: 7px 0 7px; font-size: 22px; } .loading-row { display: flex; align-items: center; gap: 9px; margin: 13px 0; color: var(--color-cobalt); font-size: 13px; } .loading-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-cobalt); animation: pulse 1s infinite ease-in-out; } .draft-answer { margin: 12px 0 4px; padding: 14px 16px; border: 1px dashed var(--color-line); border-radius: var(--radius-panel); color: var(--color-muted); background: repeating-linear-gradient(135deg, #fafbfc, #fafbfc 10px, #f4f6f8 10px, #f4f6f8 20px); } .draft-flag { display: inline-block; margin-bottom: 8px; padding: 1px 8px; border-radius: 999px; color: #8a6d1f; background: var(--color-amber-soft); font: 10px Bahnschrift, monospace; letter-spacing: .08em; } .draft-answer p { margin: 0; white-space: pre-wrap; line-height: 1.75; } .scope-note { color: #8895a1; font-size: 11px; text-align: center; } @keyframes pulse { 50% { opacity: .3; transform: scale(.7); } } @media (max-width: 600px) { .chat-intro { align-items: start; } .intro-mark { width: 66px; height: 66px; flex: 0 0 auto; } }
 </style>

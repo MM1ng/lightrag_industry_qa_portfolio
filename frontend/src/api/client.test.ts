@@ -50,4 +50,34 @@ describe('ApiClient', () => {
     await new ApiClient().submitFeedback({ request_id: 'req-1', feedback_type: 'helpful' })
     expect(fetchMock).toHaveBeenCalledWith('/v1/feedback', expect.objectContaining({ method: 'POST', body: JSON.stringify({ request_id: 'req-1', feedback_type: 'helpful' }) }))
   })
+
+  it('streams deltas and resolves the validated final payload', async () => {
+    const frames = [
+      { type: 'stage', stage: 'retrieving' },
+      { type: 'delta', text: '结论：' },
+      { type: 'delta', text: '请先停机。' },
+      { type: 'final', payload: { request_id: 'r1', status: 'success', answer: '结论：请先停机。', citations: [], claims: [], evidence: [], latency_ms: 12 } },
+    ]
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join(''), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
+
+    const stages: string[] = []
+    let preview = ''
+    const result = await new ApiClient().queryKnowledgeBaseStream('kb-1', '问题', [], {
+      onStage: (stage) => stages.push(stage),
+      onDelta: (text) => { preview += text },
+    })
+
+    expect(stages).toEqual(['retrieving'])
+    expect(preview).toBe('结论：请先停机。')
+    expect(result.answer).toBe('结论：请先停机。')
+  })
+
+  it('turns a streamed error frame into a retryable client error', async () => {
+    const frames = [{ type: 'error', code: 'QA_TIMEOUT', message: '问答请求超时，请稍后重试。' }]
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join(''), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
+
+    await expect(
+      new ApiClient().queryKnowledgeBaseStream('kb-1', '问题', []),
+    ).rejects.toMatchObject({ code: 'QA_TIMEOUT', retryable: true } satisfies Partial<ApiClientError>)
+  })
 })

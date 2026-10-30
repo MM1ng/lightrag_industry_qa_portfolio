@@ -8,6 +8,21 @@ import { useSessionStore } from '../../app/stores/session'
 const result = { request_id: 'request-1', status: 'success', answer: '结论\n\n请先停机。', citations: [], claims: [], evidence: [], latency_ms: 19 }
 const kb = { id: 'kb-1', name: 'KB', status: 'ready', document_count: 1, active_document_count: 1 }
 
+
+function sseResponse(frames: unknown[]): Response {
+  const body = frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join('')
+  return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+}
+
+function sseFinal(payload: unknown): Response {
+  return sseResponse([
+    { type: 'stage', stage: 'retrieving' },
+    { type: 'stage', stage: 'generating' },
+    { type: 'delta', text: '结论' },
+    { type: 'final', payload },
+  ])
+}
+
 beforeEach(() => { setActivePinia(createPinia()); vi.restoreAllMocks() })
 
 function readyStore() {
@@ -27,21 +42,33 @@ describe('chat workbench', () => {
   })
 
   it('locks the composer while loading and renders the returned answer', async () => {
-    let resolvePending!: (response: Response) => void
-    const pending = new Promise<Response>((resolve) => { resolvePending = resolve })
-    vi.spyOn(globalThis, 'fetch').mockReturnValue(pending)
+    let push!: (chunk: string) => void
+    let close!: () => void
+    const body = new ReadableStream({
+      start(controller) {
+        push = (chunk) => controller.enqueue(new TextEncoder().encode(chunk))
+        close = () => controller.close()
+      },
+    })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
     readyStore()
     const wrapper = mount(ChatView)
     await wrapper.get('textarea').setValue('泵为什么振动？')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.get('textarea').attributes('disabled')).toBeDefined()
-    resolvePending(new Response(JSON.stringify(result), { status: 200 }))
+
+    push(`data: ${JSON.stringify({ type: 'delta', text: '结论：' })}\n\n`)
+    await vi.waitFor(() => expect(wrapper.text()).toContain('生成中 · 未校验'))
+    push(`data: ${JSON.stringify({ type: 'final', payload: result })}\n\n`)
+    close()
+
     await vi.waitFor(() => expect(wrapper.text()).toContain('请先停机。'))
     expect(wrapper.text()).toContain('可执行回答')
+    expect(wrapper.text()).not.toContain('生成中 · 未校验')
   })
 
   it('clears the composer after submitting a high-frequency prompt', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(result), { status: 200 }))
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(sseFinal(result))
     readyStore()
     const wrapper = mount(ChatView)
     await wrapper.findComponent(HighFrequencyPrompts).get('button').trigger('click')
@@ -50,17 +77,18 @@ describe('chat workbench', () => {
   })
 
   it('clears the typed question after submitting', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(result), { status: 200 }))
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(sseFinal(result))
     readyStore()
     const wrapper = mount(ChatView)
     await wrapper.get('textarea').setValue('泵为什么振动？')
     await wrapper.get('form').trigger('submit')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('请先停机。'))
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
   })
 
   it('renders insufficient evidence and preserves the retry question', async () => {
     const insufficient = { ...result, status: 'insufficient_evidence', answer: '当前手册没有足够证据。' }
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(insufficient), { status: 200 }))
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(sseFinal(insufficient))
     const store = readyStore()
     const wrapper = mount(ChatView)
     await wrapper.get('textarea').setValue('特殊问题')

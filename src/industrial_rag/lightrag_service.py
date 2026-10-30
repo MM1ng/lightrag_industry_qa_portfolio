@@ -140,6 +140,7 @@ class LightRAGBackend(Protocol):
         system_prompt: str,
         *,
         response_format: dict[str, str] | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> str: ...
 
 
@@ -188,12 +189,35 @@ class _OfficialBackend:
         system_prompt: str,
         *,
         response_format: dict[str, str] | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> str:
+        """Generate one answer.
+
+        When ``on_delta`` is provided the upstream model is asked to stream and
+        every fragment is reported as it arrives.  The validated answer is still
+        built from the complete text: citation grounding needs the whole answer,
+        so the fragments are a preview, not the result.
+        """
         options = {"response_format": response_format} if response_format else {}
-        result = await self._llm_model_func(question, system_prompt=system_prompt, **options)
-        if not isinstance(result, str):
-            raise RuntimeError("LightRAG LLM returned a streaming response unexpectedly")
-        return result
+        if on_delta is None:
+            result = await self._llm_model_func(question, system_prompt=system_prompt, **options)
+            if not isinstance(result, str):
+                raise RuntimeError("LightRAG LLM returned a streaming response unexpectedly")
+            return result
+        stream = await self._llm_model_func(
+            question, system_prompt=system_prompt, stream=True, **options
+        )
+        if isinstance(stream, str):
+            if stream:
+                on_delta(stream)
+            return stream
+        pieces: list[str] = []
+        async for chunk in stream:
+            text = chunk if isinstance(chunk, str) else ""
+            if text:
+                pieces.append(text)
+                on_delta(text)
+        return "".join(pieces)
 
 
 def _register_project_qdrant_storage() -> None:
@@ -843,6 +867,7 @@ class LightRAGService:
         mode: QueryMode = "mix",
         top_k: int = 12,
         chunk_top_k: int = 20,
+        on_delta: Callable[[str], None] | None = None,
     ) -> QueryResult:
         if not self._initialized:
             raise RuntimeError("LightRAG 尚未初始化")
@@ -1160,6 +1185,9 @@ class LightRAGService:
             )
         )
         requirement_registry = RequirementRegistry.from_requirements(coverage_requirements)
+        # Only pass the callback when streaming was requested: third-party
+        # backends implement the protocol without it.
+        generate_kwargs: dict[str, Any] = {} if on_delta is None else {"on_delta": on_delta}
         structured_decision: StructuredCitationDecision | None = None
         structured_forced_status: Literal["insufficient_evidence"] | None = None
         backend_generate_call_count = 1
@@ -1173,6 +1201,7 @@ class LightRAGService:
                     context,
                     system_prompt,
                     response_format={"type": "json_object"},
+                    **generate_kwargs,
                 )
             ).strip()
             structured_decision = validate_structured_citation_output(
@@ -1189,7 +1218,9 @@ class LightRAGService:
                     "未覆盖内容必须明确说明，不得补充常识或推断。\n"
                 )
             answer = (
-                await self._backend.generate(normalized_question, context, system_prompt)
+                await self._backend.generate(
+                    normalized_question, context, system_prompt, **generate_kwargs
+                )
             ).strip()
         if not answer:
             audit = (

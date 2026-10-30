@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal, Protocol
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, StringConstraints
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
@@ -563,14 +565,22 @@ _INSECURE_LOCAL_DEV_TRUE = frozenset({"1", "true", "yes", "on"})
 _FEEDBACK_PATH = "/v1/feedback"
 
 
-def _is_public_kb_query_path(path: str) -> bool:
-    """Match exactly ``/v1/knowledge-bases/{kb_id}/query`` with a non-empty id."""
+_PUBLIC_QUERY_LEAVES = frozenset({"query", "stream"})
 
-    if not path.startswith(_KB_ROUTE_PREFIX) or not path.endswith("/query"):
+
+def _is_public_kb_query_path(path: str) -> bool:
+    """Match ``/v1/knowledge-bases/{kb_id}/query`` and its streaming sibling.
+
+    ``/query/stream`` is the SSE variant of the same read; both must stay on the
+    anonymous allowlist or the browser workbench cannot ask a question at all.
+    """
+
+    if not path.startswith(_KB_ROUTE_PREFIX):
         return False
-    remainder = path[len(_KB_ROUTE_PREFIX) :]
-    segments = [segment for segment in remainder.split("/") if segment]
-    return len(segments) == 2 and segments[1] == "query"
+    segments = [segment for segment in path[len(_KB_ROUTE_PREFIX) :].split("/") if segment]
+    if len(segments) == 2:
+        return segments[1] == "query"
+    return len(segments) == 3 and segments[1] == "query" and segments[2] in _PUBLIC_QUERY_LEAVES
 
 
 def _is_public_kb_graph_path(path: str) -> bool:
@@ -834,6 +844,76 @@ def _record_response_status(status_code: int) -> None:
 
     operational_metrics.increment("http_request_total")
     operational_metrics.increment(f"http_status_{status_code}_total")
+
+
+# ---------------------------------------------------------------------------
+# Server-sent events for the streaming query
+# ---------------------------------------------------------------------------
+
+_SSE_POLL_SECONDS = 0.1
+_SSE_KEEPALIVE_SECONDS = 15.0
+
+
+def _sse_event(payload: Mapping[str, Any]) -> bytes:
+    """Encode one server-sent event frame."""
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n".encode()
+
+
+async def _query_event_stream(
+    runner: Callable[[Callable[[str], None]], Awaitable[dict[str, Any]]],
+) -> AsyncIterator[bytes]:
+    """Relay a query as SSE: stage, then deltas, then the validated payload.
+
+    The deltas are a *preview*.  Citation grounding needs the complete answer, so
+    the only authoritative result is the ``final`` event — it carries exactly the
+    payload the non-streaming endpoint returns, including an
+    ``insufficient_evidence`` verdict when the answer cannot be grounded.  The
+    client is expected to replace the preview with it.
+    """
+
+    events: asyncio.Queue[str] = asyncio.Queue()
+
+    def _on_delta(text: str) -> None:
+        if text:
+            events.put_nowait(text)
+
+    task = asyncio.create_task(runner(_on_delta))
+    yield _sse_event({"type": "stage", "stage": "retrieving"})
+    generating = False
+    last_keepalive = time.monotonic()
+    while True:
+        if task.done() and events.empty():
+            break
+        try:
+            text = await asyncio.wait_for(events.get(), timeout=_SSE_POLL_SECONDS)
+        except TimeoutError:
+            if time.monotonic() - last_keepalive >= _SSE_KEEPALIVE_SECONDS:
+                last_keepalive = time.monotonic()
+                yield b": keep-alive\n\n"
+            continue
+        if not generating:
+            generating = True
+            yield _sse_event({"type": "stage", "stage": "generating"})
+        yield _sse_event({"type": "delta", "text": text})
+    try:
+        payload = await task
+    except AppError as error:
+        code = getattr(error.code, "value", str(error.code))
+        yield _sse_event(
+            {"type": "error", "code": code, "message": error.message}
+        )
+        return
+    except Exception:
+        logger.exception("streaming query failed")
+        yield _sse_event(
+            {
+                "type": "error",
+                "code": "INTERNAL_ERROR",
+                "message": "查询没有完成，请稍后重试。",
+            }
+        )
+        return
+    yield _sse_event({"type": "final", "payload": payload})
 
 
 # ---------------------------------------------------------------------------
@@ -1388,6 +1468,7 @@ def create_app(
         *,
         generation_id: str | None = None,
         background_tasks: BackgroundTasks | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> QueryResponse | JSONResponse:
         request_id = _request_id_for(request)
         trace_id = _trace_id_for(request)
@@ -1432,7 +1513,10 @@ def create_app(
                 )
                 if generation_id is None:
                     execution = await service.query_active(
-                        kb_id, payload.query, history=[item.model_dump() for item in payload.history]
+                        kb_id,
+                        payload.query,
+                        history=[item.model_dump() for item in payload.history],
+                        on_delta=on_delta,
                     )
                 else:
                     execution = await service.query_generation(
@@ -1443,6 +1527,7 @@ def create_app(
                         disable_llm_cache=(
                             request.headers.get("x-validation-disable-llm-cache") == "1"
                         ),
+                        on_delta=on_delta,
                     )
         except AppError as error:
             if error.code == "index_not_ready":
@@ -1564,6 +1649,37 @@ def create_app(
     ) -> QueryResponse | JSONResponse:
         return await _execute_kb_query(
             kb_id, payload, request, background_tasks=background_tasks
+        )
+
+    @application.post("/v1/knowledge-bases/{kb_id}/query/stream")
+    async def query_kb_stream(
+        kb_id: str,
+        payload: QueryRequest,
+        request: Request,
+        background_tasks: BackgroundTasks,
+    ) -> StreamingResponse:
+        """Same query as ``/query``, delivered as server-sent events.
+
+        The deltas are an unvalidated preview of the answer; the ``final`` event
+        carries the same payload the non-streaming endpoint returns.
+        """
+
+        async def _runner(on_delta: Callable[[str], None]) -> dict[str, Any]:
+            response = await _execute_kb_query(
+                kb_id,
+                payload,
+                request,
+                background_tasks=background_tasks,
+                on_delta=on_delta,
+            )
+            if isinstance(response, JSONResponse):
+                return {"error": json.loads(response.body)}
+            return jsonable_encoder(response)
+
+        return StreamingResponse(
+            _query_event_stream(_runner),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
     @application.post(
