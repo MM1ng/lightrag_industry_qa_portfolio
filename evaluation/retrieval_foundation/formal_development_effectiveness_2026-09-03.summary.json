@@ -1,0 +1,5555 @@
+{
+  "status": "PASS_TO_DOWNSTREAM",
+  "final_status": "PASS_TO_DOWNSTREAM",
+  "downstream_qa_allowed": true,
+  "scope": "development_only",
+  "sample_size": 24,
+  "sample_size_limitation": true,
+  "question_ids": [
+    "S014",
+    "S015",
+    "S006",
+    "S003",
+    "S016",
+    "S011",
+    "D-V2-001",
+    "D-V2-002",
+    "D-V2-003",
+    "D-V2-004",
+    "D-V2-005",
+    "D-V2-006",
+    "D-V2-007",
+    "D-V2-008",
+    "D-V2-009",
+    "D-V2-010",
+    "D-V2-011",
+    "D-V2-012",
+    "D-V2-013",
+    "D-V2-014",
+    "D-V2-015",
+    "D-V2-016",
+    "D-V2-017",
+    "D-V2-018"
+  ],
+  "generation": {
+    "generation_id": "dev-v2-20260902",
+    "child_manifest_hash": "b1a6334f6e725591e5d796f318e76d3eb77c46fa8c8cc3f6342dc850ad77d1e0",
+    "corpus_fingerprint": "ed7bf1da6aab63a7afcf88c21480c6e987d231b9de65de2dd0977ce4b4e60e68",
+    "chunk_count": 453
+  },
+  "variant_configs": {
+    "A0_lightrag": {
+      "sparse_enabled": false,
+      "rrf_enabled": false,
+      "reranker_enabled": false
+    },
+    "A1_lightrag_bm25_rrf": {
+      "sparse_enabled": true,
+      "rrf_enabled": true,
+      "reranker_enabled": false
+    },
+    "A2_lightrag_bm25_rrf_reranker": {
+      "sparse_enabled": true,
+      "rrf_enabled": true,
+      "reranker_enabled": true
+    }
+  },
+  "metrics": {
+    "A0_lightrag": {
+      "overall": {
+        "n": 24,
+        "recall@5": 0.5510416666666667,
+        "recall@10": 0.5979166666666667,
+        "mrr@5": 0.6055555555555555,
+        "mrr@10": 0.6097222222222222,
+        "question_hit@5": 0.6666666666666666,
+        "question_hit@10": 0.7083333333333334,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5416666666666666
+      },
+      "parameter": {
+        "n": 4,
+        "recall@5": 0.725,
+        "recall@10": 0.725,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "difficulty=EASY": {
+        "n": 5,
+        "recall@5": 0.58,
+        "recall@10": 0.58,
+        "mrr@5": 0.64,
+        "mrr@10": 0.64,
+        "question_hit@5": 0.8,
+        "question_hit@10": 0.8,
+        "complete_evidence_coverage@5": 0.4,
+        "complete_evidence_coverage@10": 0.4
+      },
+      "source_document=doc-4ffb6df91a9a": {
+        "n": 15,
+        "recall@5": 0.48166666666666663,
+        "recall@10": 0.5566666666666666,
+        "mrr@5": 0.5688888888888889,
+        "mrr@10": 0.5755555555555555,
+        "question_hit@5": 0.6666666666666666,
+        "question_hit@10": 0.7333333333333333,
+        "complete_evidence_coverage@5": 0.4,
+        "complete_evidence_coverage@10": 0.4666666666666667
+      },
+      "evidence_pattern=multi_evidence": {
+        "n": 7,
+        "recall@5": 0.17500000000000002,
+        "recall@10": 0.19285714285714287,
+        "mrr@5": 0.5714285714285714,
+        "mrr@10": 0.5714285714285714,
+        "question_hit@5": 0.5714285714285714,
+        "question_hit@10": 0.5714285714285714,
+        "complete_evidence_coverage@5": 0.0,
+        "complete_evidence_coverage@10": 0.0
+      },
+      "question_type=parameter": {
+        "n": 4,
+        "recall@5": 0.725,
+        "recall@10": 0.725,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "fault_handling": {
+        "n": 3,
+        "recall@5": 0.06666666666666667,
+        "recall@10": 0.06666666666666667,
+        "mrr@5": 0.3333333333333333,
+        "mrr@10": 0.3333333333333333,
+        "question_hit@5": 0.3333333333333333,
+        "question_hit@10": 0.3333333333333333,
+        "complete_evidence_coverage@5": 0.0,
+        "complete_evidence_coverage@10": 0.0
+      },
+      "difficulty=MEDIUM": {
+        "n": 11,
+        "recall@5": 0.5636363636363636,
+        "recall@10": 0.6545454545454545,
+        "mrr@5": 0.5757575757575757,
+        "mrr@10": 0.5848484848484848,
+        "question_hit@5": 0.6363636363636364,
+        "question_hit@10": 0.7272727272727273,
+        "complete_evidence_coverage@5": 0.5454545454545454,
+        "complete_evidence_coverage@10": 0.6363636363636364
+      },
+      "question_type=fault_handling": {
+        "n": 3,
+        "recall@5": 0.06666666666666667,
+        "recall@10": 0.06666666666666667,
+        "mrr@5": 0.3333333333333333,
+        "mrr@10": 0.3333333333333333,
+        "question_hit@5": 0.3333333333333333,
+        "question_hit@10": 0.3333333333333333,
+        "complete_evidence_coverage@5": 0.0,
+        "complete_evidence_coverage@10": 0.0
+      },
+      "installation_debugging": {
+        "n": 2,
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "mrr@5": 0.5,
+        "mrr@10": 0.5,
+        "question_hit@5": 0.5,
+        "question_hit@10": 0.5,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "question_type=installation_debugging": {
+        "n": 2,
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "mrr@5": 0.5,
+        "mrr@10": 0.5,
+        "question_hit@5": 0.5,
+        "question_hit@10": 0.5,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "procedure": {
+        "n": 3,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.75,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "difficulty=HARD": {
+        "n": 8,
+        "recall@5": 0.515625,
+        "recall@10": 0.53125,
+        "mrr@5": 0.625,
+        "mrr@10": 0.625,
+        "question_hit@5": 0.625,
+        "question_hit@10": 0.625,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "question_type=procedure": {
+        "n": 3,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.75,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "evidence_pattern=adjacent_chunk_evidence": {
+        "n": 1,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "evidence_pattern=table_structured": {
+        "n": 3,
+        "recall@5": 0.6666666666666666,
+        "recall@10": 0.6666666666666666,
+        "mrr@5": 0.4444444444444444,
+        "mrr@10": 0.4444444444444444,
+        "question_hit@5": 0.6666666666666666,
+        "question_hit@10": 0.6666666666666666,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "maintenance": {
+        "n": 5,
+        "recall@5": 0.8,
+        "recall@10": 0.8,
+        "mrr@5": 0.5066666666666666,
+        "mrr@10": 0.5066666666666666,
+        "question_hit@5": 0.8,
+        "question_hit@10": 0.8,
+        "complete_evidence_coverage@5": 0.8,
+        "complete_evidence_coverage@10": 0.8
+      },
+      "question_type=maintenance": {
+        "n": 5,
+        "recall@5": 0.8,
+        "recall@10": 0.8,
+        "mrr@5": 0.5066666666666666,
+        "mrr@10": 0.5066666666666666,
+        "question_hit@5": 0.8,
+        "question_hit@10": 0.8,
+        "complete_evidence_coverage@5": 0.8,
+        "complete_evidence_coverage@10": 0.8
+      },
+      "evidence_pattern=single_evidence": {
+        "n": 13,
+        "recall@5": 0.6923076923076923,
+        "recall@10": 0.7692307692307693,
+        "mrr@5": 0.6307692307692307,
+        "mrr@10": 0.6384615384615385,
+        "question_hit@5": 0.6923076923076923,
+        "question_hit@10": 0.7692307692307693,
+        "complete_evidence_coverage@5": 0.6923076923076923,
+        "complete_evidence_coverage@10": 0.7692307692307693
+      },
+      "safety_warning_limit": {
+        "n": 3,
+        "recall@5": 0.3333333333333333,
+        "recall@10": 0.6666666666666666,
+        "mrr@5": 0.3333333333333333,
+        "mrr@10": 0.3666666666666667,
+        "question_hit@5": 0.3333333333333333,
+        "question_hit@10": 0.6666666666666666,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "question_type=safety_warning_limit": {
+        "n": 3,
+        "recall@5": 0.3333333333333333,
+        "recall@10": 0.6666666666666666,
+        "mrr@5": 0.3333333333333333,
+        "mrr@10": 0.3666666666666667,
+        "question_hit@5": 0.3333333333333333,
+        "question_hit@10": 0.6666666666666666,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "component_structure": {
+        "n": 2,
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr@5": 0.0,
+        "mrr@10": 0.0,
+        "question_hit@5": 0.0,
+        "question_hit@10": 0.0,
+        "complete_evidence_coverage@5": 0.0,
+        "complete_evidence_coverage@10": 0.0
+      },
+      "question_type=component_structure": {
+        "n": 2,
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "mrr@5": 0.0,
+        "mrr@10": 0.0,
+        "question_hit@5": 0.0,
+        "question_hit@10": 0.0,
+        "complete_evidence_coverage@5": 0.0,
+        "complete_evidence_coverage@10": 0.0
+      },
+      "condition_prerequisite": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=condition_prerequisite": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "source_document=doc-6a9ea3ff1f42": {
+        "n": 9,
+        "recall@5": 0.6666666666666666,
+        "recall@10": 0.6666666666666666,
+        "mrr@5": 0.6666666666666666,
+        "mrr@10": 0.6666666666666666,
+        "question_hit@5": 0.6666666666666666,
+        "question_hit@10": 0.6666666666666666,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      }
+    },
+    "A1_lightrag_bm25_rrf": {
+      "overall": {
+        "n": 24,
+        "recall@5": 0.6635416666666667,
+        "recall@10": 0.7760416666666666,
+        "mrr@5": 0.7166666666666667,
+        "mrr@10": 0.7282407407407406,
+        "question_hit@5": 0.8333333333333334,
+        "question_hit@10": 0.9166666666666666,
+        "complete_evidence_coverage@5": 0.5833333333333334,
+        "complete_evidence_coverage@10": 0.7083333333333334
+      },
+      "parameter": {
+        "n": 4,
+        "recall@5": 0.725,
+        "recall@10": 0.725,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "difficulty=EASY": {
+        "n": 5,
+        "recall@5": 0.58,
+        "recall@10": 0.58,
+        "mrr@5": 0.7,
+        "mrr@10": 0.7,
+        "question_hit@5": 0.8,
+        "question_hit@10": 0.8,
+        "complete_evidence_coverage@5": 0.4,
+        "complete_evidence_coverage@10": 0.4
+      },
+      "source_document=doc-4ffb6df91a9a": {
+        "n": 15,
+        "recall@5": 0.5616666666666668,
+        "recall@10": 0.6416666666666667,
+        "mrr@5": 0.6799999999999999,
+        "mrr@10": 0.691111111111111,
+        "question_hit@5": 0.8,
+        "question_hit@10": 0.8666666666666667,
+        "complete_evidence_coverage@5": 0.4666666666666667,
+        "complete_evidence_coverage@10": 0.5333333333333333
+      },
+      "evidence_pattern=multi_evidence": {
+        "n": 7,
+        "recall@5": 0.275,
+        "recall@10": 0.375,
+        "mrr@5": 0.7857142857142857,
+        "mrr@10": 0.7857142857142857,
+        "question_hit@5": 0.8571428571428571,
+        "question_hit@10": 0.8571428571428571,
+        "complete_evidence_coverage@5": 0.0,
+        "complete_evidence_coverage@10": 0.14285714285714285
+      },
+      "question_type=parameter": {
+        "n": 4,
+        "recall@5": 0.725,
+        "recall@10": 0.725,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "fault_handling": {
+        "n": 3,
+        "recall@5": 0.4666666666666666,
+        "recall@10": 0.5333333333333333,
+        "mrr@5": 0.8333333333333334,
+        "mrr@10": 0.8333333333333334,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 0.3333333333333333
+      },
+      "difficulty=MEDIUM": {
+        "n": 11,
+        "recall@5": 0.5818181818181819,
+        "recall@10": 0.7818181818181817,
+        "mrr@5": 0.6818181818181818,
+        "mrr@10": 0.707070707070707,
+        "question_hit@5": 0.7272727272727273,
+        "question_hit@10": 0.9090909090909091,
+        "complete_evidence_coverage@5": 0.5454545454545454,
+        "complete_evidence_coverage@10": 0.7272727272727273
+      },
+      "question_type=fault_handling": {
+        "n": 3,
+        "recall@5": 0.4666666666666666,
+        "recall@10": 0.5333333333333333,
+        "mrr@5": 0.8333333333333334,
+        "mrr@10": 0.8333333333333334,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 0.3333333333333333
+      },
+      "installation_debugging": {
+        "n": 2,
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "mrr@5": 0.5,
+        "mrr@10": 0.5,
+        "question_hit@5": 0.5,
+        "question_hit@10": 0.5,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "question_type=installation_debugging": {
+        "n": 2,
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "mrr@5": 0.5,
+        "mrr@10": 0.5,
+        "question_hit@5": 0.5,
+        "question_hit@10": 0.5,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "procedure": {
+        "n": 3,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.7083333333333334,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "difficulty=HARD": {
+        "n": 8,
+        "recall@5": 0.828125,
+        "recall@10": 0.890625,
+        "mrr@5": 0.775,
+        "mrr@10": 0.775,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.75,
+        "complete_evidence_coverage@10": 0.875
+      },
+      "question_type=procedure": {
+        "n": 3,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.7083333333333334,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "evidence_pattern=adjacent_chunk_evidence": {
+        "n": 1,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "evidence_pattern=table_structured": {
+        "n": 3,
+        "recall@5": 0.6666666666666666,
+        "recall@10": 0.6666666666666666,
+        "mrr@5": 0.5,
+        "mrr@10": 0.5,
+        "question_hit@5": 0.6666666666666666,
+        "question_hit@10": 0.6666666666666666,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "maintenance": {
+        "n": 5,
+        "recall@5": 0.8,
+        "recall@10": 1.0,
+        "mrr@5": 0.6,
+        "mrr@10": 0.6222222222222222,
+        "question_hit@5": 0.8,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.8,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=maintenance": {
+        "n": 5,
+        "recall@5": 0.8,
+        "recall@10": 1.0,
+        "mrr@5": 0.6,
+        "mrr@10": 0.6222222222222222,
+        "question_hit@5": 0.8,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.8,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "evidence_pattern=single_evidence": {
+        "n": 13,
+        "recall@5": 0.8461538461538461,
+        "recall@10": 1.0,
+        "mrr@5": 0.7076923076923076,
+        "mrr@10": 0.729059829059829,
+        "question_hit@5": 0.8461538461538461,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.8461538461538461,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "safety_warning_limit": {
+        "n": 3,
+        "recall@5": 0.5,
+        "recall@10": 1.0,
+        "mrr@5": 0.5,
+        "mrr@10": 0.5555555555555555,
+        "question_hit@5": 0.6666666666666666,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=safety_warning_limit": {
+        "n": 3,
+        "recall@5": 0.5,
+        "recall@10": 1.0,
+        "mrr@5": 0.5,
+        "mrr@10": 0.5555555555555555,
+        "question_hit@5": 0.6666666666666666,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "component_structure": {
+        "n": 2,
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "mrr@5": 0.1,
+        "mrr@10": 0.1,
+        "question_hit@5": 0.5,
+        "question_hit@10": 0.5,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "question_type=component_structure": {
+        "n": 2,
+        "recall@5": 0.5,
+        "recall@10": 0.5,
+        "mrr@5": 0.1,
+        "mrr@10": 0.1,
+        "question_hit@5": 0.5,
+        "question_hit@10": 0.5,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "condition_prerequisite": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=condition_prerequisite": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "source_document=doc-6a9ea3ff1f42": {
+        "n": 9,
+        "recall@5": 0.8333333333333334,
+        "recall@10": 1.0,
+        "mrr@5": 0.7777777777777778,
+        "mrr@10": 0.7901234567901234,
+        "question_hit@5": 0.8888888888888888,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.7777777777777778,
+        "complete_evidence_coverage@10": 1.0
+      }
+    },
+    "A2_lightrag_bm25_rrf_reranker": {
+      "overall": {
+        "n": 24,
+        "recall@5": 0.8177083333333334,
+        "recall@10": 0.8312499999999999,
+        "mrr@5": 0.8937499999999999,
+        "mrr@10": 0.8937499999999999,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.75,
+        "complete_evidence_coverage@10": 0.75
+      },
+      "parameter": {
+        "n": 4,
+        "recall@5": 0.725,
+        "recall@10": 0.725,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "difficulty=EASY": {
+        "n": 5,
+        "recall@5": 0.78,
+        "recall@10": 0.78,
+        "mrr@5": 0.75,
+        "mrr@10": 0.75,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6,
+        "complete_evidence_coverage@10": 0.6
+      },
+      "source_document=doc-4ffb6df91a9a": {
+        "n": 15,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.73,
+        "mrr@5": 0.83,
+        "mrr@10": 0.83,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6,
+        "complete_evidence_coverage@10": 0.6
+      },
+      "evidence_pattern=multi_evidence": {
+        "n": 7,
+        "recall@5": 0.375,
+        "recall@10": 0.42142857142857143,
+        "mrr@5": 0.8857142857142858,
+        "mrr@10": 0.8857142857142858,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.14285714285714285,
+        "complete_evidence_coverage@10": 0.14285714285714285
+      },
+      "question_type=parameter": {
+        "n": 4,
+        "recall@5": 0.725,
+        "recall@10": 0.725,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "fault_handling": {
+        "n": 3,
+        "recall@5": 0.4666666666666666,
+        "recall@10": 0.5333333333333333,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 0.3333333333333333
+      },
+      "difficulty=MEDIUM": {
+        "n": 11,
+        "recall@5": 0.7818181818181817,
+        "recall@10": 0.8,
+        "mrr@5": 0.8818181818181817,
+        "mrr@10": 0.8818181818181817,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.7272727272727273,
+        "complete_evidence_coverage@10": 0.7272727272727273
+      },
+      "question_type=fault_handling": {
+        "n": 3,
+        "recall@5": 0.4666666666666666,
+        "recall@10": 0.5333333333333333,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.3333333333333333,
+        "complete_evidence_coverage@10": 0.3333333333333333
+      },
+      "installation_debugging": {
+        "n": 2,
+        "recall@5": 0.6,
+        "recall@10": 0.6,
+        "mrr@5": 0.6,
+        "mrr@10": 0.6,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "question_type=installation_debugging": {
+        "n": 2,
+        "recall@5": 0.6,
+        "recall@10": 0.6,
+        "mrr@5": 0.6,
+        "mrr@10": 0.6,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.5,
+        "complete_evidence_coverage@10": 0.5
+      },
+      "procedure": {
+        "n": 3,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.75,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "difficulty=HARD": {
+        "n": 8,
+        "recall@5": 0.890625,
+        "recall@10": 0.90625,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.875,
+        "complete_evidence_coverage@10": 0.875
+      },
+      "question_type=procedure": {
+        "n": 3,
+        "recall@5": 0.7083333333333334,
+        "recall@10": 0.75,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 0.6666666666666666,
+        "complete_evidence_coverage@10": 0.6666666666666666
+      },
+      "evidence_pattern=adjacent_chunk_evidence": {
+        "n": 1,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "evidence_pattern=table_structured": {
+        "n": 3,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.75,
+        "mrr@10": 0.75,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "maintenance": {
+        "n": 5,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.9,
+        "mrr@10": 0.9,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=maintenance": {
+        "n": 5,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.9,
+        "mrr@10": 0.9,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "evidence_pattern=single_evidence": {
+        "n": 13,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.9230769230769231,
+        "mrr@10": 0.9230769230769231,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "safety_warning_limit": {
+        "n": 3,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.8333333333333334,
+        "mrr@10": 0.8333333333333334,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=safety_warning_limit": {
+        "n": 3,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.8333333333333334,
+        "mrr@10": 0.8333333333333334,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "component_structure": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.625,
+        "mrr@10": 0.625,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=component_structure": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 0.625,
+        "mrr@10": 0.625,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "condition_prerequisite": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "question_type=condition_prerequisite": {
+        "n": 2,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      },
+      "source_document=doc-6a9ea3ff1f42": {
+        "n": 9,
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "mrr@5": 1.0,
+        "mrr@10": 1.0,
+        "question_hit@5": 1.0,
+        "question_hit@10": 1.0,
+        "complete_evidence_coverage@5": 1.0,
+        "complete_evidence_coverage@10": 1.0
+      }
+    }
+  },
+  "latency": {
+    "A0_lightrag": {
+      "p50_ms": 2513.147549999985,
+      "p95_ms": 3935.187735000067
+    },
+    "A1_lightrag_bm25_rrf": {
+      "p50_ms": 2513.999399999875,
+      "p95_ms": 3935.833654999873
+    },
+    "A2_lightrag_bm25_rrf_reranker": {
+      "p50_ms": 3137.8493500003515,
+      "p95_ms": 4913.40257000038
+    },
+    "a2_incremental_over_a1_ms": {
+      "p50_ms": 623.8499500004764,
+      "p95_ms": 977.5689150005073
+    }
+  },
+  "reranker": {
+    "calls": 24,
+    "success_count": 23,
+    "provider": "aliyun_model_studio",
+    "model": "qwen3-rerank",
+    "timeout_seconds": 2.0,
+    "external_result_determinism": "not_guaranteed",
+    "fallback_count": 1,
+    "fallback_rate": 0.041666666666666664
+  },
+  "retrieval_config": {
+    "candidate_top_n": 20,
+    "final_top_k": 10,
+    "rrf_k": 60
+  },
+  "trace_integrity": {
+    "generation_id": "dev-v2-20260902",
+    "checked_candidates": true,
+    "invalid_chunk_ids": 0,
+    "invalid_ids": []
+  },
+  "delta_summary": {
+    "NO_MATERIAL_CHANGE": 14,
+    "RERANK_IMPROVEMENT": 8,
+    "SPARSE_RECOVERY": 5,
+    "RRF_IMPROVEMENT": 3
+  },
+  "tuning_applied": false,
+  "validation_or_holdout_accessed": false,
+  "experiment_metadata": {
+    "name": "Formal Development Retrieval Effectiveness Evaluation",
+    "run_type": "immutable_evaluation",
+    "timestamp_utc": "2026-09-03T01:12:52Z",
+    "tuning_applied": false,
+    "validation_or_holdout_accessed": false
+  },
+  "dataset_identity": {
+    "path": "D:\\基于Lightrag的工业手册问答系统\\lightrag_industry_qa_portfolio-retrieval-foundation-upgrade\\evaluation\\retrieval_foundation\\retrieval_foundation_dev_v2.jsonl",
+    "fingerprint": "deac5832de37a95f933267aba10e40215582f1136cd6a60dfabf2d9784385060",
+    "question_count": 24
+  },
+  "generation_identity": {
+    "generation_id": "dev-v2-20260902",
+    "corpus_fingerprint": "ed7bf1da6aab63a7afcf88c21480c6e987d231b9de65de2dd0977ce4b4e60e68",
+    "child_manifest_hash": "b1a6334f6e725591e5d796f318e76d3eb77c46fa8c8cc3f6342dc850ad77d1e0",
+    "child_count": 453,
+    "lexical_index_fingerprint": "6a1fd370918362422d7539f60265cf3992e06f1f9ddd5c69d9e8545c3d7f1c13"
+  },
+  "integrity_checks": {
+    "question_count": true,
+    "question_ids_unique": true,
+    "dataset_fingerprint": true,
+    "evidence_mapping_complete": true,
+    "development_only": true,
+    "manifest_status": true,
+    "generation_id": true,
+    "child_count": true,
+    "corpus_fingerprint": true,
+    "child_manifest_hash": true,
+    "light_rag_workspace": true,
+    "source_documents": true,
+    "lexical_index_identity": true,
+    "mapping_children_exist": true
+  },
+  "reranker_runtime": {
+    "provider": "aliyun_model_studio",
+    "model": "qwen3-rerank",
+    "calls": 23,
+    "success_count": 23,
+    "fallback_count": 0,
+    "fallback_rate": 0.0,
+    "p50_latency_ms": 0.594,
+    "p95_latency_ms": 0.8249,
+    "calls_detail": [
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "31df7e0581c96341a46fbcfe905f3e509e77cf0c42484fc1e375049a2206be33",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+          "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+          "cchunk-pymupdf-v1-24b95119c8293288-000",
+          "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+          "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+          "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+          "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+          "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+          "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+          "cchunk-pymupdf-v1-bab93a5364ff417d-000",
+          "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+          "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+          "cchunk-pymupdf-v1-ee489855cc2e58b6-000",
+          "cchunk-pymupdf-v1-632956904d49f35c-000",
+          "cchunk-pymupdf-v1-6d168c23d348a954-000",
+          "cchunk-pymupdf-v1-6e104741e64c1c12-000",
+          "cchunk-pymupdf-v1-9c7a8fb12ef237d6-000",
+          "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+          "cchunk-pymupdf-v1-084f0820fa6d6214-000",
+          "cchunk-pymupdf-v1-edd3a5315c0eeff3-000"
+        ],
+        "input_count": 20,
+        "request_id": "129c725b-cc27-9718-a001-7a168fd12430",
+        "response_hash": "1bd1c7cc5016c8db6441156f630cb1ad4ea46d8913be1d6c52eb19b93034756a",
+        "latency": 0.515,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+            "score": 0.9435541722360573
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "score": 0.8695242965753773
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+            "score": 0.8199325977534582
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+            "score": 0.7333258488192618
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+            "score": 0.7306813720068459
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-24b95119c8293288-000",
+            "score": 0.7021939288864161
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+            "score": 0.6785980991603975
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "score": 0.6513303881268349
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+            "score": 0.6141572283380151
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+            "score": 0.5969504366044877
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6d168c23d348a954-000",
+            "score": 0.5676674951696046
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ee489855cc2e58b6-000",
+            "score": 0.5239680921968263
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+            "score": 0.5045663275900525
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-084f0820fa6d6214-000",
+            "score": 0.4070818517336552
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bab93a5364ff417d-000",
+            "score": 0.3953514665171922
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-632956904d49f35c-000",
+            "score": 0.3447859903158791
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9c7a8fb12ef237d6-000",
+            "score": 0.33727798843612344
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+            "score": 0.335795119819268
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+            "score": 0.32309492432955134
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6e104741e64c1c12-000",
+            "score": 0.2834602737122164
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-24b95119c8293288-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6d168c23d348a954-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ee489855cc2e58b6-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-084f0820fa6d6214-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bab93a5364ff417d-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-632956904d49f35c-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9c7a8fb12ef237d6-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6e104741e64c1c12-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "d6bd0897acf75ba6aa761e228514c6b327c8dd3c985f0c97bbe2fe2ca6b6d629",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+          "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+          "cchunk-pymupdf-v1-fe809800f501116a-000",
+          "cchunk-pymupdf-v1-7227e2460f83a192-000",
+          "cchunk-pymupdf-v1-a29c091c7ffaf7d0-000",
+          "cchunk-pymupdf-v1-23747aac05fbe151-000",
+          "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+          "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+          "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+          "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+          "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+          "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+          "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+          "cchunk-pymupdf-v1-0d6e694179b30242-000",
+          "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+          "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+          "cchunk-pymupdf-v1-3de8aa9caa68e922-000",
+          "cchunk-pymupdf-v1-e538966686c111ea-000",
+          "cchunk-pymupdf-v1-80a3e97c382e29c8-000",
+          "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000"
+        ],
+        "input_count": 20,
+        "request_id": "9eb91e5d-edfb-9ffc-adec-2f04a493a6d0",
+        "response_hash": "134d8163fe9a807c2d45b32ec50b03e749a4d8f80c4352d604350c9100b3f567",
+        "latency": 0.469,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+            "score": 0.9195068564937097
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "score": 0.9081363678842169
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+            "score": 0.6916256704608892
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+            "score": 0.600865528141349
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+            "score": 0.5778067362995716
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+            "score": 0.5728789976643149
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+            "score": 0.5728789976643149
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+            "score": 0.5384955847805105
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+            "score": 0.48601170140241384
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+            "score": 0.45888961141045126
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+            "score": 0.4521281863532802
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "score": 0.44477069128274344
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+            "score": 0.4218215364876044
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a29c091c7ffaf7d0-000",
+            "score": 0.406893928992971
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3de8aa9caa68e922-000",
+            "score": 0.3919850438238606
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+            "score": 0.3624338484530493
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+            "score": 0.27949245678932977
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-80a3e97c382e29c8-000",
+            "score": 0.27234374655832627
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0d6e694179b30242-000",
+            "score": 0.2711754305780487
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-23747aac05fbe151-000",
+            "score": 0.2505760252381415
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0cc8c711a69b9bad-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a29c091c7ffaf7d0-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3de8aa9caa68e922-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-80a3e97c382e29c8-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0d6e694179b30242-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-23747aac05fbe151-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "1a74b232dcfbe32163af60b83e416c960df7585299caf038254b47e718a83b10",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+          "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+          "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+          "cchunk-pymupdf-v1-6f14788cb29e00e4-000",
+          "cchunk-pymupdf-v1-12d2db1366f00cb3-000",
+          "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+          "cchunk-pymupdf-v1-0746dbb63847a62a-000",
+          "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+          "cchunk-pymupdf-v1-72dc92e40727047d-000",
+          "cchunk-pymupdf-v1-f91f795e526170e8-000",
+          "cchunk-pymupdf-v1-01be0d79ca8b2087-000",
+          "cchunk-pymupdf-v1-cf44582c25e3be91-000",
+          "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+          "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+          "cchunk-pymupdf-v1-d2d1bfc9260c23a0-000",
+          "cchunk-pymupdf-v1-7227e2460f83a192-000",
+          "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+          "cchunk-pymupdf-v1-9c7a8fb12ef237d6-000",
+          "cchunk-pymupdf-v1-d376dd44adad266c-000",
+          "cchunk-pymupdf-v1-e538966686c111ea-000"
+        ],
+        "input_count": 20,
+        "request_id": "b8f510b5-0f9a-9664-b1ab-43c0c976e26e",
+        "response_hash": "d15d7865b7de2755e338d968afb616eb6dcb4e34e7b7cbcf6d88d17aa8cef9f7",
+        "latency": 0.562,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+            "score": 0.8707868287179481
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+            "score": 0.8437357596107948
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+            "score": 0.7907608822133712
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+            "score": 0.7702584837896922
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cf44582c25e3be91-000",
+            "score": 0.6968448873500385
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "score": 0.5486898453972772
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-72dc92e40727047d-000",
+            "score": 0.5341651321892503
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6f14788cb29e00e4-000",
+            "score": 0.4814435282095113
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+            "score": 0.46793823651656963
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+            "score": 0.45021560765216484
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "score": 0.42924709841617315
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+            "score": 0.4205825505480246
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d2d1bfc9260c23a0-000",
+            "score": 0.39029108518789596
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-01be0d79ca8b2087-000",
+            "score": 0.3881819437633014
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f91f795e526170e8-000",
+            "score": 0.37509105654521346
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-12d2db1366f00cb3-000",
+            "score": 0.35663662294280546
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "score": 0.33921884367273886
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+            "score": 0.33449038260766584
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0746dbb63847a62a-000",
+            "score": 0.3185981414599461
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9c7a8fb12ef237d6-000",
+            "score": 0.3032177135534053
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cf44582c25e3be91-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-72dc92e40727047d-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6f14788cb29e00e4-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d2d1bfc9260c23a0-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-01be0d79ca8b2087-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f91f795e526170e8-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-12d2db1366f00cb3-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0746dbb63847a62a-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9c7a8fb12ef237d6-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "6fe422f0375ed58a8b064663b5f6bf7af1913881e61405f471ba45a02b952e61",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+          "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+          "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+          "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+          "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+          "cchunk-pymupdf-v1-f80d252c372c1323-000",
+          "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+          "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+          "cchunk-pymupdf-v1-e116eb96bcdf7847-000",
+          "cchunk-pymupdf-v1-fe809800f501116a-000",
+          "cchunk-pymupdf-v1-0f88a9f22f7ca117-000",
+          "cchunk-pymupdf-v1-81364d915c3384f9-000",
+          "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+          "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+          "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+          "cchunk-pymupdf-v1-43c97208361c8b22-000",
+          "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+          "cchunk-pymupdf-v1-ee489855cc2e58b6-000",
+          "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+          "cchunk-pymupdf-v1-dc2a8b69ee0e2fc9-000"
+        ],
+        "input_count": 20,
+        "request_id": "9bc20369-c316-978c-8670-3cb17f6aeb93",
+        "response_hash": "2af304b9d385f6df5fcd61ecdd9b18dfde0808b2343cdebb6ad5e63d75ff4a75",
+        "latency": 0.484,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+            "score": 0.9506167835200849
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+            "score": 0.6465276879890324
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "score": 0.6453232473575552
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-43c97208361c8b22-000",
+            "score": 0.5494053096935938
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+            "score": 0.535333793890124
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+            "score": 0.5217107774761879
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ee489855cc2e58b6-000",
+            "score": 0.5165752620618964
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+            "score": 0.49016427307737037
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "score": 0.4759318575353125
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+            "score": 0.4719638357008339
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+            "score": 0.4718617218367715
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+            "score": 0.4608133670156302
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81364d915c3384f9-000",
+            "score": 0.3836103077720525
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+            "score": 0.37054113080543405
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+            "score": 0.3470648199156327
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f80d252c372c1323-000",
+            "score": 0.31122494614593976
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0f88a9f22f7ca117-000",
+            "score": 0.2789439849796924
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-dc2a8b69ee0e2fc9-000",
+            "score": 0.27849375044850466
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+            "score": 0.231750454837167
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e116eb96bcdf7847-000",
+            "score": 0.22913265651017412
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-43c97208361c8b22-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ee489855cc2e58b6-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81364d915c3384f9-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f80d252c372c1323-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0f88a9f22f7ca117-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-dc2a8b69ee0e2fc9-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e116eb96bcdf7847-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "c64860c4b61b7abbee1a7e3349df80784a086eb0905fb5af6ac8cd4dded66480",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+          "cchunk-pymupdf-v1-d376dd44adad266c-000",
+          "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+          "cchunk-pymupdf-v1-7138da7cd05fc64e-000",
+          "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+          "cchunk-pymupdf-v1-7227e2460f83a192-000",
+          "cchunk-pymupdf-v1-e538966686c111ea-000",
+          "cchunk-pymupdf-v1-0a30c7b1dea2f085-000",
+          "cchunk-pymupdf-v1-0d6e694179b30242-000",
+          "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+          "cchunk-pymupdf-v1-3de8aa9caa68e922-000",
+          "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+          "cchunk-pymupdf-v1-3b71d7036ff4ac18-000",
+          "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+          "cchunk-pymupdf-v1-d2d1bfc9260c23a0-000",
+          "cchunk-pymupdf-v1-fe809800f501116a-000",
+          "cchunk-pymupdf-v1-72dc92e40727047d-000",
+          "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+          "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+          "cchunk-pymupdf-v1-bab93a5364ff417d-000"
+        ],
+        "input_count": 20,
+        "request_id": "28dc69f4-287e-971d-83f3-144f32120cfe",
+        "response_hash": "dd70dd7009f255606f5f4fb1e6a2212176ac09b87fd0995f35bf796aa0c02053",
+        "latency": 0.5,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "score": 0.8735632179329367
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+            "score": 0.7389492808326857
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+            "score": 0.6058703772701182
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+            "score": 0.578078814850097
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+            "score": 0.44499377287360053
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+            "score": 0.4095715160984825
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d2d1bfc9260c23a0-000",
+            "score": 0.40455569043143147
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-72dc92e40727047d-000",
+            "score": 0.3989571006468431
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+            "score": 0.363553790003401
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3de8aa9caa68e922-000",
+            "score": 0.3597169243851638
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b71d7036ff4ac18-000",
+            "score": 0.34491674544952766
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+            "score": 0.3447432719098257
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+            "score": 0.3396930165178985
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bab93a5364ff417d-000",
+            "score": 0.2937684126338062
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+            "score": 0.2860163611763554
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7138da7cd05fc64e-000",
+            "score": 0.2842679048647737
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0a30c7b1dea2f085-000",
+            "score": 0.2722840566561411
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+            "score": 0.2713773063197088
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "score": 0.2712327917538501
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0d6e694179b30242-000",
+            "score": 0.26605303890025844
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d2d1bfc9260c23a0-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-72dc92e40727047d-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3de8aa9caa68e922-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b71d7036ff4ac18-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bab93a5364ff417d-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7138da7cd05fc64e-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0a30c7b1dea2f085-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0d6e694179b30242-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "824d5e79d94231972e46e047e4c72effce7aacbe2603fe33a3a02da7c057cb86",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+          "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+          "cchunk-pymupdf-v1-285811f368cf8a64-000",
+          "cchunk-pymupdf-v1-3055533062112b3d-000",
+          "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+          "cchunk-pymupdf-v1-16686d3e3ddcc21b-000",
+          "cchunk-pymupdf-v1-b3fcc507b8b40953-000",
+          "cchunk-pymupdf-v1-226728a01042056b-000",
+          "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+          "cchunk-pymupdf-v1-5204df83f2867fee-000",
+          "cchunk-pymupdf-v1-887daf03f3e72f8c-000",
+          "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+          "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+          "cchunk-pymupdf-v1-5989850607a8046c-000",
+          "cchunk-pymupdf-v1-0589d6a5f7b810ac-000",
+          "cchunk-pymupdf-v1-3c48ca477586c617-000",
+          "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+          "cchunk-pymupdf-v1-fe809800f501116a-000",
+          "cchunk-pymupdf-v1-82b1cd3c8562d093-000",
+          "cchunk-pymupdf-v1-d8cb574a88fca00e-000"
+        ],
+        "input_count": 20,
+        "request_id": "3b0d47ca-8f24-91d3-ba32-63cb98674033",
+        "response_hash": "4aa14d0cbbbcc640bf0448d369e18dc2ba8386d56e7bfcbfe5ee0313840d7004",
+        "latency": 0.516,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "score": 0.9217829229443716
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "score": 0.8140757762968354
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-285811f368cf8a64-000",
+            "score": 0.7707336604511696
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+            "score": 0.7407984807156138
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+            "score": 0.6142055857363652
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+            "score": 0.5857246189078433
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-887daf03f3e72f8c-000",
+            "score": 0.5556816877750135
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+            "score": 0.5239125489113531
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+            "score": 0.5134812353253113
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5204df83f2867fee-000",
+            "score": 0.4294924005561751
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0589d6a5f7b810ac-000",
+            "score": 0.40429704711512293
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-82b1cd3c8562d093-000",
+            "score": 0.3999006330581434
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+            "score": 0.3973382326350935
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5989850607a8046c-000",
+            "score": 0.38732644332499444
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-226728a01042056b-000",
+            "score": 0.35919272006609404
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-16686d3e3ddcc21b-000",
+            "score": 0.3329644357204372
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b3fcc507b8b40953-000",
+            "score": 0.3329644357204372
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d8cb574a88fca00e-000",
+            "score": 0.30805123237457444
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+            "score": 0.26756768647918516
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3055533062112b3d-000",
+            "score": 0.24924305111417516
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-285811f368cf8a64-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2db1a56a7e45ceb2-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-887daf03f3e72f8c-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe809800f501116a-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5204df83f2867fee-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0589d6a5f7b810ac-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-82b1cd3c8562d093-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5989850607a8046c-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-226728a01042056b-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-16686d3e3ddcc21b-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b3fcc507b8b40953-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d8cb574a88fca00e-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3055533062112b3d-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "40fdb325e4b42d13160e65d64ffb8f83add582c3b79b1f9c17f5f2a0ccda3cf7",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+          "cchunk-pymupdf-v1-24b95119c8293288-000",
+          "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+          "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+          "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+          "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+          "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+          "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+          "cchunk-pymupdf-v1-387e3de8ee9b066f-000",
+          "cchunk-pymupdf-v1-19108f4b15af9ae3-000",
+          "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+          "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+          "cchunk-pymupdf-v1-632956904d49f35c-000",
+          "cchunk-pymupdf-v1-6d168c23d348a954-000",
+          "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+          "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+          "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+          "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+          "cchunk-pymupdf-v1-e615074edc8ab539-000",
+          "cchunk-pymupdf-v1-edd3a5315c0eeff3-000"
+        ],
+        "input_count": 20,
+        "request_id": "6e56f9ae-eae9-9b47-a229-8ca3435b1616",
+        "response_hash": "6eeec1ac915c39020917b43f72f336603923b8bf2b904aa9a1032a162b8b8236",
+        "latency": 0.547,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "score": 0.9390865643570496
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+            "score": 0.9288094571420429
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+            "score": 0.8819579447220645
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+            "score": 0.8751442295401203
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+            "score": 0.7579677499751687
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-24b95119c8293288-000",
+            "score": 0.7521156330982983
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "score": 0.7337865270659396
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+            "score": 0.7116065614862417
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+            "score": 0.6962693626875995
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+            "score": 0.6280673565622402
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+            "score": 0.5758115973186353
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-19108f4b15af9ae3-000",
+            "score": 0.5369594366957187
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6d168c23d348a954-000",
+            "score": 0.5240422447489171
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-387e3de8ee9b066f-000",
+            "score": 0.5120770086157274
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+            "score": 0.47184790858740344
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+            "score": 0.42131016394805876
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-632956904d49f35c-000",
+            "score": 0.3634938285290974
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+            "score": 0.28890757787123456
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e615074edc8ab539-000",
+            "score": 0.2805113745395168
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+            "score": 0.21535752550568005
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-aea0380728d8dc1d-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-24b95119c8293288-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-edd3a5315c0eeff3-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-19108f4b15af9ae3-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6d168c23d348a954-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-387e3de8ee9b066f-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-632956904d49f35c-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e615074edc8ab539-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "675708d846ae15113af1f25c50e4551317be61a1570a8ad4d24b139906a75493",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+          "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+          "cchunk-pymupdf-v1-b8d299b0f9bed299-000",
+          "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+          "cchunk-pymupdf-v1-5d75f7554358132e-000",
+          "cchunk-pymupdf-v1-29247897fcf1016b-000",
+          "cchunk-pymupdf-v1-5989850607a8046c-000",
+          "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+          "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+          "cchunk-pymupdf-v1-226728a01042056b-000",
+          "cchunk-pymupdf-v1-81364d915c3384f9-000",
+          "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+          "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+          "cchunk-pymupdf-v1-7227e2460f83a192-000",
+          "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+          "cchunk-pymupdf-v1-37d65b1d13e56432-000",
+          "cchunk-pymupdf-v1-d304378193e1a750-000",
+          "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+          "cchunk-pymupdf-v1-4f28239f5b4a3f2e-000",
+          "cchunk-pymupdf-v1-c3e028986eb40916-000"
+        ],
+        "input_count": 20,
+        "request_id": "b2a30a70-fa4d-9013-a2d9-e666170a8ff0",
+        "response_hash": "8d7592d23377a227e19c335a1e5d9c81e650a681d37907a8e00ca380a362f0fa",
+        "latency": 0.563,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "score": 0.9572605007937793
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "score": 0.9468374239853707
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+            "score": 0.6423665664931401
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b8d299b0f9bed299-000",
+            "score": 0.5567293270281342
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "score": 0.5379402572888304
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+            "score": 0.47658660775514133
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "score": 0.4761903687354306
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-29247897fcf1016b-000",
+            "score": 0.4654006678430315
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d304378193e1a750-000",
+            "score": 0.4330423084308205
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-226728a01042056b-000",
+            "score": 0.4091092000349654
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4f28239f5b4a3f2e-000",
+            "score": 0.36893515727038206
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5d75f7554358132e-000",
+            "score": 0.3635752368472869
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81364d915c3384f9-000",
+            "score": 0.3614526210997242
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c3e028986eb40916-000",
+            "score": 0.32759694287391816
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5989850607a8046c-000",
+            "score": 0.3266367942237302
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+            "score": 0.32301083260117835
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+            "score": 0.3085014779285799
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "score": 0.29561114958688284
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+            "score": 0.2807599913778879
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-37d65b1d13e56432-000",
+            "score": 0.23011610393400317
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-46817ac8a36f3301-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b8d299b0f9bed299-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-29247897fcf1016b-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d304378193e1a750-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-226728a01042056b-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4f28239f5b4a3f2e-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5d75f7554358132e-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81364d915c3384f9-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c3e028986eb40916-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5989850607a8046c-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-78b62811ac79e6c1-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-37d65b1d13e56432-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "3acd27aa01d287ef2736d2aa86fd03f52167d67d8390c8165978bd19023becaa",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+          "cchunk-pymupdf-v1-e538966686c111ea-000",
+          "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+          "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+          "cchunk-pymupdf-v1-cbe7e23b0ba4f07d-000",
+          "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+          "cchunk-pymupdf-v1-7192fa1959afa851-000",
+          "cchunk-pymupdf-v1-53618e43576473eb-000",
+          "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+          "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+          "cchunk-pymupdf-v1-ce93a6a3ed3b805d-000",
+          "cchunk-pymupdf-v1-cc6c857df70a4a09-000",
+          "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+          "cchunk-pymupdf-v1-37d65b1d13e56432-000",
+          "cchunk-pymupdf-v1-90a6de4f7ec8d47b-000",
+          "cchunk-pymupdf-v1-1881d83dc43fd135-000",
+          "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+          "cchunk-pymupdf-v1-6234f75e75447179-000",
+          "cchunk-pymupdf-v1-03594e70100cd2ed-000",
+          "cchunk-pymupdf-v1-c869dede284f9e15-000"
+        ],
+        "input_count": 20,
+        "request_id": "3eaa9006-9b68-9607-b6ff-179ef78d63b0",
+        "response_hash": "008ab143b7dea937b5ba7da555acc09bc2183d02c2b5dd7e2dd816124a77db8f",
+        "latency": 0.672,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+            "score": 0.9413701610604251
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+            "score": 0.8904375675772427
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+            "score": 0.8186328118421025
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cbe7e23b0ba4f07d-000",
+            "score": 0.6872496684355117
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+            "score": 0.6616982271651745
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7192fa1959afa851-000",
+            "score": 0.5898108215200617
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+            "score": 0.5574910954773703
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c869dede284f9e15-000",
+            "score": 0.5465711870016551
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "score": 0.522940763872436
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+            "score": 0.5167720570390303
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6234f75e75447179-000",
+            "score": 0.5134393166822001
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+            "score": 0.44938011508037257
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-90a6de4f7ec8d47b-000",
+            "score": 0.41137680651012515
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1881d83dc43fd135-000",
+            "score": 0.39212135942683785
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cc6c857df70a4a09-000",
+            "score": 0.37376398048869053
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-03594e70100cd2ed-000",
+            "score": 0.3562220148235731
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ce93a6a3ed3b805d-000",
+            "score": 0.3349248774438569
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-37d65b1d13e56432-000",
+            "score": 0.3304162055566905
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+            "score": 0.30035777522943535
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-53618e43576473eb-000",
+            "score": 0.23086770898340891
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cbe7e23b0ba4f07d-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7192fa1959afa851-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f13e5d0f9df649e2-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c869dede284f9e15-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6234f75e75447179-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2d71181df615e5b-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-90a6de4f7ec8d47b-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1881d83dc43fd135-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cc6c857df70a4a09-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-03594e70100cd2ed-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ce93a6a3ed3b805d-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-37d65b1d13e56432-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-53618e43576473eb-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "2ff0d039e4494b4f692da03bbdfb2d5708c77153483adf97bd0ab2191340b695",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+          "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+          "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+          "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+          "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+          "cchunk-pymupdf-v1-cc6c857df70a4a09-000",
+          "cchunk-pymupdf-v1-03594e70100cd2ed-000",
+          "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+          "cchunk-pymupdf-v1-78a156ed97cebd53-000",
+          "cchunk-pymupdf-v1-ee489855cc2e58b6-000",
+          "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+          "cchunk-pymupdf-v1-81364d915c3384f9-000",
+          "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+          "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+          "cchunk-pymupdf-v1-43c97208361c8b22-000",
+          "cchunk-pymupdf-v1-12d2db1366f00cb3-000",
+          "cchunk-pymupdf-v1-9f6953e0c16993e4-000",
+          "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+          "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+          "cchunk-pymupdf-v1-fa64c4920b551368-000"
+        ],
+        "input_count": 20,
+        "request_id": "cdbbba61-ec2c-920c-9bda-713bd1400681",
+        "response_hash": "75faff9d0c1803253e6575194d84a8a3f76c6840e23be67213d212c76f146ab3",
+        "latency": 0.531,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+            "score": 0.9361274865885527
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+            "score": 0.7631448121809168
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "score": 0.612430599485553
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "score": 0.5975226834782735
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+            "score": 0.5845077130185574
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+            "score": 0.5544999591549805
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+            "score": 0.5240639113452623
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "score": 0.5122135341601715
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-43c97208361c8b22-000",
+            "score": 0.5079790839760943
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ee489855cc2e58b6-000",
+            "score": 0.48872756740497103
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fa64c4920b551368-000",
+            "score": 0.4877583822135569
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cc6c857df70a4a09-000",
+            "score": 0.48225529475460516
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-78a156ed97cebd53-000",
+            "score": 0.47913116016263285
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+            "score": 0.4635830994330065
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-03594e70100cd2ed-000",
+            "score": 0.43005458543201086
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-12d2db1366f00cb3-000",
+            "score": 0.42242608610170396
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+            "score": 0.4052382642606727
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81364d915c3384f9-000",
+            "score": 0.3922436942164501
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9f6953e0c16993e4-000",
+            "score": 0.36366351772494326
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+            "score": 0.3088413627606731
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a9a1f3c1a7578885-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5ea5c41790ab805a-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-43c97208361c8b22-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ee489855cc2e58b6-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fa64c4920b551368-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cc6c857df70a4a09-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-78a156ed97cebd53-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6a06daba53cbf4ab-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-03594e70100cd2ed-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-12d2db1366f00cb3-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2815c3fc28f984f6-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81364d915c3384f9-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9f6953e0c16993e4-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "e49783b80207f6d15b1cff777496e9bcde4b252fdf8abef0117ac2dec8492e7c",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-c7d618e454697d05-000",
+          "cchunk-pymupdf-v1-d358c2a60824cb3a-000",
+          "cchunk-pymupdf-v1-8248fd274f74a545-000",
+          "cchunk-pymupdf-v1-952a0b7c9f91d08d-000",
+          "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+          "cchunk-pymupdf-v1-285811f368cf8a64-000",
+          "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+          "cchunk-pymupdf-v1-0f88a9f22f7ca117-000",
+          "cchunk-pymupdf-v1-46b0c76bfc95f894-000",
+          "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+          "cchunk-pymupdf-v1-4cd24e8fdc8ae1a5-000",
+          "cchunk-pymupdf-v1-82b1cd3c8562d093-000",
+          "cchunk-pymupdf-v1-e116eb96bcdf7847-000",
+          "cchunk-pymupdf-v1-387e3de8ee9b066f-000",
+          "cchunk-pymupdf-v1-3b71d7036ff4ac18-000",
+          "cchunk-pymupdf-v1-a29c091c7ffaf7d0-000",
+          "cchunk-pymupdf-v1-c3e028986eb40916-000",
+          "cchunk-pymupdf-v1-d3667221649aedb9-000",
+          "cchunk-pymupdf-v1-b67105f478c0549e-000",
+          "cchunk-pymupdf-v1-5492c43ea549477a-000"
+        ],
+        "input_count": 20,
+        "request_id": "c15da19e-e68c-95d5-9b6d-b5a9ce2c35db",
+        "response_hash": "fb4941e31d874870343371cf7b3feae6f6961175de0d153ddf4a47c401653f96",
+        "latency": 0.797,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+            "score": 0.9571817158994268
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-285811f368cf8a64-000",
+            "score": 0.9547887476597527
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8248fd274f74a545-000",
+            "score": 0.6078473765754548
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-82b1cd3c8562d093-000",
+            "score": 0.5676034061809415
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b67105f478c0549e-000",
+            "score": 0.5627422893697589
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4cd24e8fdc8ae1a5-000",
+            "score": 0.5416124329167047
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0f88a9f22f7ca117-000",
+            "score": 0.5176356621004525
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d358c2a60824cb3a-000",
+            "score": 0.513303055960479
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e116eb96bcdf7847-000",
+            "score": 0.4715995432729486
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5492c43ea549477a-000",
+            "score": 0.4715684624918212
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c7d618e454697d05-000",
+            "score": 0.4452681800413283
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+            "score": 0.4415180851924873
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-387e3de8ee9b066f-000",
+            "score": 0.43067260417815084
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c3e028986eb40916-000",
+            "score": 0.4301219349013689
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-46b0c76bfc95f894-000",
+            "score": 0.4239327105374148
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-952a0b7c9f91d08d-000",
+            "score": 0.3822688873028381
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+            "score": 0.37473452079964387
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b71d7036ff4ac18-000",
+            "score": 0.34680768005889806
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d3667221649aedb9-000",
+            "score": 0.34324754546873804
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a29c091c7ffaf7d0-000",
+            "score": 0.24457114650272366
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-9de58a796bbbd884-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-285811f368cf8a64-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8248fd274f74a545-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-82b1cd3c8562d093-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b67105f478c0549e-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4cd24e8fdc8ae1a5-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0f88a9f22f7ca117-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d358c2a60824cb3a-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e116eb96bcdf7847-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5492c43ea549477a-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c7d618e454697d05-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-387e3de8ee9b066f-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c3e028986eb40916-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-46b0c76bfc95f894-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-952a0b7c9f91d08d-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-630ee10c87acabb3-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b71d7036ff4ac18-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d3667221649aedb9-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a29c091c7ffaf7d0-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "d3834ae9e643e909686e2daa5c133612c5e3facd1563ad102fa19355c2a6e416",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-7192fa1959afa851-000",
+          "cchunk-pymupdf-v1-6c84270736d64bea-000",
+          "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+          "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+          "cchunk-pymupdf-v1-976cad9e869b3472-000",
+          "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+          "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+          "cchunk-pymupdf-v1-241bca917a4f2625-000",
+          "cchunk-pymupdf-v1-43c97208361c8b22-000",
+          "cchunk-pymupdf-v1-37d65b1d13e56432-000",
+          "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+          "cchunk-pymupdf-v1-500cc82f705b8d03-000",
+          "cchunk-pymupdf-v1-dbc7a03b76048b03-000",
+          "cchunk-pymupdf-v1-88f5a448ffe25ab0-000",
+          "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+          "cchunk-pymupdf-v1-8198e38bb184b987-000",
+          "cchunk-pymupdf-v1-e615074edc8ab539-000",
+          "cchunk-pymupdf-v1-bf2be6315d2f187b-000",
+          "cchunk-pymupdf-v1-d523dd950c22c321-000",
+          "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000"
+        ],
+        "input_count": 20,
+        "request_id": "fcf71b5b-efd1-97f4-ac63-73bd0b9880c6",
+        "response_hash": "0155e929fc50a8f54286e8192ae7b06daad72770bcbcd9ec09172d391615c651",
+        "latency": 0.61,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7192fa1959afa851-000",
+            "score": 0.965300931233132
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6c84270736d64bea-000",
+            "score": 0.932259639676787
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+            "score": 0.8508771685700232
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+            "score": 0.8293839075097966
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d523dd950c22c321-000",
+            "score": 0.8238545387478723
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8198e38bb184b987-000",
+            "score": 0.8181396882517669
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+            "score": 0.7105494273983096
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+            "score": 0.7072650826056178
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-241bca917a4f2625-000",
+            "score": 0.6788597444479355
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-dbc7a03b76048b03-000",
+            "score": 0.6750191317498705
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+            "score": 0.6553404674836739
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-37d65b1d13e56432-000",
+            "score": 0.6369924261003836
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+            "score": 0.6257860025365543
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-976cad9e869b3472-000",
+            "score": 0.6053130661677298
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-43c97208361c8b22-000",
+            "score": 0.4345330342403485
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+            "score": 0.3658799721284885
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e615074edc8ab539-000",
+            "score": 0.29338240791183073
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-500cc82f705b8d03-000",
+            "score": 0.2736873624212012
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bf2be6315d2f187b-000",
+            "score": 0.2553358660932119
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-88f5a448ffe25ab0-000",
+            "score": 0.2087289320553697
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7192fa1959afa851-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6c84270736d64bea-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d523dd950c22c321-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8198e38bb184b987-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-241bca917a4f2625-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-dbc7a03b76048b03-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-37d65b1d13e56432-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fcc2e6681bc7509c-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-976cad9e869b3472-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-43c97208361c8b22-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e615074edc8ab539-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-500cc82f705b8d03-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bf2be6315d2f187b-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-88f5a448ffe25ab0-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "57f43afca39c9539c1b44df989f00c59afe3f9c60e78028837d860a11928131a",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-20b5442f699e315c-000",
+          "cchunk-pymupdf-v1-3f0fab177b358d7f-000",
+          "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+          "cchunk-pymupdf-v1-b16dfe0a30592b02-000",
+          "cchunk-pymupdf-v1-3ebbb1124d091142-000",
+          "cchunk-pymupdf-v1-6031ad5e15a73119-000",
+          "cchunk-pymupdf-v1-d523dd950c22c321-000",
+          "cchunk-pymupdf-v1-241bca917a4f2625-000",
+          "cchunk-pymupdf-v1-6d80f2e277647c3e-000",
+          "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+          "cchunk-pymupdf-v1-8198e38bb184b987-000",
+          "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+          "cchunk-pymupdf-v1-485805a0b0552b8d-000",
+          "cchunk-pymupdf-v1-976cad9e869b3472-000",
+          "cchunk-pymupdf-v1-bab93a5364ff417d-000",
+          "cchunk-pymupdf-v1-f23b20e6cbfc675b-000",
+          "cchunk-pymupdf-v1-a0dec5288f01cbab-000",
+          "cchunk-pymupdf-v1-226728a01042056b-000",
+          "cchunk-pymupdf-v1-ee71decb3cedbdd5-000",
+          "cchunk-pymupdf-v1-f4f5d9ac54ec6b2a-000"
+        ],
+        "input_count": 20,
+        "request_id": "25ed4005-ae17-9512-88ac-832459ecd424",
+        "response_hash": "3cedda6ff38d6abc9ef0c72c0ab556f78797b37d33d131ad5dcd65d747d5b326",
+        "latency": 0.594,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-241bca917a4f2625-000",
+            "score": 0.9594428112531497
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+            "score": 0.9586951443011291
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8198e38bb184b987-000",
+            "score": 0.9396966035063423
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+            "score": 0.9374149822259426
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+            "score": 0.9301801604517149
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d523dd950c22c321-000",
+            "score": 0.9223793836900017
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6031ad5e15a73119-000",
+            "score": 0.7023620941665952
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-226728a01042056b-000",
+            "score": 0.6557251739826024
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-20b5442f699e315c-000",
+            "score": 0.616605091670606
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b16dfe0a30592b02-000",
+            "score": 0.6051172094250096
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3f0fab177b358d7f-000",
+            "score": 0.6017335233426037
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f23b20e6cbfc675b-000",
+            "score": 0.5949776247825584
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bab93a5364ff417d-000",
+            "score": 0.5691586043567923
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-485805a0b0552b8d-000",
+            "score": 0.5584725018315075
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a0dec5288f01cbab-000",
+            "score": 0.5518164631183161
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6d80f2e277647c3e-000",
+            "score": 0.4547623895186588
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3ebbb1124d091142-000",
+            "score": 0.4074255906983131
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f4f5d9ac54ec6b2a-000",
+            "score": 0.3969449644900501
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ee71decb3cedbdd5-000",
+            "score": 0.3164690292859905
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-976cad9e869b3472-000",
+            "score": 0.31429178273301617
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-241bca917a4f2625-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8198e38bb184b987-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d523dd950c22c321-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6031ad5e15a73119-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-226728a01042056b-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-20b5442f699e315c-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b16dfe0a30592b02-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3f0fab177b358d7f-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f23b20e6cbfc675b-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bab93a5364ff417d-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-485805a0b0552b8d-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a0dec5288f01cbab-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6d80f2e277647c3e-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3ebbb1124d091142-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f4f5d9ac54ec6b2a-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ee71decb3cedbdd5-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-976cad9e869b3472-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "c1c3f5795f5c04bd1660e417e2497d521178694ad4e3bafb9db463e1b540f1aa",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+          "cchunk-pymupdf-v1-5492c43ea549477a-000",
+          "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+          "cchunk-pymupdf-v1-952a0b7c9f91d08d-000",
+          "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+          "cchunk-pymupdf-v1-ec37ee06eaf56b40-000",
+          "cchunk-pymupdf-v1-f340ff3c046586a6-000",
+          "cchunk-pymupdf-v1-f80d252c372c1323-000",
+          "cchunk-pymupdf-v1-485805a0b0552b8d-000",
+          "cchunk-pymupdf-v1-c7d618e454697d05-000",
+          "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+          "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+          "cchunk-pymupdf-v1-79b799b246f5a9a6-000",
+          "cchunk-pymupdf-v1-b67105f478c0549e-000",
+          "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+          "cchunk-pymupdf-v1-3d4bbec2e5edecfe-000",
+          "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+          "cchunk-pymupdf-v1-09945fe687997108-000",
+          "cchunk-pymupdf-v1-6f3192a6ebd440cd-000",
+          "cchunk-pymupdf-v1-17f4771c4c817a77-000"
+        ],
+        "input_count": 20,
+        "request_id": "c2e44c50-d3a7-9bda-876d-8a5ca0240188",
+        "response_hash": "9c6a859f9dec98ef244c4d4ed39b47a350ba351724675fe4d27f0e9550804a85",
+        "latency": 0.641,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "score": 0.9457912051619263
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "score": 0.8970098043104606
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+            "score": 0.8756808751096338
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+            "score": 0.8393685746454406
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "score": 0.838429004279168
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+            "score": 0.7017381435129089
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5492c43ea549477a-000",
+            "score": 0.6800505760680896
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-485805a0b0552b8d-000",
+            "score": 0.5904475669742507
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f340ff3c046586a6-000",
+            "score": 0.5903207294677154
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ec37ee06eaf56b40-000",
+            "score": 0.5862222102164688
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b67105f478c0549e-000",
+            "score": 0.5662304432184035
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+            "score": 0.5329018627938357
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c7d618e454697d05-000",
+            "score": 0.5153042823919096
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6f3192a6ebd440cd-000",
+            "score": 0.5079304167783953
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-952a0b7c9f91d08d-000",
+            "score": 0.49242865291133714
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+            "score": 0.445179372954583
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3d4bbec2e5edecfe-000",
+            "score": 0.4304910720783418
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-09945fe687997108-000",
+            "score": 0.39660992250617016
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-79b799b246f5a9a6-000",
+            "score": 0.35146617281268566
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f80d252c372c1323-000",
+            "score": 0.34085353496723547
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b58bc1e45428865-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f11d1e9bdc292c-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d0bf0e7542532ef9-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e2388fe05f8eb9ad-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5492c43ea549477a-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-485805a0b0552b8d-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f340ff3c046586a6-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ec37ee06eaf56b40-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b67105f478c0549e-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cfb9dc12aee556ee-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c7d618e454697d05-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6f3192a6ebd440cd-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-952a0b7c9f91d08d-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3d4bbec2e5edecfe-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-09945fe687997108-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-79b799b246f5a9a6-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f80d252c372c1323-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "a55b585410ede4b19b1f9443f098080efeaa32addd46667a8a9fb85bdfa0c41f",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+          "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+          "cchunk-pymupdf-v1-24b95119c8293288-000",
+          "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+          "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+          "cchunk-pymupdf-v1-81364d915c3384f9-000",
+          "cchunk-pymupdf-v1-6d168c23d348a954-000",
+          "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+          "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+          "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+          "cchunk-pymupdf-v1-dbc7a03b76048b03-000",
+          "cchunk-pymupdf-v1-6031ad5e15a73119-000",
+          "cchunk-pymupdf-v1-632956904d49f35c-000",
+          "cchunk-pymupdf-v1-99121c418e138c64-000",
+          "cchunk-pymupdf-v1-e538966686c111ea-000",
+          "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+          "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+          "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+          "cchunk-pymupdf-v1-3d4bbec2e5edecfe-000",
+          "cchunk-pymupdf-v1-8198e38bb184b987-000"
+        ],
+        "input_count": 20,
+        "request_id": "feb5e51e-88f1-90f7-b443-afbcecd273fe",
+        "response_hash": "a3c9efd1b4faf6ce794e11865a54baddfc2e5eb5be68f1450eae04eb8ee3206e",
+        "latency": 0.704,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+            "score": 0.8952584154817216
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+            "score": 0.8472953448569189
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "score": 0.7237431715674133
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "score": 0.5432637931206299
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+            "score": 0.49340909865737104
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+            "score": 0.48679322949322046
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6d168c23d348a954-000",
+            "score": 0.4823510216523829
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+            "score": 0.4224387377624423
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-24b95119c8293288-000",
+            "score": 0.4143664703706105
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+            "score": 0.4059818915696701
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81364d915c3384f9-000",
+            "score": 0.39916116745508456
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-632956904d49f35c-000",
+            "score": 0.3597120757373936
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-99121c418e138c64-000",
+            "score": 0.33867657049705513
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+            "score": 0.330082957614255
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-dbc7a03b76048b03-000",
+            "score": 0.30298039779185115
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6031ad5e15a73119-000",
+            "score": 0.2978182284247318
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+            "score": 0.2664457774648915
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8198e38bb184b987-000",
+            "score": 0.2662745306548374
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3d4bbec2e5edecfe-000",
+            "score": 0.2439090919478631
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+            "score": 0.22840524963276337
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7e3e80ba8c62809f-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a94c7167b5a3f6ed-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6573fac2b717a23e-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-83d62dcdb9835c1f-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6d168c23d348a954-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-17f4771c4c817a77-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-24b95119c8293288-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c8f73a00e3c0ab13-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81364d915c3384f9-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-632956904d49f35c-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-99121c418e138c64-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b51aa23d91a889b8-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-dbc7a03b76048b03-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6031ad5e15a73119-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8198e38bb184b987-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3d4bbec2e5edecfe-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e538966686c111ea-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "9413119dd3b6630cb8ee51c7dc8160b13c3822dd0f4af255f07315c1f147c7be",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+          "cchunk-pymupdf-v1-53f148860125f4f4-000",
+          "cchunk-pymupdf-v1-2e91d7e64f3794b6-000",
+          "cchunk-pymupdf-v1-0261999df5570bed-000",
+          "cchunk-pymupdf-v1-fe95f94d24968921-000",
+          "cchunk-pymupdf-v1-d376dd44adad266c-000",
+          "cchunk-pymupdf-v1-7227e2460f83a192-000",
+          "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+          "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+          "cchunk-pymupdf-v1-283cd58808264f0e-000",
+          "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+          "cchunk-pymupdf-v1-7cb002bdb6ad2337-000",
+          "cchunk-pymupdf-v1-ab5e16a023d3f7d0-000",
+          "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+          "cchunk-pymupdf-v1-340b63862adc52b0-000",
+          "cchunk-pymupdf-v1-3c48ca477586c617-000",
+          "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+          "cchunk-pymupdf-v1-4e096a6fd9a0af8e-001",
+          "cchunk-pymupdf-v1-6e5ccff01e8a29b7-000",
+          "cchunk-pymupdf-v1-5cb922ccf2388a71-000"
+        ],
+        "input_count": 20,
+        "request_id": "1ea19a91-d8a0-9693-a248-76ca088d6381",
+        "response_hash": "fb486f25f70dc437240f22abaa1c53fb46ef5e0e3359f7ebe54e5633da328907",
+        "latency": 0.61,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+            "score": 0.9611197921265385
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+            "score": 0.9290474108436859
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+            "score": 0.8692051354687078
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "score": 0.8249716047034451
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+            "score": 0.7991003294853175
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e096a6fd9a0af8e-001",
+            "score": 0.7985491099564013
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-340b63862adc52b0-000",
+            "score": 0.7576884855151165
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+            "score": 0.7420069693991915
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+            "score": 0.7201995030843289
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "score": 0.7197458305869407
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe95f94d24968921-000",
+            "score": 0.6789621079984391
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+            "score": 0.6443121872892524
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2e91d7e64f3794b6-000",
+            "score": 0.6291372791258942
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5cb922ccf2388a71-000",
+            "score": 0.5655962067604685
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+            "score": 0.550919349965917
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ab5e16a023d3f7d0-000",
+            "score": 0.4750629277281076
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6e5ccff01e8a29b7-000",
+            "score": 0.42869270142761584
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7cb002bdb6ad2337-000",
+            "score": 0.4258654616980977
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-283cd58808264f0e-000",
+            "score": 0.3596442667874963
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+            "score": 0.33194174497509665
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e096a6fd9a0af8e-001",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-340b63862adc52b0-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe95f94d24968921-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2e91d7e64f3794b6-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5cb922ccf2388a71-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ab5e16a023d3f7d0-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6e5ccff01e8a29b7-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7cb002bdb6ad2337-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-283cd58808264f0e-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "6e16e49dfa37d7caccf9bdb0d23063761c484fbcbb80249677cd7771ca129f22",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+          "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+          "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+          "cchunk-pymupdf-v1-0261999df5570bed-000",
+          "cchunk-pymupdf-v1-063aef1e983ec778-000",
+          "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+          "cchunk-pymupdf-v1-7138da7cd05fc64e-000",
+          "cchunk-pymupdf-v1-ac2c48838803419d-000",
+          "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+          "cchunk-pymupdf-v1-ab5e16a023d3f7d0-000",
+          "cchunk-pymupdf-v1-f340ff3c046586a6-000",
+          "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+          "cchunk-pymupdf-v1-00e544a08ac569cc-000",
+          "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+          "cchunk-pymupdf-v1-37e3cc68a5fb4276-000",
+          "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+          "cchunk-pymupdf-v1-5deeaa90569ccec4-000",
+          "cchunk-pymupdf-v1-0a30c7b1dea2f085-000",
+          "cchunk-pymupdf-v1-362158f68adf720f-000",
+          "cchunk-pymupdf-v1-2e91d7e64f3794b6-000"
+        ],
+        "input_count": 20,
+        "request_id": "5741cb0b-a8e2-92df-81b8-dfb1603bd2c7",
+        "response_hash": "d01c1ff9cc9349b6ccb5974e8517bd601c20c0b892165acd15c4f4cbb3a3c5ce",
+        "latency": 0.594,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+            "score": 0.9465759532636121
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+            "score": 0.9328110396152279
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+            "score": 0.9019186890360493
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "score": 0.8074335837426567
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-37e3cc68a5fb4276-000",
+            "score": 0.7729903245767222
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ac2c48838803419d-000",
+            "score": 0.7714579186240131
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5deeaa90569ccec4-000",
+            "score": 0.7232671575612442
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+            "score": 0.6755492566579171
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+            "score": 0.6355943111931401
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+            "score": 0.5844838399977316
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+            "score": 0.5493957348784365
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0a30c7b1dea2f085-000",
+            "score": 0.4606818177347297
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2e91d7e64f3794b6-000",
+            "score": 0.41488478868584544
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-00e544a08ac569cc-000",
+            "score": 0.3983419768941961
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+            "score": 0.3745830416526496
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-362158f68adf720f-000",
+            "score": 0.3404454131625211
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ab5e16a023d3f7d0-000",
+            "score": 0.3353228550055402
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f340ff3c046586a6-000",
+            "score": 0.31129528548880836
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-063aef1e983ec778-000",
+            "score": 0.3075536909928156
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7138da7cd05fc64e-000",
+            "score": 0.2742891226786811
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-37e3cc68a5fb4276-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ac2c48838803419d-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5deeaa90569ccec4-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0a30c7b1dea2f085-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2e91d7e64f3794b6-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-00e544a08ac569cc-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-eb3236bb50e802d1-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-362158f68adf720f-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ab5e16a023d3f7d0-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f340ff3c046586a6-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-063aef1e983ec778-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7138da7cd05fc64e-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "d9a7d5921336af5d789ae421fd8d0ea3c95b2b7839fd0c8b2b46e1767016b78a",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-7ed93679bb25416b-000",
+          "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+          "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+          "cchunk-pymupdf-v1-ab5e16a023d3f7d0-000",
+          "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+          "cchunk-pymupdf-v1-031107a3c2337259-000",
+          "cchunk-pymupdf-v1-3c48ca477586c617-000",
+          "cchunk-pymupdf-v1-7227e2460f83a192-000",
+          "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+          "cchunk-pymupdf-v1-0746dbb63847a62a-000",
+          "cchunk-pymupdf-v1-2e91d7e64f3794b6-000",
+          "cchunk-pymupdf-v1-075079781e245894-000",
+          "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+          "cchunk-pymupdf-v1-58f5902fcdf80561-000",
+          "cchunk-pymupdf-v1-b5a8f25cefe47aef-000",
+          "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+          "cchunk-pymupdf-v1-5cb922ccf2388a71-000",
+          "cchunk-pymupdf-v1-500cc82f705b8d03-000",
+          "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+          "cchunk-pymupdf-v1-18c85b3ecf9f1f7f-000"
+        ],
+        "input_count": 20,
+        "request_id": "493f289f-5617-97d7-b3fd-e3b43f637cbe",
+        "response_hash": "202bf10fd32017d430184c7c5d0753e12a078507605151503d8d3b2af2a2c3f2",
+        "latency": 0.906,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7ed93679bb25416b-000",
+            "score": 0.9326652746252506
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+            "score": 0.615333166100978
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+            "score": 0.5750455209395869
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-075079781e245894-000",
+            "score": 0.5472059190289953
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-18c85b3ecf9f1f7f-000",
+            "score": 0.5177747309326538
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "score": 0.5096577073017328
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+            "score": 0.5043469842694837
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2e91d7e64f3794b6-000",
+            "score": 0.4769915881597943
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0746dbb63847a62a-000",
+            "score": 0.4557211642051011
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+            "score": 0.44333936763296733
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b5a8f25cefe47aef-000",
+            "score": 0.43066504064462113
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ab5e16a023d3f7d0-000",
+            "score": 0.4233121593019158
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+            "score": 0.4113351388210132
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f5902fcdf80561-000",
+            "score": 0.40591313503368526
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "score": 0.3936257701982805
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-031107a3c2337259-000",
+            "score": 0.38075159771067546
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5cb922ccf2388a71-000",
+            "score": 0.36758220273902653
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+            "score": 0.3007707516467685
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+            "score": 0.29464940252726746
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-500cc82f705b8d03-000",
+            "score": 0.17064237535146853
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7ed93679bb25416b-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fc16e77b6450e35c-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-075079781e245894-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-18c85b3ecf9f1f7f-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-2e91d7e64f3794b6-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0746dbb63847a62a-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b5a8f25cefe47aef-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ab5e16a023d3f7d0-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f5902fcdf80561-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-031107a3c2337259-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5cb922ccf2388a71-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0bf7939a36bff59b-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-500cc82f705b8d03-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "c980cd786158f50de804f402c77289870ef2c7b6cdc8a257c37cab020d9b170d",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+          "cchunk-pymupdf-v1-f1d515087d6f1eee-000",
+          "cchunk-pymupdf-v1-c6c9af0f75f5ce08-000",
+          "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+          "cchunk-pymupdf-v1-031107a3c2337259-000",
+          "cchunk-pymupdf-v1-b5a8f25cefe47aef-000",
+          "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+          "cchunk-pymupdf-v1-468e65ee12f9fcd7-000",
+          "cchunk-pymupdf-v1-81ae918d833d4dd5-000",
+          "cchunk-pymupdf-v1-f86158424224442d-000",
+          "cchunk-pymupdf-v1-c252bcbee91ab8cc-000",
+          "cchunk-pymupdf-v1-53f148860125f4f4-000",
+          "cchunk-pymupdf-v1-d8cb574a88fca00e-000",
+          "cchunk-pymupdf-v1-3c48ca477586c617-000",
+          "cchunk-pymupdf-v1-f3e464810f681475-000",
+          "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+          "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+          "cchunk-pymupdf-v1-0261999df5570bed-000",
+          "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+          "cchunk-pymupdf-v1-340b63862adc52b0-000"
+        ],
+        "input_count": 20,
+        "request_id": "7e1df97a-fe44-9580-8301-a9dc53f4cd6b",
+        "response_hash": "ff3bc352719a2dcfbe10e3902ed5efca080dc61f88799bd69939db6d203f3612",
+        "latency": 0.531,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+            "score": 0.7756551553644864
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f1d515087d6f1eee-000",
+            "score": 0.5635867478244204
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c6c9af0f75f5ce08-000",
+            "score": 0.4684730548710762
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+            "score": 0.4075285749765662
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81ae918d833d4dd5-000",
+            "score": 0.3656499613845104
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+            "score": 0.35311956483470874
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-031107a3c2337259-000",
+            "score": 0.3508112038009218
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+            "score": 0.3416049849786947
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f86158424224442d-000",
+            "score": 0.33316957791528035
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b5a8f25cefe47aef-000",
+            "score": 0.3285529206798816
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c252bcbee91ab8cc-000",
+            "score": 0.3210779589934172
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+            "score": 0.30907616041248054
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+            "score": 0.3084711935199419
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-468e65ee12f9fcd7-000",
+            "score": 0.30585466032941916
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+            "score": 0.2929710924637189
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d8cb574a88fca00e-000",
+            "score": 0.2918770044642922
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-340b63862adc52b0-000",
+            "score": 0.2782935394290215
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+            "score": 0.26289833503567506
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+            "score": 0.24597280333630656
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f3e464810f681475-000",
+            "score": 0.2366856614239306
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-6ebe88f96ee7a0d4-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f1d515087d6f1eee-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c6c9af0f75f5ce08-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1f3fac6e86eebfd0-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81ae918d833d4dd5-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-031107a3c2337259-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f86158424224442d-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b5a8f25cefe47aef-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c252bcbee91ab8cc-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-8ac7c8e5aafefa93-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-468e65ee12f9fcd7-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d8cb574a88fca00e-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-340b63862adc52b0-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f3e464810f681475-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "064bdad9b832ad1195d47fad27f0722f1f4db6b7986a924f9e583784778149f9",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-53f148860125f4f4-000",
+          "cchunk-pymupdf-v1-0261999df5570bed-000",
+          "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+          "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+          "cchunk-pymupdf-v1-d376dd44adad266c-000",
+          "cchunk-pymupdf-v1-3c48ca477586c617-000",
+          "cchunk-pymupdf-v1-468e65ee12f9fcd7-000",
+          "cchunk-pymupdf-v1-23747aac05fbe151-000",
+          "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+          "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+          "cchunk-pymupdf-v1-c6c9af0f75f5ce08-000",
+          "cchunk-pymupdf-v1-be05e39f5774d237-000",
+          "cchunk-pymupdf-v1-0d6e694179b30242-000",
+          "cchunk-pymupdf-v1-3cd1e40d8ea8cd28-000",
+          "cchunk-pymupdf-v1-fdb56c9863904d5d-000",
+          "cchunk-pymupdf-v1-58f5902fcdf80561-000",
+          "cchunk-pymupdf-v1-283cd58808264f0e-000",
+          "cchunk-pymupdf-v1-075079781e245894-000",
+          "cchunk-pymupdf-v1-e4b0189663f03dcf-000",
+          "cchunk-pymupdf-v1-81ae918d833d4dd5-000"
+        ],
+        "input_count": 20,
+        "request_id": "6c3ff39e-e25f-9868-86d1-b779adf1ffea",
+        "response_hash": "b05e7aa1ccd5c99c8df634d04ce6e71ecb4a4fc9941de9c2f1a12725138d66dd",
+        "latency": 0.485,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+            "score": 0.9247276672247313
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+            "score": 0.8567672337480482
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+            "score": 0.8261271530143097
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+            "score": 0.6094054292928459
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+            "score": 0.5671627219354246
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+            "score": 0.5463692263037447
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "score": 0.5047754318553129
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+            "score": 0.4912850186141245
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-075079781e245894-000",
+            "score": 0.4866971022176434
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-468e65ee12f9fcd7-000",
+            "score": 0.44261428648704
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f5902fcdf80561-000",
+            "score": 0.42194077451657863
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3cd1e40d8ea8cd28-000",
+            "score": 0.40801915312339776
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-283cd58808264f0e-000",
+            "score": 0.3965840746728061
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e4b0189663f03dcf-000",
+            "score": 0.3458203737291283
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c6c9af0f75f5ce08-000",
+            "score": 0.3227360208885275
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81ae918d833d4dd5-000",
+            "score": 0.27048437188786456
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0d6e694179b30242-000",
+            "score": 0.26432678944851934
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-be05e39f5774d237-000",
+            "score": 0.250014958968345
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-23747aac05fbe151-000",
+            "score": 0.24327933761181303
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fdb56c9863904d5d-000",
+            "score": 0.21165142826281658
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-075079781e245894-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-468e65ee12f9fcd7-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-58f5902fcdf80561-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3cd1e40d8ea8cd28-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-283cd58808264f0e-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e4b0189663f03dcf-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c6c9af0f75f5ce08-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-81ae918d833d4dd5-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0d6e694179b30242-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-be05e39f5774d237-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-23747aac05fbe151-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fdb56c9863904d5d-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "9ac0f11a2d96bc89cf17df973b0253fb2d445b6d02dabf7604710af901dfe00f",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+          "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+          "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+          "cchunk-pymupdf-v1-53f148860125f4f4-000",
+          "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+          "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+          "cchunk-pymupdf-v1-7227e2460f83a192-000",
+          "cchunk-pymupdf-v1-7a7a1d9527900134-000",
+          "cchunk-pymupdf-v1-64e302610f23e9ce-000",
+          "cchunk-pymupdf-v1-ac2c48838803419d-000",
+          "cchunk-pymupdf-v1-be05e39f5774d237-000",
+          "cchunk-pymupdf-v1-362158f68adf720f-000",
+          "cchunk-pymupdf-v1-d376dd44adad266c-000",
+          "cchunk-pymupdf-v1-cbe7e23b0ba4f07d-000",
+          "cchunk-pymupdf-v1-fe95f94d24968921-000",
+          "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+          "cchunk-pymupdf-v1-7138da7cd05fc64e-000",
+          "cchunk-pymupdf-v1-cfb8e6e6bca5f996-000",
+          "cchunk-pymupdf-v1-063aef1e983ec778-000",
+          "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000"
+        ],
+        "input_count": 20,
+        "request_id": "e9eb5a0b-1f1d-9f87-a63f-15be0c46488d",
+        "response_hash": "8581c4efa27a56acc3162c449c35af0fd600644130addd35b0563fd0e95aa766",
+        "latency": 0.688,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+            "score": 0.9296932889884112
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+            "score": 0.6485287657935288
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+            "score": 0.575372040098559
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+            "score": 0.5000527118987689
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7a7a1d9527900134-000",
+            "score": 0.44423224533224576
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "score": 0.40677706987105955
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "score": 0.39411288766951214
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cfb8e6e6bca5f996-000",
+            "score": 0.383430462269871
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ac2c48838803419d-000",
+            "score": 0.3649564636337258
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+            "score": 0.35725719786964283
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+            "score": 0.328115156294816
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+            "score": 0.3267374745358176
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cbe7e23b0ba4f07d-000",
+            "score": 0.326668954403984
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-64e302610f23e9ce-000",
+            "score": 0.31734060491243654
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-362158f68adf720f-000",
+            "score": 0.3020382505905073
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe95f94d24968921-000",
+            "score": 0.2776037765817423
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-063aef1e983ec778-000",
+            "score": 0.27478760647447376
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7138da7cd05fc64e-000",
+            "score": 0.24904149545895554
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+            "score": 0.2434038092918528
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-be05e39f5774d237-000",
+            "score": 0.23366098643328553
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7a7a1d9527900134-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7227e2460f83a192-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cfb8e6e6bca5f996-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-ac2c48838803419d-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d376dd44adad266c-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cbe7e23b0ba4f07d-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-64e302610f23e9ce-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-362158f68adf720f-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe95f94d24968921-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-063aef1e983ec778-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7138da7cd05fc64e-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-be05e39f5774d237-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "c9526a4b81f923cb209157754bc8c40ef7502b6d9beaca641ad5fd0dc04cbcc0",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-f86158424224442d-000",
+          "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+          "cchunk-pymupdf-v1-819bbea0402b4ad0-000",
+          "cchunk-pymupdf-v1-d523dd950c22c321-000",
+          "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+          "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+          "cchunk-pymupdf-v1-fe95f94d24968921-000",
+          "cchunk-pymupdf-v1-0261999df5570bed-000",
+          "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+          "cchunk-pymupdf-v1-340b63862adc52b0-000",
+          "cchunk-pymupdf-v1-0589d6a5f7b810ac-000",
+          "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+          "cchunk-pymupdf-v1-075079781e245894-000",
+          "cchunk-pymupdf-v1-15441122e7bcbb40-000",
+          "cchunk-pymupdf-v1-29247897fcf1016b-000",
+          "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+          "cchunk-pymupdf-v1-bb26526f42418702-000",
+          "cchunk-pymupdf-v1-0a30c7b1dea2f085-000",
+          "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+          "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000"
+        ],
+        "input_count": 20,
+        "request_id": "b8914722-c83b-9565-b7a7-8cfa2095d79a",
+        "response_hash": "0b17ee962aedba906f20ffaadd5b8c466e263903b5645b547fa3cc0761a514d4",
+        "latency": 0.594,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+            "score": 0.8710847465351139
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+            "score": 0.760909327300197
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-340b63862adc52b0-000",
+            "score": 0.7065781347684996
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-819bbea0402b4ad0-000",
+            "score": 0.704938000717671
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+            "score": 0.6603057233493305
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f86158424224442d-000",
+            "score": 0.6429574949490933
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+            "score": 0.6102433741342502
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+            "score": 0.5809267332511809
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-075079781e245894-000",
+            "score": 0.5619450170090037
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0a30c7b1dea2f085-000",
+            "score": 0.520229641187663
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "score": 0.5073527729961884
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe95f94d24968921-000",
+            "score": 0.47365091590310565
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-29247897fcf1016b-000",
+            "score": 0.40962900658923024
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0589d6a5f7b810ac-000",
+            "score": 0.4072866733929423
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-15441122e7bcbb40-000",
+            "score": 0.384083680549586
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bb26526f42418702-000",
+            "score": 0.3458511488939871
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+            "score": 0.33214462786588395
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+            "score": 0.32532045977450497
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+            "score": 0.31951284669082736
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d523dd950c22c321-000",
+            "score": 0.30879339639464576
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-cb4c3258ac73b8a0-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-340b63862adc52b0-000",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-819bbea0402b4ad0-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3b696cbc7be8d3d5-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f86158424224442d-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f7bbb8547420f197-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e1d1a306d81ddb56-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-075079781e245894-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0a30c7b1dea2f085-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe95f94d24968921-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-29247897fcf1016b-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0589d6a5f7b810ac-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-15441122e7bcbb40-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-bb26526f42418702-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-988dcff223bf0cfc-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-1dae2ee51fbf69b6-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-0993bee22239dfa9-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-d523dd950c22c321-000",
+            "rank": 20
+          }
+        ]
+      },
+      {
+        "cache_hit": false,
+        "requested_model": "qwen3-rerank",
+        "query_hash": "8ae232ff065fca208747ca8b0f64fdfd9f632056488a53bef868d4740e027507",
+        "candidate_ids": [
+          "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+          "cchunk-pymupdf-v1-fe95f94d24968921-000",
+          "cchunk-pymupdf-v1-e7a688c7518528a7-000",
+          "cchunk-pymupdf-v1-b5a8f25cefe47aef-000",
+          "cchunk-pymupdf-v1-3055533062112b3d-000",
+          "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+          "cchunk-pymupdf-v1-15441122e7bcbb40-000",
+          "cchunk-pymupdf-v1-06b6dedf7872d290-000",
+          "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+          "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+          "cchunk-pymupdf-v1-3ebbb1124d091142-000",
+          "cchunk-pymupdf-v1-5cb922ccf2388a71-000",
+          "cchunk-pymupdf-v1-38d6610960704fc6-000",
+          "cchunk-pymupdf-v1-4e096a6fd9a0af8e-001",
+          "cchunk-pymupdf-v1-00e544a08ac569cc-000",
+          "cchunk-pymupdf-v1-4afb1bd71eb2e7fc-000",
+          "cchunk-pymupdf-v1-22ddf2d0277db19d-000",
+          "cchunk-pymupdf-v1-b997b291141915cb-000",
+          "cchunk-pymupdf-v1-a79c9c18bf36865b-000",
+          "cchunk-pymupdf-v1-f80d252c372c1323-000"
+        ],
+        "input_count": 20,
+        "request_id": "a698715b-dade-9a3b-a689-ea292ba2c1be",
+        "response_hash": "8a9de8d047a9c5a8729549b04bc00e6d98004149706170c0e575778953aa712b",
+        "latency": 0.828,
+        "status": "ok",
+        "error": null,
+        "returned_scores": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+            "score": 0.9394647583610122
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e7a688c7518528a7-000",
+            "score": 0.8181064904812115
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e096a6fd9a0af8e-001",
+            "score": 0.6768886134705101
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe95f94d24968921-000",
+            "score": 0.63439566587076
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-00e544a08ac569cc-000",
+            "score": 0.6280796809218238
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+            "score": 0.6182172666739714
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5cb922ccf2388a71-000",
+            "score": 0.6065703527224823
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+            "score": 0.5601748848717604
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-06b6dedf7872d290-000",
+            "score": 0.5478369860350062
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-38d6610960704fc6-000",
+            "score": 0.5360208077253397
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a79c9c18bf36865b-000",
+            "score": 0.5266140589241488
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3ebbb1124d091142-000",
+            "score": 0.5198965671833751
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f80d252c372c1323-000",
+            "score": 0.5122153775274944
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4afb1bd71eb2e7fc-000",
+            "score": 0.464036885131138
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b5a8f25cefe47aef-000",
+            "score": 0.4597439528657937
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b997b291141915cb-000",
+            "score": 0.4499669024921859
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-15441122e7bcbb40-000",
+            "score": 0.41005004838622927
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-22ddf2d0277db19d-000",
+            "score": 0.3830118873864357
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3055533062112b3d-000",
+            "score": 0.3724794983635417
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "score": 0.3001785792694788
+          }
+        ],
+        "returned_ranks": [
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b0fdd25338e01728-000",
+            "rank": 1
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-e7a688c7518528a7-000",
+            "rank": 2
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4e096a6fd9a0af8e-001",
+            "rank": 3
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-fe95f94d24968921-000",
+            "rank": 4
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-00e544a08ac569cc-000",
+            "rank": 5
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-7733ed3c6f455ef6-000",
+            "rank": 6
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-5cb922ccf2388a71-000",
+            "rank": 7
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+            "rank": 8
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-06b6dedf7872d290-000",
+            "rank": 9
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-38d6610960704fc6-000",
+            "rank": 10
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-a79c9c18bf36865b-000",
+            "rank": 11
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3ebbb1124d091142-000",
+            "rank": 12
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-f80d252c372c1323-000",
+            "rank": 13
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-4afb1bd71eb2e7fc-000",
+            "rank": 14
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b5a8f25cefe47aef-000",
+            "rank": 15
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-b997b291141915cb-000",
+            "rank": 16
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-15441122e7bcbb40-000",
+            "rank": 17
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-22ddf2d0277db19d-000",
+            "rank": 18
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-3055533062112b3d-000",
+            "rank": 19
+          },
+          {
+            "child_chunk_id": "cchunk-pymupdf-v1-c1a49660ca4fa082-001",
+            "rank": 20
+          }
+        ]
+      }
+    ]
+  },
+  "regression_cases": [],
+  "missed_by_all": [],
+  "per_question_omitted": {
+    "count": 24,
+    "reason": "each record embeds protected manual excerpts; the full artifact stays in the local working copy",
+    "full_artifact": "formal_development_effectiveness_2026-09-03.json"
+  }
+}

@@ -97,7 +97,27 @@ evaluation/**
 !evaluation/bootstrap_suites/
 !evaluation/bootstrap_suites/README.md
 !evaluation/bootstrap_suites/approved_suites.json
-reports/**
+# The aggregate metric files cited by README's Evaluation section are small and
+# carry no manual text; without them the published numbers cannot be checked.
+!evaluation/experiments/
+!evaluation/experiments/phase6/
+!evaluation/experiments/phase6/e2e/
+!evaluation/experiments/phase6/e2e/metrics.json
+!evaluation/experiments/phase6/shadow_audit/
+!evaluation/experiments/phase6/shadow_audit/validation_summary.json
+!evaluation/experiments/phase8/
+!evaluation/experiments/phase8/acceptance/
+!evaluation/experiments/phase8/acceptance/metrics.json
+# The frozen effectiveness artifact embeds protected manual excerpts, so only the
+# aggregate summary is tracked; README cites it for the 0.818 / 0.894 numbers.
+!evaluation/retrieval_foundation/
+evaluation/retrieval_foundation/*
+!evaluation/retrieval_foundation/formal_development_effectiveness_2026-09-03.summary.json
+# Generated artifacts stay out, but the written reports are the evidence chain
+# behind README numbers, so top-level markdown is tracked. Logs, pid files and
+# the historical bundles (acceptance_environment, delivery_closeout) stay local.
+reports/*
+!reports/*.md
 artifacts/**
 data/db/**
 data/knowledge_bases/**

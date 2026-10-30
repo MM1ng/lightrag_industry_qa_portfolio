@@ -193,7 +193,7 @@ development script to compare LightRAG, Sparse/RRF, and reranked outputs.
 
 ### Frozen Development A2 snapshot
 
-以下指标来自冻结的 Development scope artifact `evaluation/retrieval_foundation/formal_development_effectiveness_2026-09-03.json`，不是 production benchmark：
+以下指标来自冻结的 Development scope artifact `evaluation/retrieval_foundation/formal_development_effectiveness_2026-09-03.json`，不是 production benchmark。仓库内提交的是同一份产物的聚合摘要（[`...summary.json`](evaluation/retrieval_foundation/formal_development_effectiveness_2026-09-03.summary.json)）：`per_question` 明细里嵌了手册原文片段，按数据约定不入库，仅保留在本地工作副本，摘要中记录其条数与省略原因。
 
 | Metric | Frozen A2 |
 | --- | ---: |
@@ -203,6 +203,21 @@ development script to compare LightRAG, Sparse/RRF, and reranked outputs.
 | Complete Evidence Coverage@5 | **0.750** |
 
 Phase16 不修改 Retrieval Foundation 算法、golden questions、Development dataset、阈值或评测口径。
+
+## Evidence
+
+上面的数字背后有书面报告，不只是生成产物。完整索引见 [`reports/README.md`](reports/README.md)。
+
+| Report | What it establishes |
+| --- | --- |
+| [`audit-report-2026-10-23.md`](reports/audit-report-2026-10-23.md) | 安全与稳定性审计：5 项高优先级（H1–H5）、8 项中等（M1–M8），每条带 file:line |
+| [`fix-report-2026-10-23.md`](reports/fix-report-2026-10-23.md) | H1–H5 的修复与各自防住的失败模式 |
+| [`takeover-gate-check-2026-10-29.md`](reports/takeover-gate-check-2026-10-29.md) | 接手时独立复跑门禁的“修复前”状态：`2 failed, 1288 passed` + 3 个 collection error 直接中断 |
+| [`iteration-1-plan-2026-10-29.md`](reports/iteration-1-plan-2026-10-29.md) | 对审计结论逐条回到代码复核，附实测（6 个等待任务占用 6/15 条连接；一次图谱概览阻塞事件循环约 230ms） |
+| [`iteration-1-qa-verification-2026-10-29.md`](reports/iteration-1-qa-verification-2026-10-29.md) | 独立验收第 1 轮：每项都用对照组验证，同一脚本在旧代码上读到 `pool.checkedout()=6`、新代码读到 `=2`。判定 YELLOW，提 2 个缺陷 |
+| [`iteration-1-qa-verification-2026-10-29-round2.md`](reports/iteration-1-qa-verification-2026-10-29-round2.md) | 第 2 轮：两个缺陷用同一测量口径关闭，迭代门禁转绿 |
+| [`iteration-1-acceptance-checklist-2026-10-29.md`](reports/iteration-1-acceptance-checklist-2026-10-29.md) | 可复跑的四层验收程序：环境、门禁、逐项证据、运维冒烟，并列出清单覆盖不到的盲点 |
+| [`iteration-1-acceptance-run-2026-10-29.md`](reports/iteration-1-acceptance-run-2026-10-29.md) | 执行该清单的结果：23 项中 22 项通过；未通过项（伪造 `X-Forwarded-For` 绕过限流）附对照实验，证明根因在 ASGI 服务器而非应用代码 |
 
 ## Project Structure
 
