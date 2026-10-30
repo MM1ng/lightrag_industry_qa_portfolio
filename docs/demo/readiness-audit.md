@@ -7,7 +7,7 @@
 | 启动 | READY | `scripts/start_workbench.ps1 -NoBrowser` 已存在；当前 API 8000、前端 5173 正在运行 |
 | `/chat` | READY | `http://127.0.0.1:5173/chat` HTTP 200；页面显示 API 就绪和当前 KB |
 | 提问 | READY | 高频问题可提交；真实回答耗时 5851 ms，状态为“可执行回答” |
-| 查看回答 | READY | 回答按正文、核验要点、依据和反馈分区展示 |
+| 查看回答 | READY | 回答按正文（含可点击的行内引用）、依据和反馈分区展示；与正文重复的论点不再二次渲染 |
 | 查看 citation | READY | 引用 `[1]`、`[2]` 可点击；抽屉展示文档、页码、Generation、版本和摘录 |
 | 查看来源 | READY | 抽屉提供页面上下文和 `打开原始 PDF` 链接 |
 | Knowledge Base 状态 | PARTIAL → Phase16 UI 补强 | 原页面能选择当前 KB、显示文档/chunks；补强后显示 Active 标记和 Active Generation |
