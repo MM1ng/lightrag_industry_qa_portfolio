@@ -14,6 +14,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 import re
 import secrets
 import shutil
@@ -68,7 +69,14 @@ from industrial_rag.vector_collections import CollectionNameResolver, VectorBack
 
 logger = logging.getLogger(__name__)
 LIGHTRAG_CLOSE_TIMEOUT_SECONDS = 30.0
-LIGHTRAG_INSERT_TIMEOUT_SECONDS = 300.0
+# Entity extraction is the slow half of an insert: every chunk costs one LLM
+# round trip before the merge stage writes any entity.  A short ceiling cut the
+# insert off between "chunks are durable" and "graph is merged", which left
+# generations active with a completely empty graph.  The default is generous on
+# purpose and can be tuned per deployment.
+LIGHTRAG_INSERT_TIMEOUT_SECONDS = float(
+    os.environ.get("LIGHTRAG_INSERT_TIMEOUT_SECONDS", "3600") or 3600
+)
 
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".pdf"}
@@ -1739,6 +1747,19 @@ class IncrementalUpdateService:
         )
         await service.initialize()
         try:
+            # The candidate inherited the active generation's document registry,
+            # which still lists this document as processed.  LightRAG treats a
+            # re-insert with the same id/content as a duplicate and skips the
+            # whole pipeline — including entity extraction — so the graph would
+            # stay exactly as empty as the generation we are trying to repair.
+            storage_root = (
+                candidate_workspace / settings.vector_workspace
+                if settings.vector_workspace
+                else candidate_workspace
+            )
+            await self._purge_workspace_references(
+                storage_root, set(), internal_doc_id=f"kb-{identity}"
+            )
             insert_task = asyncio.create_task(
                 service._backend.ainsert(
                     input=[boundary.join(parts)],
@@ -1753,34 +1774,29 @@ class IncrementalUpdateService:
             )
             if done:
                 await insert_task
+                entity_count, relationship_count = await self._verify_candidate_graph(generation)
+                logger.info(
+                    "Candidate generation %s graph: %d entities, %d relationships",
+                    generation.generation,
+                    entity_count,
+                    relationship_count,
+                )
             else:
                 insert_task.cancel()
-                internal_ids = [
-                    f"kb-{identity}-chunk-{index:03d}"
-                    for index in range(len(children))
-                ]
-                if not await self._candidate_chunks_are_durable(
-                    generation.collections["chunks"], internal_ids
-                ):
-                    raise RuntimeError(
-                        "LightRAG insert timed out before candidate chunks were durable"
-                    )
-                storage_root = (
-                    candidate_workspace / settings.vector_workspace
-                    if settings.vector_workspace
-                    else candidate_workspace
-                )
-                if not finalize_timed_out_lightrag_status(
-                    storage_root,
-                    f"kb-{identity}",
-                    expected_chunk_count=len(children),
-                ):
-                    raise RuntimeError(
-                        "LightRAG insert timed out with incomplete document status"
-                    )
-                logger.warning(
-                    "LightRAG insert exceeded %.0fs after candidate chunks became durable; continuing",
-                    LIGHTRAG_INSERT_TIMEOUT_SECONDS,
+                try:
+                    await insert_task
+                except asyncio.CancelledError:
+                    pass
+                # Do not fall back to "chunks are durable, carry on".  A timed-out
+                # insert stops before the merge stage, so the generation would be
+                # promoted with an empty knowledge graph and every query would
+                # silently degrade to vector-only retrieval.
+                raise RuntimeError(
+                    "LightRAG insert exceeded "
+                    f"{LIGHTRAG_INSERT_TIMEOUT_SECONDS:.0f}s before entity extraction "
+                    "finished; the candidate generation was discarded so an empty "
+                    "knowledge graph cannot be promoted. Raise "
+                    "LIGHTRAG_INSERT_TIMEOUT_SECONDS for large documents."
                 )
         finally:
             try:
@@ -1799,6 +1815,39 @@ class IncrementalUpdateService:
             indexed_at=_utcnow(),
         )
         return len(children)
+
+    async def _verify_candidate_graph(self, generation: Any) -> tuple[int, int]:
+        """Prove the candidate actually contains entities and relationships.
+
+        A chunk-only candidate answers from vectors alone, so promotion must be
+        refused instead of silently shipping an empty graph.  Nano generations
+        keep their graph in a workspace file and are checked elsewhere.
+        """
+        collections = generation.collections or {}
+        entities_name = collections.get("entities")
+        relationships_name = collections.get("relationships")
+        if not entities_name or not relationships_name:
+            if getattr(generation, "backend", None) != VectorBackend.qdrant.value:
+                return 0, 0
+            raise RuntimeError(
+                "Index health: candidate generation has no entity/relationship "
+                "collections; the graph was never provisioned"
+            )
+        client = self._new_qdrant_client()
+        try:
+            entities = (await client.count(collection_name=entities_name, exact=True)).count
+            relationships = (
+                await client.count(collection_name=relationships_name, exact=True)
+            ).count
+        finally:
+            await client.close()
+        if entities == 0 or relationships == 0:
+            raise RuntimeError(
+                "Index health: candidate knowledge graph is empty "
+                f"(entities={entities}, relationships={relationships}); "
+                "the generation was discarded instead of being promoted without a graph"
+            )
+        return entities, relationships
 
     async def _candidate_chunks_are_durable(
         self, collection_name: str, internal_ids: list[str]

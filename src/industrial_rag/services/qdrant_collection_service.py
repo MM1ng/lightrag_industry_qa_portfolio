@@ -73,3 +73,26 @@ class QdrantCollectionService:
             return count
         finally:
             await client.close()
+
+    async def verify_graph(self, *, minimum_entities: int = 1) -> tuple[int, int]:
+        """Verify the entity and relationship namespaces were materialised.
+
+        Chunk-level checks pass even when entity extraction wrote nothing, which
+        is how a knowledge base ends up ``ready`` while its graph is empty.  A
+        generation in that state answers from vectors only, so it must not be
+        activated as if the graph worked.
+        """
+        client = self._client()
+        try:
+            names = self.names()
+            entities = (await client.count(names["entities"], exact=True)).count
+            relationships = (await client.count(names["relationships"], exact=True)).count
+            if entities < minimum_entities or relationships < minimum_entities:
+                raise RuntimeError(
+                    "Index health: knowledge graph is empty "
+                    f"(entities={entities}, relationships={relationships}); "
+                    "re-index the documents so entity extraction can write the graph"
+                )
+            return entities, relationships
+        finally:
+            await client.close()

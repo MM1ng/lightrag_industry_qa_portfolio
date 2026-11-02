@@ -125,3 +125,6 @@ frontend/node_modules/
 frontend/dist/
 frontend/test-results/
 current-ui.png
+
+# Local probe knowledge bases created outside KB_DATA_ROOT
+ira_demo_data/

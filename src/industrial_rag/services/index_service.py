@@ -199,11 +199,16 @@ class IndexService:
                 workspace_token=kb_settings.vector_workspace,
             )
             if selected_backend is VectorBackend.qdrant:
-                qdrant_chunks = await QdrantCollectionService(kb_settings).verify_generation(
+                collections = QdrantCollectionService(kb_settings)
+                qdrant_chunks = await collections.verify_generation(
                     expected_chunks=len(all_children)
                 )
+                entity_count, relationship_count = await collections.verify_graph()
             else:
                 qdrant_chunks = 0
+                entity_count, relationship_count = self._verify_nano_graph(
+                    shadow_workspace, kb_settings.vector_workspace
+                )
 
             if selected_backend is VectorBackend.nano:
                 backup = canonical_nano_workspace.parent / f"backup-{generation_name}"
@@ -259,6 +264,8 @@ class IndexService:
                 "kb_id": kb_id,
                 "active_docs": len(active_docs),
                 "chunks": chunk_count,
+                "entities": entity_count,
+                "relationships": relationship_count,
                 "backend": selected_backend.value,
                 "generation": generation_name,
                 "generation_id": record.id,
@@ -273,6 +280,35 @@ class IndexService:
             if shadow_workspace.exists():
                 shutil.rmtree(shadow_workspace, ignore_errors=True)
             raise
+
+    @staticmethod
+    def _verify_nano_graph(workspace: Path, workspace_token: str | None) -> tuple[int, int]:
+        """Reject a Nano generation whose graph file holds no entities.
+
+        Nano keeps the graph in a GraphML file rather than Qdrant collections,
+        so the only cheap proof that extraction ran is a non-empty node set.
+        """
+        storage_root = workspace / workspace_token if workspace_token else workspace
+        graph_file = storage_root / "graph_chunk_entity_relation.graphml"
+        if not graph_file.is_file():
+            raise RuntimeError(
+                "Index health: knowledge graph file is missing "
+                f"({graph_file}); re-index the documents so entity extraction can write it"
+            )
+        with graph_file.open(encoding="utf-8", errors="ignore") as handle:
+            nodes = 0
+            edges = 0
+            for line in handle:
+                if "<node " in line:
+                    nodes += 1
+                elif "<edge " in line:
+                    edges += 1
+        if nodes == 0:
+            raise RuntimeError(
+                "Index health: knowledge graph is empty (0 entities); "
+                "re-index the documents so entity extraction can write the graph"
+            )
+        return nodes, edges
 
     async def _health_verify(
         self,

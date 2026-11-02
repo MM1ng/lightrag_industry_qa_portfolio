@@ -171,6 +171,33 @@ class FakeBackend:
                 [models.PointStruct(id=point_id, vector=[0.1] * 1024, payload=payload)],
                 wait=True,
             )
+            # Real LightRAG extraction also writes one entity and one relationship
+            # per chunk; the fake must do the same or graph verification would
+            # fail for a reason production never sees.
+            await self.service.qdrant.upsert(
+                self.service.names["entities"],
+                [
+                    models.PointStruct(
+                        id=_point_id(f"{chunk_id}-ent"),
+                        vector=[0.2] * 1024,
+                        payload={"id": f"{chunk_id}-ent", "kb_id": self.service.kb_id,
+                                 "generation": self.service.generation, "content": part},
+                    )
+                ],
+                wait=True,
+            )
+            await self.service.qdrant.upsert(
+                self.service.names["relationships"],
+                [
+                    models.PointStruct(
+                        id=_point_id(f"{chunk_id}-rel"),
+                        vector=[0.3] * 1024,
+                        payload={"id": f"{chunk_id}-rel", "kb_id": self.service.kb_id,
+                                 "generation": self.service.generation, "content": part},
+                    )
+                ],
+                wait=True,
+            )
         status = json.loads(status_path.read_text(encoding="utf-8"))
         status[doc_token]["status"] = "processed"
         status_path.write_text(json.dumps(status), encoding="utf-8")
@@ -379,9 +406,49 @@ def test_lightrag_close_timeout_does_not_block_candidate_completion(
     _run(_test())
 
 
-def test_lightrag_insert_timeout_requires_durable_candidate_chunks(
+def test_rebuild_clears_inherited_document_registry_before_insert(
     ctx: Phase9Ctx, monkeypatch
 ):
+    """A rebuild must not inherit "this document is already processed".
+
+    The candidate workspace is a copy of the active generation, so LightRAG would
+    treat the re-insert as a duplicate and skip entity extraction — the exact
+    reason a re-indexed knowledge base kept its empty graph.
+    """
+    from industrial_rag.services.incremental_update_service import (
+        IncrementalUpdateService,
+    )
+
+    purged: list[str] = []
+    original_purge = IncrementalUpdateService._purge_workspace_references
+
+    async def recording_purge(self, storage_root, removed, *, internal_doc_id):
+        purged.append(internal_doc_id)
+        return await original_purge(
+            self, storage_root, removed, internal_doc_id=internal_doc_id
+        )
+
+    monkeypatch.setattr(
+        IncrementalUpdateService, "_purge_workspace_references", recording_purge
+    )
+
+    async def _test():
+        kb_id = await ctx.create_kb()
+        result = await ctx.add(kb_id, "P9-PURGE 泵额定功率 7.5 kW。", "purge.pdf")
+        assert result["status"] == "candidate_built"
+        assert purged, "the inherited document registry must be cleared before insert"
+
+    _run(_test())
+
+
+def test_lightrag_insert_timeout_discards_candidate_generation(
+    ctx: Phase9Ctx, monkeypatch
+):
+    """A timed-out insert must never be promoted as a "buildable" candidate.
+
+    Durability of the chunks is not enough: the merge stage writes the graph, so
+    an aborted insert would ship a generation whose knowledge graph is empty.
+    """
     original_insert = FakeBackend.ainsert
 
     async def durable_then_hanging_insert(self, *args, **kwargs) -> None:
@@ -400,8 +467,8 @@ def test_lightrag_insert_timeout_requires_durable_candidate_chunks(
 
     async def _test():
         kb_id = await ctx.create_kb()
-        result = await ctx.add(kb_id, "P9-INSERT-TIMEOUT 已持久化构建。", "insert.pdf")
-        assert result["status"] == "candidate_built"
+        with pytest.raises(RuntimeError, match="LightRAG insert exceeded"):
+            await ctx.add(kb_id, "P9-INSERT-TIMEOUT 已持久化构建。", "insert.pdf")
 
     _run(_test())
 
