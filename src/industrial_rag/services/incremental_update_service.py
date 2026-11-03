@@ -72,10 +72,11 @@ LIGHTRAG_CLOSE_TIMEOUT_SECONDS = 30.0
 # Entity extraction is the slow half of an insert: every chunk costs one LLM
 # round trip before the merge stage writes any entity.  A short ceiling cut the
 # insert off between "chunks are durable" and "graph is merged", which left
-# generations active with a completely empty graph.  The default is generous on
-# purpose and can be tuned per deployment.
+# generations active with a completely empty graph.  Entity extraction costs one
+# LLM round trip per chunk, so a 400+ chunk manual needs hours; the default is
+# generous on purpose and can be tuned per deployment.
 LIGHTRAG_INSERT_TIMEOUT_SECONDS = float(
-    os.environ.get("LIGHTRAG_INSERT_TIMEOUT_SECONDS", "3600") or 3600
+    os.environ.get("LIGHTRAG_INSERT_TIMEOUT_SECONDS", "21600") or 21600
 )
 
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024

@@ -105,6 +105,7 @@ class Settings:
     llm_model: str = "kimi-k2.6"
     llm_fallback_models: tuple[str, ...] = ()
     model_fallback_enabled: bool = True
+    llm_max_async: int = 8
     embedding_model: str = "text-embedding-v4"
     embedding_dim: int = 1024
     chunk_token_size: int = 1600
@@ -248,6 +249,12 @@ class Settings:
             raise ValueError("LIGHTRAG_CHUNK_TOKEN_SIZE 必须是整数") from error
         if chunk_token_size < 512:
             raise ValueError("LIGHTRAG_CHUNK_TOKEN_SIZE 不能小于 512")
+        try:
+            llm_max_async = int(values.get("LLM_MAX_ASYNC") or "8")
+        except ValueError as error:
+            raise ValueError("LLM_MAX_ASYNC 必须是整数") from error
+        if not 1 <= llm_max_async <= 32:
+            raise ValueError("LLM_MAX_ASYNC 必须在 1 到 32 之间")
         raw_working_dir = values.get("LIGHTRAG_WORKING_DIR") or "./lightrag_storage"
         working_dir = Path(raw_working_dir)
         if not working_dir.is_absolute():
@@ -449,6 +456,7 @@ class Settings:
             embedding_model=embedding_model,
             embedding_dim=embedding_dim,
             chunk_token_size=chunk_token_size,
+            llm_max_async=llm_max_async,
             working_dir=working_dir.resolve(),
             vector_backend=vector_backend,
             qdrant_url=qdrant_url,

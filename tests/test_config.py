@@ -178,3 +178,35 @@ def test_rate_limit_zero_disables_and_proxy_headers_opt_in() -> None:
     assert settings.public_rate_limit_per_minute == 0
     assert settings.feedback_rate_limit_per_minute == 0
     assert settings.trust_proxy_headers is True
+
+
+def test_llm_max_async_defaults_to_eight() -> None:
+    settings = Settings.from_mapping(_valid_values())
+    assert settings.llm_max_async == 8
+
+
+def test_llm_max_async_is_read_from_environment() -> None:
+    settings = Settings.from_mapping({**_valid_values(), "LLM_MAX_ASYNC": "16"})
+    assert settings.llm_max_async == 16
+
+
+@pytest.mark.parametrize("raw", ["0", "33", "abc"])
+def test_llm_max_async_rejects_out_of_range_values(raw: str) -> None:
+    with pytest.raises(ValueError, match="LLM_MAX_ASYNC"):
+        Settings.from_mapping({**_valid_values(), "LLM_MAX_ASYNC": raw})
+
+
+def test_llm_max_async_defaults_to_eight() -> None:
+    settings = Settings.from_mapping(_valid_values())
+    assert settings.llm_max_async == 8
+
+
+def test_llm_max_async_is_read_from_environment() -> None:
+    settings = Settings.from_mapping({**_valid_values(), "LLM_MAX_ASYNC": "16"})
+    assert settings.llm_max_async == 16
+
+
+@pytest.mark.parametrize("raw", ["0", "33", "abc"])
+def test_llm_max_async_rejects_out_of_range_values(raw: str) -> None:
+    with pytest.raises(ValueError, match="LLM_MAX_ASYNC"):
+        Settings.from_mapping({**_valid_values(), "LLM_MAX_ASYNC": raw})

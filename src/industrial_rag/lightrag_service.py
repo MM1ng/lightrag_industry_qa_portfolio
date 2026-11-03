@@ -319,6 +319,7 @@ def build_official_backend(
         llm_model_name=settings.llm_model,
         embedding_func=embedding_func,
         chunk_token_size=settings.chunk_token_size,
+        llm_model_max_async=settings.llm_max_async,
         enable_llm_cache=settings.enable_llm_cache,
         enable_content_headings=True,
         entity_extract_max_gleaning=0,
