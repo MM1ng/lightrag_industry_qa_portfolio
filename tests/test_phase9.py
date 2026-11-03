@@ -473,6 +473,90 @@ def test_lightrag_insert_timeout_discards_candidate_generation(
     _run(_test())
 
 
+def test_insert_retries_when_lightrag_leaves_document_failed(
+    ctx: Phase9Ctx, monkeypatch
+):
+    """``ainsert`` returns normally after a per-document extraction failure.
+
+    LightRAG logs the error, marks the document ``failed`` in its sidecar status
+    and returns — so awaiting the insert is not proof that the graph was merged.
+    The build must notice and retry instead of promoting a half-extracted
+    candidate.
+    """
+    original_insert = FakeBackend.ainsert
+    attempts = {"n": 0}
+
+    async def fail_once_then_succeed(self, *args, **kwargs) -> None:
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            status_path = self.service.storage_root / "kv_store_doc_status.json"
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+            status_path.write_text(
+                json.dumps(
+                    {
+                        kwargs["ids"][0]: {
+                            "status": "failed",
+                            "chunks_count": 1,
+                            "chunks_list": [f"{kwargs['ids'][0]}-chunk-000"],
+                            "error_msg": "extract LLM func: Worker execution timeout",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return
+        await original_insert(self, *args, **kwargs)
+
+    monkeypatch.setattr(FakeBackend, "ainsert", fail_once_then_succeed)
+
+    async def _test():
+        kb_id = await ctx.create_kb()
+        result = await ctx.add(kb_id, "P9-RETRY 泵额定功率 7.5 kW。", "retry.pdf")
+        assert result["status"] == "candidate_built"
+        assert attempts["n"] == 2, "the failed document must be retried exactly once"
+
+    _run(_test())
+
+
+def test_insert_failure_discards_candidate_after_retries(
+    ctx: Phase9Ctx, monkeypatch
+):
+    original_insert = FakeBackend.ainsert
+    attempts = {"n": 0}
+
+    async def always_fail(self, *args, **kwargs) -> None:
+        attempts["n"] += 1
+        status_path = self.service.storage_root / "kv_store_doc_status.json"
+        status_path.parent.mkdir(parents=True, exist_ok=True)
+        status_path.write_text(
+            json.dumps(
+                {
+                    kwargs["ids"][0]: {
+                        "status": "failed",
+                        "chunks_count": 1,
+                        "chunks_list": [f"{kwargs['ids'][0]}-chunk-000"],
+                        "error_msg": "extract LLM func: Worker execution timeout",
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(FakeBackend, "ainsert", always_fail)
+    monkeypatch.setattr(
+        "industrial_rag.services.incremental_update_service._LIGHTRAG_INSERT_ATTEMPTS",
+        2,
+    )
+
+    async def _test():
+        kb_id = await ctx.create_kb()
+        with pytest.raises(RuntimeError, match="partially extracted"):
+            await ctx.add(kb_id, "P9-RETRY-FAIL 泵额定功率 7.5 kW。", "retry-fail.pdf")
+        assert attempts["n"] == 2
+
+    _run(_test())
+
+
 def test_01_upload_same_file_twice_returns_no_change(ctx: Phase9Ctx):
     async def _test():
         kb_id = await ctx.create_kb()

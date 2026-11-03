@@ -79,10 +79,40 @@ LIGHTRAG_INSERT_TIMEOUT_SECONDS = float(
     os.environ.get("LIGHTRAG_INSERT_TIMEOUT_SECONDS", "21600") or 21600
 )
 
+# ``ainsert`` reports success even when a document failed to extract, so the
+# build re-checks the sidecar status and retries.  Chunk results already cached
+# make a retry incremental, which is why a small number of attempts is enough.
+_LIGHTRAG_INSERT_ATTEMPTS = max(
+    1, int(os.environ.get("LIGHTRAG_INSERT_ATTEMPTS", "3") or 3)
+)
+
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".pdf"}
 PDF_MAGIC = b"%PDF-"
 _ATTEMPT_ARTIFACT_FILES = ("complete.json", "parent_chunks.jsonl", "child_chunks.jsonl")
+
+
+def read_lightrag_doc_status(
+    storage_root: Path, internal_doc_id: str
+) -> tuple[str | None, str]:
+    """Return LightRAG's own verdict for one document.
+
+    ``ainsert`` swallows per-document extraction failures: it logs the error,
+    marks the document ``failed`` in this sidecar file and returns normally.  A
+    caller that only awaits the insert therefore believes the graph was merged
+    when in fact the document contributed nothing but chunks.
+    """
+    path = storage_root / "kv_store_doc_status.json"
+    if not path.is_file():
+        return None, ""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, ""
+    record = data.get(internal_doc_id) if isinstance(data, dict) else None
+    if not isinstance(record, dict):
+        return None, ""
+    return record.get("status"), str(record.get("error_msg") or "")
 
 
 def finalize_timed_out_lightrag_status(
@@ -1761,44 +1791,70 @@ class IncrementalUpdateService:
             await self._purge_workspace_references(
                 storage_root, set(), internal_doc_id=f"kb-{identity}"
             )
-            insert_task = asyncio.create_task(
-                service._backend.ainsert(
-                    input=[boundary.join(parts)],
-                    ids=[f"kb-{identity}"],
-                    file_paths=[doc.original_file_name],
-                    split_by_character=boundary,
-                    split_by_character_only=True,
+            for attempt in range(1, _LIGHTRAG_INSERT_ATTEMPTS + 1):
+                # Re-purging on every attempt is deliberate: LightRAG would
+                # otherwise treat the retried document as a duplicate and skip
+                # the pipeline again.  Chunk-level LLM cache keeps the retry
+                # cheap — only the chunks that never finished are re-extracted.
+                await self._purge_workspace_references(
+                    storage_root, set(), internal_doc_id=f"kb-{identity}"
                 )
-            )
-            done, _pending = await asyncio.wait(
-                {insert_task}, timeout=LIGHTRAG_INSERT_TIMEOUT_SECONDS
-            )
-            if done:
+                insert_task = asyncio.create_task(
+                    service._backend.ainsert(
+                        input=[boundary.join(parts)],
+                        ids=[f"kb-{identity}"],
+                        file_paths=[doc.original_file_name],
+                        split_by_character=boundary,
+                        split_by_character_only=True,
+                    )
+                )
+                done, _pending = await asyncio.wait(
+                    {insert_task}, timeout=LIGHTRAG_INSERT_TIMEOUT_SECONDS
+                )
+                if not done:
+                    insert_task.cancel()
+                    try:
+                        await insert_task
+                    except asyncio.CancelledError:
+                        pass
+                    # Do not fall back to "chunks are durable, carry on".  A timed-out
+                    # insert stops before the merge stage, so the generation would be
+                    # promoted with an empty knowledge graph and every query would
+                    # silently degrade to vector-only retrieval.
+                    raise RuntimeError(
+                        "LightRAG insert exceeded "
+                        f"{LIGHTRAG_INSERT_TIMEOUT_SECONDS:.0f}s before entity extraction "
+                        "finished; the candidate generation was discarded so an empty "
+                        "knowledge graph cannot be promoted. Raise "
+                        "LIGHTRAG_INSERT_TIMEOUT_SECONDS for large documents."
+                    )
                 await insert_task
-                entity_count, relationship_count = await self._verify_candidate_graph(generation)
-                logger.info(
-                    "Candidate generation %s graph: %d entities, %d relationships",
-                    generation.generation,
-                    entity_count,
-                    relationship_count,
+                status, detail = read_lightrag_doc_status(storage_root, f"kb-{identity}")
+                if status == "processed":
+                    break
+                if attempt == _LIGHTRAG_INSERT_ATTEMPTS:
+                    raise RuntimeError(
+                        f"LightRAG left {doc.original_file_name} in status {status!r} "
+                        f"after {attempt} attempt(s): {detail or 'no error message'}; "
+                        "the candidate generation was discarded instead of being "
+                        "promoted with a partially extracted document"
+                    )
+                logger.warning(
+                    "LightRAG did not finish %s (status=%s: %s); retrying insert "
+                    "(attempt %d/%d)",
+                    doc.original_file_name,
+                    status,
+                    detail or "no error message",
+                    attempt + 1,
+                    _LIGHTRAG_INSERT_ATTEMPTS,
                 )
-            else:
-                insert_task.cancel()
-                try:
-                    await insert_task
-                except asyncio.CancelledError:
-                    pass
-                # Do not fall back to "chunks are durable, carry on".  A timed-out
-                # insert stops before the merge stage, so the generation would be
-                # promoted with an empty knowledge graph and every query would
-                # silently degrade to vector-only retrieval.
-                raise RuntimeError(
-                    "LightRAG insert exceeded "
-                    f"{LIGHTRAG_INSERT_TIMEOUT_SECONDS:.0f}s before entity extraction "
-                    "finished; the candidate generation was discarded so an empty "
-                    "knowledge graph cannot be promoted. Raise "
-                    "LIGHTRAG_INSERT_TIMEOUT_SECONDS for large documents."
-                )
+            entity_count, relationship_count = await self._verify_candidate_graph(generation)
+            logger.info(
+                "Candidate generation %s graph: %d entities, %d relationships",
+                generation.generation,
+                entity_count,
+                relationship_count,
+            )
         finally:
             try:
                 await asyncio.wait_for(
