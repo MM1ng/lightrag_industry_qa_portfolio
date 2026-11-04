@@ -754,6 +754,16 @@ def _structured_citation_system_prompt(
         + "请只输出合法JSON，不要输出Markdown代码块或其他文字。\n"
         + "只能使用下列 Source ID；不要输出数据库 Chunk ID。每个 answer_point 必须有 1 到 2 个不同 source_ids。\n"
         + "Source 足够时不要添加第二个；没有直接证据的答案点不要输出。\n"
+        # The strict "no direct evidence -> no point" rule alone made the model
+        # return zero answer points whenever the evidence was fragmented (parts
+        # tables, troubleshooting rows), even though those rows did answer the
+        # question.  Measured on the packing-seal question: 4 of 5 identical
+        # calls returned an empty answer_points list, while the same evidence
+        # answered normally without the JSON contract.  State the positive
+        # obligation explicitly so partial evidence is used instead of skipped.
+        + "只要 Source 中包含与问题相关的事实，就必须输出答案点，即使证据只覆盖问题的一部分。\n"
+        + "证据来自零件表、故障排查表或零散条目时，也要据此归纳作答，不要因为格式零散而拒绝。\n"
+        + "只有当所有 Source 都与问题完全无关、不具备任何可用信息时，才输出空的 answer_points 并标记 insufficient_evidence。\n"
         + "若有答案点且有未解决项，使用 partial_answer；没有答案点时使用 insufficient_evidence。\n"
         + "输出格式：{\"status\":\"success|partial_answer|insufficient_evidence\",\"answer_points\":[{\"text\":\"...\",\"source_ids\":[\"S1\"]}],\"unresolved_requirement_ids\":[\"R1\"]}\n"
         + f"当前 Requirement IDs：{unresolved}\n\n"

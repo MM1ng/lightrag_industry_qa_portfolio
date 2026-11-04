@@ -175,3 +175,54 @@ async def test_flag_off_keeps_existing_non_json_prompt_and_result_shape(tmp_path
     assert result.answer == "原J0回答。"
     assert result.retrieval_trace is not None
     assert result.retrieval_trace.structured_citation_flag is False
+
+
+def _packing_prompt() -> str:
+    from industrial_rag.evidence_answer_schema import EvidenceRef
+    from industrial_rag.lightrag_service import _structured_citation_system_prompt
+    from industrial_rag.structured_citation_output import (
+        RequirementRegistry,
+        SourceRegistry,
+    )
+
+    refs = (
+        EvidenceRef(
+            evidence_id="E1",
+            chunk_id="c1",
+            generation_id="g1",
+            document_name="manual.pdf",
+            citation_id="cite_1",
+            context_role="primary",
+            text=(
+                "编织填料作为所有泵的标准设备提供。安装压盖螺栓的螺母时，仅用手拧紧。"
+                "在启动时调节压盖螺栓的螺母，达到每分钟滴漏 40-65 滴。"
+                "若填料函装填不当导致过度滴漏，需要重新装填填料函。"
+            ),
+            is_child=True,
+        ),
+    )
+    return _structured_citation_system_prompt(
+        SourceRegistry.from_evidence(refs), RequirementRegistry.from_requirements(())
+    )
+
+
+def test_structured_prompt_requires_answering_from_partial_evidence() -> None:
+    """Regression: the strict prompt made the model return zero answer points.
+
+    Measured before the fix: the same prompt returned an empty answer_points
+    list in 4 of 5 calls for a question the evidence clearly answered.
+    """
+
+    prompt = _packing_prompt()
+
+    assert "必须输出答案点" in prompt
+    assert "零件表" in prompt or "故障排查表" in prompt
+
+
+def test_structured_prompt_still_allows_refusal_for_unrelated_sources() -> None:
+    """Loosening must stay bounded: refusal remains the fallback, not the default."""
+
+    prompt = _packing_prompt()
+
+    assert "完全无关" in prompt
+    assert "insufficient_evidence" in prompt
