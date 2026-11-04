@@ -268,6 +268,13 @@ def build_official_backend(
         ) -> str:
             nonlocal active_model_index
             kwargs.pop("model", None)
+            if settings.llm_enable_thinking is not None:
+                # DashScope compatible-mode takes this as an extra body field.
+                # Hybrid-reasoning models otherwise spend the completion budget
+                # on ``reasoning_content`` and can return an empty answer.
+                kwargs.setdefault(
+                    "extra_body", {"enable_thinking": settings.llm_enable_thinking}
+                )
             configured_models = (
                 settings.llm_models
                 if settings.model_fallback_enabled

@@ -196,17 +196,20 @@ def test_llm_max_async_rejects_out_of_range_values(raw: str) -> None:
         Settings.from_mapping({**_valid_values(), "LLM_MAX_ASYNC": raw})
 
 
-def test_llm_max_async_defaults_to_eight() -> None:
+def test_llm_enable_thinking_is_unset_by_default() -> None:
     settings = Settings.from_mapping(_valid_values())
-    assert settings.llm_max_async == 8
+    assert settings.llm_enable_thinking is None
 
 
-def test_llm_max_async_is_read_from_environment() -> None:
-    settings = Settings.from_mapping({**_valid_values(), "LLM_MAX_ASYNC": "16"})
-    assert settings.llm_max_async == 16
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("false", False), ("FALSE", False), ("true", True), ("auto", None), ("", None)],
+)
+def test_llm_enable_thinking_is_read_from_environment(raw: str, expected) -> None:
+    settings = Settings.from_mapping({**_valid_values(), "LLM_ENABLE_THINKING": raw})
+    assert settings.llm_enable_thinking is expected
 
 
-@pytest.mark.parametrize("raw", ["0", "33", "abc"])
-def test_llm_max_async_rejects_out_of_range_values(raw: str) -> None:
-    with pytest.raises(ValueError, match="LLM_MAX_ASYNC"):
-        Settings.from_mapping({**_valid_values(), "LLM_MAX_ASYNC": raw})
+def test_llm_enable_thinking_rejects_unknown_values() -> None:
+    with pytest.raises(ValueError, match="LLM_ENABLE_THINKING"):
+        Settings.from_mapping({**_valid_values(), "LLM_ENABLE_THINKING": "maybe"})

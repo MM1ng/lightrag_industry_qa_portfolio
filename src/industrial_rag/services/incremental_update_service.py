@@ -43,6 +43,10 @@ from industrial_rag.db.models import (
 from industrial_rag.errors import AppError, AppErrorCode
 from industrial_rag.kb_runtime_settings import settings_for_knowledge_base
 from industrial_rag.operational_metrics import operational_metrics
+from industrial_rag.qdrant_graph_reader import (
+    load_graph_from_qdrant,
+    materialize_graphml,
+)
 from industrial_rag.repositories.document_repository import DocumentRepository
 from industrial_rag.repositories.knowledge_base_repository import (
     KnowledgeBaseRepository,
@@ -1855,6 +1859,17 @@ class IncrementalUpdateService:
                 entity_count,
                 relationship_count,
             )
+            if getattr(generation, "backend", None) == VectorBackend.qdrant.value:
+                # Qdrant holds entities/relationships in vector collections only;
+                # LightRAG's query path traverses the graph through its GraphML
+                # storage.  Materialise that file from the collections we just
+                # verified, otherwise every ``mix`` query degrades to vectors.
+                materialised = await self._materialise_graph_file(settings, storage_root)
+                logger.info(
+                    "Materialised graph structure for %s at %s",
+                    generation.generation,
+                    materialised,
+                )
         finally:
             try:
                 await asyncio.wait_for(
@@ -1872,6 +1887,15 @@ class IncrementalUpdateService:
             indexed_at=_utcnow(),
         )
         return len(children)
+
+    async def _materialise_graph_file(self, settings: Any, storage_root: Path) -> Path:
+        """Write the generation's graph projection next to its workspace."""
+        graph, _ = await load_graph_from_qdrant(settings)
+        if graph.number_of_nodes() == 0:
+            raise RuntimeError(
+                "Index health: refusing to materialise an empty graph file"
+            )
+        return materialize_graphml(graph, storage_root)
 
     async def _verify_candidate_graph(self, generation: Any) -> tuple[int, int]:
         """Prove the candidate actually contains entities and relationships.

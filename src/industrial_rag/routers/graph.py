@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import OrderedDict
+from pathlib import Path
 from typing import Any
 
 import networkx as nx
@@ -14,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from industrial_rag import graph_visualizer as graph_tools
+from industrial_rag import qdrant_graph_reader
 from industrial_rag.config import Settings
 from industrial_rag.db.models import KBStatus, KnowledgeBase
 from industrial_rag.db.session import get_session_factory
@@ -91,31 +93,58 @@ async def _kb_settings(request: Request, kb_id: str) -> Settings:
             ) from error
 
 
-def _graph_path(settings: Settings):
+def _graph_path(settings: Settings) -> Path | None:
+    """Return the legacy GraphML path of this generation, if one exists."""
     workspace = settings.vector_workspace
     if workspace is None and settings.qdrant_generation:
         workspace = f"{settings.vector_backend.value}-{settings.qdrant_generation}"
     graph_path = graph_tools.locate_graph_file(settings.working_dir, workspace=workspace)
     if graph_path is None and workspace is not None:
         graph_path = graph_tools.locate_graph_file(settings.working_dir)
-    if graph_path is None:
-        raise AppError("graph_not_found", "当前知识库没有可用的知识图谱。", status_code=404)
     return graph_path
 
 
-async def _load_graph(request: Request, kb_id: str) -> tuple[nx.Graph, str]:
-    """Load one knowledge base's graph off the event loop with its file identity.
+async def _load_qdrant_graph(settings: Settings) -> tuple[nx.Graph, str]:
+    """Rebuild the graph from the generation's Qdrant collections.
 
-    ``nx.read_graphml`` is a synchronous, CPU/IO bound call that costs hundreds
-    of milliseconds on a production graph, so it runs in a worker thread and is
-    memoised by ``(path, mtime, size)`` in :mod:`industrial_rag.graph_visualizer`.
+    Qdrant generations never write a GraphML file, so the file-first lookup in
+    :func:`_graph_path` cannot find them; the entity/relationship collections
+    already hold everything the projection needs.
     """
-    graph_path = _graph_path(await _kb_settings(request, kb_id))
+    try:
+        graph, fingerprint = await qdrant_graph_reader.load_graph_from_qdrant(settings)
+    except FileNotFoundError as error:
+        raise AppError(
+            "graph_not_found", "当前知识库没有可用的知识图谱。", status_code=404
+        ) from error
+    except RuntimeError as error:
+        raise AppError(
+            "graph_not_found", "当前知识库尚未完成索引。", status_code=404
+        ) from error
+    except Exception as error:
+        raise AppError("graph_unreadable", "知识图谱暂时无法读取。", status_code=503) from error
+    if graph.number_of_nodes() == 0:
+        raise AppError("graph_not_found", "当前知识库没有可用的知识图谱。", status_code=404)
+    return graph, fingerprint
+
+
+async def _load_graph(request: Request, kb_id: str) -> tuple[nx.Graph, str]:
+    """Load one knowledge base's graph off the event loop with its identity.
+
+    GraphML (NetworkX generations) is preferred when present; Qdrant-backed
+    generations fall back to their entity/relationship collections.  Both paths
+    run off the event loop and the GraphML path is memoised by
+    ``(path, mtime, size)`` in :mod:`industrial_rag.graph_visualizer`.
+    """
+    settings = await _kb_settings(request, kb_id)
+    graph_path = _graph_path(settings)
+    if graph_path is None:
+        return await _load_qdrant_graph(settings)
     try:
         fingerprint = await asyncio.to_thread(graph_tools.graph_file_fingerprint, graph_path)
         graph = await asyncio.to_thread(graph_tools.load_graph_cached, graph_path)
     except FileNotFoundError:
-        raise AppError("graph_not_found", "当前知识库没有可用的知识图谱。", status_code=404) from None
+        return await _load_qdrant_graph(settings)
     except Exception as error:
         raise AppError("graph_unreadable", "知识图谱暂时无法读取。", status_code=503) from error
     return graph, fingerprint

@@ -190,3 +190,73 @@ def test_graph_unreadable_file_returns_public_503(tmp_path: Path):
         response = client.get(f"/v1/knowledge-bases/{kb_id}/graph/overview")
     assert response.status_code == 503
     assert response.json()["code"] == "graph_unreadable"
+
+
+def _qdrant_app(tmp_path: Path) -> tuple[object, str]:
+    """A Qdrant-backed KB whose generation has no GraphML on disk."""
+    storage = tmp_path / "qdrant-only-root"
+    workspace = storage / "qdrant-gtest0001"
+    workspace.mkdir(parents=True)
+    kb_id = seed_qdrant_knowledge_base(workspace=workspace, generation="gtest0001")
+    settings = Settings(
+        api_key="offline-test-key",
+        working_dir=storage,
+        vector_backend=VectorBackend.qdrant,
+        qdrant_url="http://127.0.0.1:17333",
+    )
+    return create_app(settings=settings, runtime_factory=lambda _: _Runtime()), kb_id
+
+
+def test_graph_overview_falls_back_to_qdrant_collections(tmp_path: Path, monkeypatch):
+    from industrial_rag.routers import graph as graph_router
+
+    graph = nx.Graph()
+    graph.add_node("Pump", entity_name="Pump", entity_type="artifact", description="离心泵")
+    graph.add_node("Bearing", entity_name="Bearing", entity_type="artifact")
+    graph.add_edge("Pump", "Bearing", keywords="contains")
+
+    async def _fake_loader(settings):
+        return graph, "fingerprint"
+
+    monkeypatch.setattr(graph_router.qdrant_graph_reader, "load_graph_from_qdrant", _fake_loader)
+    app, kb_id = _qdrant_app(tmp_path)
+    with TestClient(app) as client:
+        response = client.get(f"/v1/knowledge-bases/{kb_id}/graph/overview")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert {node["label"] for node in payload["nodes"]} == {"Pump", "Bearing"}
+    assert payload["stats"]["edge_count"] == 1
+    assert payload["edges"][0]["label"] == "contains"
+
+
+def test_graph_overview_returns_404_when_qdrant_collections_are_missing(
+    tmp_path: Path, monkeypatch
+):
+    from industrial_rag.routers import graph as graph_router
+
+    async def _missing(settings):
+        raise FileNotFoundError("Qdrant collection is missing: entities")
+
+    monkeypatch.setattr(graph_router.qdrant_graph_reader, "load_graph_from_qdrant", _missing)
+    app, kb_id = _qdrant_app(tmp_path)
+    with TestClient(app) as client:
+        response = client.get(f"/v1/knowledge-bases/{kb_id}/graph/overview")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "graph_not_found"
+
+
+def test_graph_overview_returns_404_when_qdrant_graph_is_empty(tmp_path: Path, monkeypatch):
+    from industrial_rag.routers import graph as graph_router
+
+    async def _empty(settings):
+        return nx.Graph(), "empty-fingerprint"
+
+    monkeypatch.setattr(graph_router.qdrant_graph_reader, "load_graph_from_qdrant", _empty)
+    app, kb_id = _qdrant_app(tmp_path)
+    with TestClient(app) as client:
+        response = client.get(f"/v1/knowledge-bases/{kb_id}/graph/overview")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "graph_not_found"

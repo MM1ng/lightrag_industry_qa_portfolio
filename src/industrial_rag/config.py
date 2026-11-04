@@ -106,6 +106,11 @@ class Settings:
     llm_fallback_models: tuple[str, ...] = ()
     model_fallback_enabled: bool = True
     llm_max_async: int = 8
+    # ``None`` keeps the provider default; ``False`` asks hybrid-reasoning models
+    # (Qwen3 family) to answer without a thinking phase.  Thinking models spend
+    # the completion budget on ``reasoning_content`` first, which can leave the
+    # visible answer empty and starve the grounding layer.
+    llm_enable_thinking: bool | None = None
     embedding_model: str = "text-embedding-v4"
     embedding_dim: int = 1024
     chunk_token_size: int = 1600
@@ -255,6 +260,15 @@ class Settings:
             raise ValueError("LLM_MAX_ASYNC 必须是整数") from error
         if not 1 <= llm_max_async <= 32:
             raise ValueError("LLM_MAX_ASYNC 必须在 1 到 32 之间")
+        raw_enable_thinking = (values.get("LLM_ENABLE_THINKING") or "").strip().lower()
+        if raw_enable_thinking in ("", "auto"):
+            llm_enable_thinking: bool | None = None
+        elif raw_enable_thinking in ("true", "1", "yes"):
+            llm_enable_thinking = True
+        elif raw_enable_thinking in ("false", "0", "no"):
+            llm_enable_thinking = False
+        else:
+            raise ValueError("LLM_ENABLE_THINKING 必须是 true/false 或留空")
         raw_working_dir = values.get("LIGHTRAG_WORKING_DIR") or "./lightrag_storage"
         working_dir = Path(raw_working_dir)
         if not working_dir.is_absolute():
@@ -457,6 +471,7 @@ class Settings:
             embedding_dim=embedding_dim,
             chunk_token_size=chunk_token_size,
             llm_max_async=llm_max_async,
+            llm_enable_thinking=llm_enable_thinking,
             working_dir=working_dir.resolve(),
             vector_backend=vector_backend,
             qdrant_url=qdrant_url,
