@@ -147,6 +147,11 @@ async def _load_graph(request: Request, kb_id: str) -> tuple[nx.Graph, str]:
         return await _load_qdrant_graph(settings)
     except Exception as error:
         raise AppError("graph_unreadable", "知识图谱暂时无法读取。", status_code=503) from error
+    # LightRAG's entity payloads never persist ``entity_type``, so GraphML
+    # materialised from them says UNKNOWN for every node and the legend collapses
+    # to a single "未知".  Complete the type at read time instead of asking for a
+    # generation rebuild; real types are left untouched.
+    qdrant_graph_reader.apply_display_entity_types(graph)
     return graph, fingerprint
 
 

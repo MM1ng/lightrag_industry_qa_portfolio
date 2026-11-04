@@ -141,3 +141,46 @@ def test_materialize_graphml_replaces_previous_file(tmp_path) -> None:
     path = reader.materialize_graphml(second, target)
 
     assert set(nx.read_graphml(path).nodes) == {"Pump", "Valve"}
+
+
+def test_stored_entity_type_wins_over_inference() -> None:
+    graph = reader.build_graph_from_payloads(
+        [_entity("Mechanical Seal", "机械密封", entity_type="artifact")], []
+    )
+
+    assert graph.nodes["Mechanical Seal"]["entity_type"] == "artifact"
+
+
+def test_unknown_stored_type_falls_back_to_inference() -> None:
+    graph = reader.build_graph_from_payloads(
+        [_entity("Mechanical Seal", "机械密封", entity_type="UNKNOWN")], []
+    )
+
+    assert graph.nodes["Mechanical Seal"]["entity_type"] == "inferred:component"
+
+
+def test_payload_without_type_is_inferred_for_display() -> None:
+    """Payloads carry no entity_type today; nodes must not all read 未知."""
+
+    graph = reader.build_graph_from_payloads(
+        [
+            _entity("Mechanical Seal", "机械密封"),
+            _entity("Installation", "安装步骤"),
+            _entity("Bearing Temperature", "轴承温度限值"),
+            _entity("2196-ANSI-Manual-Chinese.pdf", "手册文件"),
+        ],
+        [],
+    )
+
+    types = {name: graph.nodes[name]["entity_type"] for name in graph.nodes}
+    assert types["Mechanical Seal"] == "inferred:component"
+    assert types["Installation"] == "inferred:procedure"
+    assert types["Bearing Temperature"] == "inferred:measurement"
+    assert types["2196-ANSI-Manual-Chinese.pdf"] == "inferred:document"
+    assert "UNKNOWN" not in types.values()
+
+
+def test_unmatched_entity_name_stays_unknown() -> None:
+    graph = reader.build_graph_from_payloads([_entity("Zzz", "无类型线索")], [])
+
+    assert graph.nodes["Zzz"]["entity_type"] == reader.DEFAULT_ENTITY_TYPE

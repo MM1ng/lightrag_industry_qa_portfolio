@@ -26,11 +26,60 @@ import networkx as nx
 from qdrant_client import AsyncQdrantClient
 
 from industrial_rag.config import Settings
+from industrial_rag.graph_display_mapping import infer_entity_type
 from industrial_rag.services.qdrant_collection_service import QdrantCollectionService
 
 _SCROLL_LIMIT = 1000
 GRAPHML_FILENAME = "graph_chunk_entity_relation.graphml"
 DEFAULT_ENTITY_TYPE = "UNKNOWN"
+
+
+def _entity_type_for(payload: Mapping[str, Any], name: str) -> str:
+    """Prefer a stored ``entity_type``; otherwise infer one for display only.
+
+    LightRAG's ``entities_vdb`` meta_fields are exactly
+    ``{entity_name, source_id, content, file_path}``, so today's payloads never
+    contain a real type and every node would render as "未知".  A stored type
+    (present as soon as the payload whitelist includes it) always wins; the
+    inferred fallback is marked with ``inferred:`` so the UI can label it as a
+    presentation guess rather than an extraction result.
+    """
+
+    stored = str(payload.get("entity_type") or "").strip()
+    if stored and stored.upper() != DEFAULT_ENTITY_TYPE:
+        return stored
+    return infer_entity_type(name) or DEFAULT_ENTITY_TYPE
+
+
+def _display_type(stored: Any, name: str) -> str:
+    return _entity_type_for({"entity_type": stored}, name)
+
+
+def apply_display_entity_types(graph: nx.Graph) -> int:
+    """Fill missing node types with display-only inferences, in place.
+
+    GraphML materialised before this change carries ``entity_type=UNKNOWN`` for
+    every node.  Repairing the rendered legend must not require rewriting the
+    file (or rebuilding the generation), so the projection is completed here at
+    read time.  Real types are never overwritten.
+
+    Returns the number of nodes whose type was inferred.
+    """
+
+    inferred = 0
+    for node_id, attrs in graph.nodes(data=True):
+        current = str(attrs.get("entity_type") or "").strip()
+        if current and current.upper() != DEFAULT_ENTITY_TYPE:
+            continue
+        name = str(attrs.get("entity_name") or node_id)
+        resolved = _display_type(current, name)
+        if resolved == current:
+            continue
+        attrs["entity_type"] = resolved
+        graph.nodes[node_id]["entity_type"] = resolved
+        if resolved != DEFAULT_ENTITY_TYPE:
+            inferred += 1
+    return inferred
 
 
 def _split_headline(text: str, *, separator: str = "\n") -> tuple[str, str]:
@@ -57,7 +106,7 @@ def build_graph_from_payloads(
             name,
             entity_id=name,
             entity_name=name,
-            entity_type=DEFAULT_ENTITY_TYPE,
+            entity_type=_entity_type_for(payload, name),
             description=description,
             source_id=payload.get("source_id") or "",
             file_path=payload.get("file_path") or "",
