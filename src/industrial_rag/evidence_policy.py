@@ -26,12 +26,12 @@ _CJK_BOUNDARY_PATTERN = re.compile(
 # operator searches with ("安装步骤", "拆卸注意").  Treating them as generic
 # filler made installation/disassembly questions unmatchable, so they stay
 # matchable while the remaining instructional fillers remain filtered.
-_CJK_INDEX_TERMS = frozenset({"安装", "拆卸", "检修", "启动", "停机"})
+_CJK_INDEX_TERMS = frozenset({"安装", "拆卸", "检修", "启动", "停机", "型号", "规格"})
 # Answer-shape words describe how an answer should look, not what it is about.
 # Left inside a CJK run they produce junk terms such as 装步 / 安装步, which
 # then never match manual prose and starve the generator of evidence.
 _CJK_SCAFFOLD_PATTERN = re.compile(
-    r"(?:注意事项|注意什么|怎么办|排查|步骤|注意|事项|什么|方法|要求|说明|情况|过程|流程|时候|原因)+"
+    r"(?:有哪些|有什么|注意事项|注意什么|怎么办|哪些|哪个|排查|步骤|注意|事项|什么|方法|要求|说明|情况|过程|流程|时候|原因)+"
 )
 # Nouns naming the corpus itself rather than the question's subject.
 _CJK_TOPIC_WORDS = frozenset({"泵", "水泵", "泵组", "设备", "机组", "系统", "手册"})
@@ -337,10 +337,17 @@ def _cjk_terms(token: str) -> frozenset[str]:
 
 
 def _cjk_segments(token: str) -> tuple[str, ...]:
-    """Split one CJK run into word-like segments (see ``_cjk_terms``)."""
+    """Split one CJK run into word-like segments (see ``_cjk_terms``).
+
+    Corpus-wide topic nouns (泵/设备) are removed first: they name the manual's
+    subject rather than the question's, and leaving them in splits compounds such
+    as 型号规格 into 泵型 + 号规.
+    """
 
     normalized = _GENERIC_CJK_PHRASE_PATTERN.sub("", token)
     normalized = _CJK_SCAFFOLD_PATTERN.sub("", normalized)
+    for topic in _CJK_TOPIC_WORDS:
+        normalized = normalized.replace(topic, "")
     normalized = _CONDITION_PATTERN.sub(
         lambda match: _CONDITION_NORMALIZATIONS[match.group()], normalized
     )

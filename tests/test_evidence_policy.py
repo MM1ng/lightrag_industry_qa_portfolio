@@ -544,3 +544,33 @@ def test_subject_only_or_unrelated_chunks_still_refuse(question: str, text: str)
     decision = select_evidence(question, _payload(candidate))
 
     assert decision == EvidenceDecision(False, None, ())
+
+
+def test_model_specification_question_matches_model_listing() -> None:
+    """Regression: 2196 泵有哪些型号规格 refused despite the manual listing them."""
+
+    candidate = _path_candidate(
+        SUMMIT_MANUAL,
+        46,
+        "model-listing",
+        "泵型号规格包括 SUMMIT PUMP 2196 / 2196-LF / 2196-R / 2796 型，"
+        "以及 STO、MTO、LTO、XLO 和 XLO-17 型号。",
+    )
+
+    decision = select_evidence("2196 泵有哪些型号规格？", _payload(candidate))
+
+    assert decision.allowed is True
+    assert decision.selected[0].citation.chunk_id == "model-listing"
+
+
+def test_model_specification_question_still_refuses_unrelated_chunk() -> None:
+    candidate = _path_candidate(
+        SUMMIT_MANUAL,
+        47,
+        "unrelated",
+        "今天天气很好适合去公园散步。",
+    )
+
+    decision = select_evidence("2196 泵有哪些型号规格？", _payload(candidate))
+
+    assert decision == EvidenceDecision(False, None, ())
