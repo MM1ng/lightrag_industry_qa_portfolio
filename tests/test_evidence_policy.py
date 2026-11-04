@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 from industrial_rag.citation_formatter import Citation, encode_chunk_header, encode_source_ref
-from industrial_rag.evidence_policy import EvidenceDecision, select_evidence
+from industrial_rag.evidence_policy import EvidenceDecision, _tokens, select_evidence
 
 SUMMIT_MANUAL = "2196-ANSI-Manual-Chinese.pdf"
 DESMI_MANUAL = "t1739cn.pdf"
@@ -470,3 +470,77 @@ def test_troubleshooting_selection_keeps_actionable_chunk_ahead_of_manual_title_
     assert "diagnostic-page" in selected_ids
     assert "title-page" not in selected_ids
     assert "another-title-page" not in selected_ids
+
+
+def test_chinese_cjk_tokens_do_not_cross_structural_particles() -> None:
+    """Cross-particle fragments made ordinary Chinese questions unmatchable."""
+
+    tokens = _tokens("泵的安装步骤是什么？")
+
+    assert "安装" in tokens
+    assert not {token for token in tokens if "的" in token or token.endswith("是")}
+
+
+def test_installation_question_matches_installation_chunks() -> None:
+    """Regression: 泵的安装步骤是什么 selected one chunk and answered nothing."""
+
+    candidates = (
+        _path_candidate(
+            SUMMIT_MANUAL,
+            23,
+            "vibration-base",
+            "当泵安装在减震台座上，进出口管路需要用挠性接头。",
+        ),
+        _path_candidate(
+            SUMMIT_MANUAL,
+            22,
+            "shim-base",
+            "在水泵底板和基础之间使用垫片，确保安装固定时泵脚不受拉力。",
+        ),
+        _path_candidate(
+            SUMMIT_MANUAL,
+            44,
+            "foot-table",
+            "泵 支脚类型 轴 架 尺寸 Z X A B C D SP E1 E2 F H U 键槽",
+        ),
+    )
+
+    decision = select_evidence("泵的安装步骤是什么？", _payload(*candidates))
+
+    selected_ids = [item.citation.chunk_id for item in decision.selected]
+    assert decision.allowed is True
+    assert "vibration-base" in selected_ids
+    assert "shim-base" in selected_ids
+
+
+def test_mechanical_seal_disassembly_question_matches_seal_evidence() -> None:
+    candidate = _path_candidate(
+        SUMMIT_MANUAL,
+        32,
+        "seal-leak",
+        "机械密封在运行期间仅会出现轻微泄漏或不可见泄漏（如蒸汽）的情况。",
+    )
+
+    decision = select_evidence("2196 泵的机械密封拆卸注意什么？", _payload(candidate))
+
+    assert decision.allowed is True
+    assert decision.selected[0].citation.chunk_id == "seal-leak"
+
+
+@pytest.mark.parametrize(
+    ("question", "text"),
+    [
+        # The chunk names the machine but never the fault being asked about.
+        ("泵体泄漏怎么办？", "泵体材质为铸铁。"),
+        # Unrelated subject: sharing only the corpus noun must not admit.
+        ("泵的安装步骤是什么？", "今天天气很好适合去公园散步。"),
+        # Fabricated material spec that no chunk states.
+        ("泵体泄漏怎么办？", "该泵由钛合金整体铸造。"),
+    ],
+)
+def test_subject_only_or_unrelated_chunks_still_refuse(question: str, text: str) -> None:
+    candidate = _path_candidate(SUMMIT_MANUAL, 18, "subject-only", text)
+
+    decision = select_evidence(question, _payload(candidate))
+
+    assert decision == EvidenceDecision(False, None, ())
