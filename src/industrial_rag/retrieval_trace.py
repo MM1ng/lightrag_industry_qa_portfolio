@@ -202,6 +202,12 @@ class RetrievalExecutionTrace:
     grounding_removed_answer_points: tuple[str, ...] = ()
     grounding_removal_reasons: tuple[dict[str, object], ...] = ()
     grounding_false_negative_diagnostics: tuple[dict[str, object], ...] = ()
+    # Admin-only audit of answer points that shipped while asserting identifiers
+    # (model/variant names, standard numbers) absent from their cited evidence.
+    # Observation only: it never changes the answer or the status, so operators
+    # can measure how often model prose outruns the manual before deciding
+    # whether to enforce a semantic grounding gate.
+    unsupported_assertion_audit: tuple[dict[str, object], ...] = ()
     generated_answer_points: tuple[str, ...] = ()
     rejected_answer_points: tuple[str, ...] = ()
     support_validation_reason_codes: tuple[str, ...] = ()
@@ -361,6 +367,7 @@ class RetrievalExecutionTrace:
             "grounding_removed_answer_points": list(self.grounding_removed_answer_points),
             "grounding_removal_reasons": list(self.grounding_removal_reasons),
             "grounding_false_negative_diagnostics": list(self.grounding_false_negative_diagnostics),
+            "unsupported_assertion_audit": list(self.unsupported_assertion_audit),
             "generated_answer_points": list(self.generated_answer_points),
             "rejected_answer_points": list(self.rejected_answer_points),
             "support_validation_reason_codes": list(self.support_validation_reason_codes),

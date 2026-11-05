@@ -226,3 +226,85 @@ def test_structured_prompt_still_allows_refusal_for_unrelated_sources() -> None:
 
     assert "完全无关" in prompt
     assert "insufficient_evidence" in prompt
+
+
+def test_unsupported_assertion_audit_records_invented_identifier() -> None:
+    """Observation only: the point is recorded, not dropped."""
+
+    from industrial_rag.answer_grounding import AnswerPoint
+    from industrial_rag.citation_formatter import Citation
+    from industrial_rag.evidence_policy import EvidenceCandidate
+    from industrial_rag.lightrag_service import _unsupported_assertion_audit
+
+    evidence = "对于直连结构，轴承温度不得超过电机允许值（具体按照电机铭牌要求，在电机外壳测量）。"
+    candidates = (EvidenceCandidate(Citation("m.pdf", 45, "c1"), evidence, 1),)
+    grounded = type(
+        "G",
+        (),
+        {
+            "answer_points": (
+                AnswerPoint(
+                    "P1",
+                    "对于直连结构（API 682 标准），轴承温度不得超过电机允许值。",
+                    ("E1",),
+                    "supported",
+                ),
+            )
+        },
+    )()
+
+    audit = _unsupported_assertion_audit(grounded, candidates)
+
+    assert audit, "invented identifier must be recorded"
+    assert set(audit[0]["unverified_identifiers"]) == {"682", "api"}
+
+
+def test_unsupported_assertion_audit_ignores_faithful_restatement() -> None:
+    from industrial_rag.answer_grounding import AnswerPoint
+    from industrial_rag.citation_formatter import Citation
+    from industrial_rag.evidence_policy import EvidenceCandidate
+    from industrial_rag.lightrag_service import _unsupported_assertion_audit
+
+    evidence = "对于直连结构，轴承温度不得超过电机允许值（具体按照电机铭牌要求，在电机外壳测量）。"
+    candidates = (EvidenceCandidate(Citation("m.pdf", 45, "c1"), evidence, 1),)
+    grounded = type(
+        "G",
+        (),
+        {
+            "answer_points": (
+                AnswerPoint(
+                    "P1",
+                    "对于直连结构，轴承温度不得超过电机允许值。",
+                    ("E1",),
+                    "supported",
+                ),
+            )
+        },
+    )()
+
+    assert _unsupported_assertion_audit(grounded, candidates) == ()
+
+
+def test_unsupported_assertion_audit_accepts_identifier_present_in_any_candidate() -> None:
+    """One supporting chunk is enough; only identifiers absent everywhere flag."""
+
+    from industrial_rag.answer_grounding import AnswerPoint
+    from industrial_rag.citation_formatter import Citation
+    from industrial_rag.evidence_policy import EvidenceCandidate
+    from industrial_rag.lightrag_service import _unsupported_assertion_audit
+
+    candidates = (
+        EvidenceCandidate(Citation("m.pdf", 45, "c1"), "轴承温度不得超过电机允许值。", 1),
+        EvidenceCandidate(Citation("m.pdf", 46, "c2"), "参见 API 682 标准的相关要求。", 2),
+    )
+    grounded = type(
+        "G",
+        (),
+        {
+            "answer_points": (
+                AnswerPoint("P1", "按 API 682 标准，轴承温度不得超过电机允许值。", ("E1",), "supported"),
+            )
+        },
+    )()
+
+    assert _unsupported_assertion_audit(grounded, candidates) == ()

@@ -14,6 +14,7 @@ from industrial_rag.answer_grounding import (
     AnswerPoint,
     GroundedAnswer,
     GroundingAudit,
+    _unverified_identifiers,
     build_answer_plan,
     build_non_generation_audit,
     classify_question_type,
@@ -537,6 +538,7 @@ def _build_retrieval_trace(
     grounding_removed_answer_points: Sequence[str] = (),
     grounding_removal_reasons: Sequence[dict[str, object]] = (),
     grounding_false_negative_diagnostics: Sequence[dict[str, object]] = (),
+    unsupported_assertion_audit: Sequence[dict[str, object]] = (),
     structured_citation_flag: bool = False,
     json_mode_enabled: bool = False,
     source_registry_count: int = 0,
@@ -716,6 +718,7 @@ def _build_retrieval_trace(
         grounding_removed_answer_points=tuple(grounding_removed_answer_points),
         grounding_removal_reasons=tuple(grounding_removal_reasons),
         grounding_false_negative_diagnostics=tuple(grounding_false_negative_diagnostics),
+        unsupported_assertion_audit=tuple(unsupported_assertion_audit),
         generated_answer_points=tuple(generated_answer_points),
         rejected_answer_points=tuple(rejected_answer_points),
         support_validation_reason_codes=tuple(support_validation_reason_codes),
@@ -726,6 +729,44 @@ def _build_retrieval_trace(
 
 def _generation_system_prompt(context: str) -> str:
     return _SYSTEM_PROMPT_BASE + _SELECTED_CONTEXT_LABEL + context
+
+
+def _unsupported_assertion_audit(
+    grounded: GroundedAnswer | None,
+    candidates: Sequence[EvidenceCandidate],
+) -> tuple[dict[str, object], ...]:
+    """Record answer points asserting identifiers their evidence never contains.
+
+    This is observation only.  It does not drop points, change the status or
+    alter citations — enforcement needs a semantic (not token-overlap) judgement,
+    because the current gate cannot tell a faithful paraphrase from an invented
+    qualifier: "保持充足的汽蚀余量" scores 0.50 against "确保始终有足够的有效汽蚀余量"
+    while "(DNS标准结构)" scores 0.90 against evidence that never mentions DNS.
+
+    The operator measures real-world frequency here first; only then is it safe
+    to decide whether a paid semantic check per answer is worth its latency.
+    """
+
+    if grounded is None or not candidates:
+        return ()
+    evidence_texts = tuple(candidate.text for candidate in candidates)
+    audit: list[dict[str, object]] = []
+    for point in grounded.answer_points:
+        # An identifier is only flagged when NO candidate contains it; a single
+        # supporting chunk is enough evidence for the assertion.
+        unverified: set[str] | None = None
+        for text in evidence_texts:
+            missing = _unverified_identifiers(point.content, text)
+            unverified = missing if unverified is None else (unverified & missing)
+        if unverified:
+            audit.append(
+                {
+                    "point_id": point.point_id,
+                    "unverified_identifiers": sorted(unverified)[:10],
+                    "evidence_ids": list(point.evidence_ids),
+                }
+            )
+    return tuple(audit)
 
 
 def _structured_citation_system_prompt(
@@ -1486,6 +1527,9 @@ class LightRAGService:
             ),
             completion_drop_reasons=completion_drop_reasons,
             coverage_requirement_ids=coverage_requirements,
+            unsupported_assertion_audit=_unsupported_assertion_audit(
+                grounded, grounding_candidates
+            ),
             coverage_funnel_stage=("supplemental" if supplemental_result and supplemental_result.triggered else ("completion" if completed_context else "initial")),
             supplemental_retrieval_triggered=bool(supplemental_result and supplemental_result.triggered),
             supplemental_query_text=(supplemental_result.supplemental_query.question if supplemental_result and supplemental_result.supplemental_query else None),
