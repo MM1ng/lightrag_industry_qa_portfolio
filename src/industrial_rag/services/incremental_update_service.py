@@ -2210,6 +2210,14 @@ class IncrementalUpdateService:
             )
 
     def _new_qdrant_client(self) -> AsyncQdrantClient:
+        """Return a client the caller owns and must close.
+
+        Every call site wraps the returned client in ``try/finally: close()``, so
+        ``qdrant_client_factory`` **must return a newly created client**, not a
+        shared singleton -- closing a shared client would break other callers.
+        Tests that inject a fake should therefore return a fresh fake per call
+        (``lambda: FakeQdrant()``) rather than one long-lived instance.
+        """
         if self._qdrant_client_factory is not None:
             return self._qdrant_client_factory()
         return AsyncQdrantClient(

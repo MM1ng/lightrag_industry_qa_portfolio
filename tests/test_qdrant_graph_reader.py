@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import networkx as nx
 import pytest
 from industrial_rag import qdrant_graph_reader as reader
@@ -184,3 +186,86 @@ def test_unmatched_entity_name_stays_unknown() -> None:
     graph = reader.build_graph_from_payloads([_entity("Zzz", "无类型线索")], [])
 
     assert graph.nodes["Zzz"]["entity_type"] == reader.DEFAULT_ENTITY_TYPE
+
+
+class _StubClient:
+    """Minimal AsyncQdrantClient stand-in recording close() calls."""
+
+    def __init__(self, *, entities: bool = True, relationships: bool = True) -> None:
+        self._entities = entities
+        self._relationships = relationships
+        self.closed = 0
+
+    async def collection_exists(self, name: str) -> bool:
+        if name.endswith("_entities"):
+            return self._entities
+        if name.endswith("_relationships"):
+            return self._relationships
+        return False
+
+    async def scroll(self, collection_name, limit=1000, with_payload=True, with_vectors=False, offset=None):
+        class _Record:
+            payload: ClassVar[dict[str, str]] = {
+                "entity_name": "Pump",
+                "content": "Pump\nA pump.",
+                "source_id": "c1",
+                "file_path": "manual.pdf",
+                "src_id": "Pump",
+                "tgt_id": "Seal",
+            }
+
+        return [_Record()], None
+
+    async def close(self) -> None:
+        self.closed += 1
+
+
+def _settings() -> object:
+    from industrial_rag.config import Settings
+
+    return Settings.from_mapping(
+        {
+            "DASHSCOPE_API_KEY": "test-key",
+            "QDRANT_URL": "http://fake:6333",
+            "VECTOR_BACKEND": "qdrant",
+            # Generation must match ^g[a-z0-9]{8,63}$ (see _SAFE_GENERATION).
+            "QDRANT_GENERATION": "g0123456789abcdef",
+            # kb_id must be a 32-char lowercase hex string (see _validate_kb_id).
+            "QDRANT_KB_ID": "0123456789abcdef0123456789abcdef",
+        }
+    )
+
+
+@pytest.mark.asyncio
+async def test_injected_client_is_not_closed_by_the_reader() -> None:
+    """A caller-owned client must survive the read."""
+
+    client = _StubClient()
+
+    await reader.load_graph_from_qdrant(_settings(), client=client)
+
+    assert client.closed == 0, "the reader must not close a caller-owned client"
+
+
+@pytest.mark.asyncio
+async def test_injected_client_is_not_closed_when_collections_are_missing() -> None:
+    """Error paths must also leave a caller-owned client open."""
+
+    client = _StubClient(entities=False)
+
+    with pytest.raises(FileNotFoundError):
+        await reader.load_graph_from_qdrant(_settings(), client=client)
+
+    assert client.closed == 0
+
+
+@pytest.mark.asyncio
+async def test_reader_closes_only_the_client_it_created(monkeypatch) -> None:
+    """Without injection the reader owns the client and must close it."""
+
+    client = _StubClient()
+    monkeypatch.setattr(reader, "AsyncQdrantClient", lambda **_kwargs: client)
+
+    await reader.load_graph_from_qdrant(_settings())
+
+    assert client.closed == 1, "a self-created client must be closed exactly once"
