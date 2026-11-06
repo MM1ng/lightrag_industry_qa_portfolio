@@ -259,8 +259,21 @@ async def test_candidate_ingest_marks_its_frozen_workspace_before_lightrag_initi
     observed: dict[str, object] = {}
 
     class _Backend:
-        async def ainsert(self, **_kwargs) -> None:
-            return None
+        async def ainsert(self, ids=None, **_kwargs) -> None:
+            # Real LightRAG records a per-document verdict in this sidecar file.
+            # The ingestion path now refuses to promote a candidate whose document
+            # never reached ``processed``, so the stub must write it or the test
+            # would fail for a reason production never sees.  The file lives in the
+            # generation's vector workspace, not the candidate root.
+            doc_id = (ids or ["kb-unknown"])[0]
+            workspace = candidate_workspace / "qdrant-candidate-generation"
+            workspace.mkdir(parents=True, exist_ok=True)
+            status_path = workspace / "kv_store_doc_status.json"
+            payload = {}
+            if status_path.is_file():
+                payload = json.loads(status_path.read_text(encoding="utf-8"))
+            payload[doc_id] = {"status": "processed"}
+            status_path.write_text(json.dumps(payload), encoding="utf-8")
 
     class _LightRAG:
         _backend = _Backend()

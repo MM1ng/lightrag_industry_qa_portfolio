@@ -173,15 +173,34 @@ class FakeBackend:
             )
             # Real LightRAG extraction also writes one entity and one relationship
             # per chunk; the fake must do the same or graph verification would
-            # fail for a reason production never sees.
+            # fail for a reason production never sees.  Payloads must follow the
+            # real contract consumed by qdrant_graph_reader: entities carry
+            # ``entity_name`` (the graph node key) and relationships carry
+            # ``src_id``/``tgt_id``.
+            entity_name = f"{chunk_id}-ent"
+            related_name = f"{chunk_id}-rel-target"
             await self.service.qdrant.upsert(
                 self.service.names["entities"],
                 [
                     models.PointStruct(
-                        id=_point_id(f"{chunk_id}-ent"),
+                        id=_point_id(entity_name),
                         vector=[0.2] * 1024,
-                        payload={"id": f"{chunk_id}-ent", "kb_id": self.service.kb_id,
-                                 "generation": self.service.generation, "content": part},
+                        payload={"id": entity_name, "kb_id": self.service.kb_id,
+                                 "generation": self.service.generation,
+                                 "entity_name": entity_name,
+                                 "content": f"{entity_name}\n{part}",
+                                 "source_id": chunk_id,
+                                 "file_path": "test.pdf"},
+                    ),
+                    models.PointStruct(
+                        id=_point_id(related_name),
+                        vector=[0.2] * 1024,
+                        payload={"id": related_name, "kb_id": self.service.kb_id,
+                                 "generation": self.service.generation,
+                                 "entity_name": related_name,
+                                 "content": f"{related_name}\n{part}",
+                                 "source_id": chunk_id,
+                                 "file_path": "test.pdf"},
                     )
                 ],
                 wait=True,
@@ -193,7 +212,12 @@ class FakeBackend:
                         id=_point_id(f"{chunk_id}-rel"),
                         vector=[0.3] * 1024,
                         payload={"id": f"{chunk_id}-rel", "kb_id": self.service.kb_id,
-                                 "generation": self.service.generation, "content": part},
+                                 "generation": self.service.generation,
+                                 "src_id": entity_name,
+                                 "tgt_id": related_name,
+                                 "content": f"relates_to\t{part}",
+                                 "source_id": chunk_id,
+                                 "file_path": "test.pdf"},
                     )
                 ],
                 wait=True,
@@ -521,7 +545,6 @@ def test_insert_retries_when_lightrag_leaves_document_failed(
 def test_insert_failure_discards_candidate_after_retries(
     ctx: Phase9Ctx, monkeypatch
 ):
-    original_insert = FakeBackend.ainsert
     attempts = {"n": 0}
 
     async def always_fail(self, *args, **kwargs) -> None:

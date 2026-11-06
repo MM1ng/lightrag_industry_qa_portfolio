@@ -173,19 +173,31 @@ def materialize_graphml(graph: nx.Graph, storage_root: Path | str) -> Path:
     return target
 
 
-async def load_graph_from_qdrant(settings: Settings) -> tuple[nx.Graph, str]:
+async def load_graph_from_qdrant(
+    settings: Settings,
+    *,
+    client: AsyncQdrantClient | None = None,
+) -> tuple[nx.Graph, str]:
     """Build the graph of the generation configured on ``settings``.
+
+    ``client`` lets callers supply an already-configured (or test double) client.
+    Without it this function would always open a real connection to
+    ``settings.qdrant_url``, which made the ingestion path impossible to exercise
+    in tests and forced callers to reach the network even when their own storage
+    was a fake.
 
     Raises ``FileNotFoundError`` when the generation has no entity or
     relationship collection, so callers can keep their existing 404 semantics.
     """
     service = QdrantCollectionService(settings)
     names = service.names()
-    client = AsyncQdrantClient(
-        url=settings.qdrant_url,
-        api_key=settings.qdrant_api_key,
-        timeout=30,
-    )
+    owns_client = client is None
+    if client is None:
+        client = AsyncQdrantClient(
+            url=settings.qdrant_url,
+            api_key=settings.qdrant_api_key,
+            timeout=30,
+        )
     try:
         entity_collection = names["entities"]
         relation_collection = names["relationships"]
@@ -196,7 +208,9 @@ async def load_graph_from_qdrant(settings: Settings) -> tuple[nx.Graph, str]:
         if await client.collection_exists(relation_collection):
             relation_payloads = await _scroll_payloads(client, relation_collection)
     finally:
-        await client.close()
+        # Only close a client we created; the caller owns an injected one.
+        if owns_client:
+            await client.close()
 
     graph = build_graph_from_payloads(entity_payloads, relation_payloads)
     return graph, graph_fingerprint(settings.qdrant_generation or "", graph)

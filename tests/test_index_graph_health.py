@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from industrial_rag.config import Settings
 from industrial_rag.services.index_service import IndexService
 from industrial_rag.services.qdrant_collection_service import QdrantCollectionService
@@ -23,7 +22,7 @@ _GRAPH_HEADER = '<?xml version="1.0" encoding="utf-8"?>\n<graphml xmlns="http://
 def _write_graphml(path: Path, *, nodes: int, edges: int) -> None:
     lines = [_GRAPH_HEADER, '  <graph id="G" edgedefault="directed">\n']
     lines += [f'    <node id="n{i}" />\n' for i in range(nodes)]
-    lines += [f'    <edge source="n0" target="n1" />\n' for _ in range(edges)]
+    lines += ['    <edge source="n0" target="n1" />\n' for _ in range(edges)]
     lines.append("  </graph>\n</graphml>\n")
     path.write_text("".join(lines), encoding="utf-8")
 
@@ -43,7 +42,7 @@ class _CountingClient:
     def __init__(self, counts: dict[str, int]) -> None:
         self._counts = counts
 
-    async def count(self, name: str, exact: bool = True) -> Any:  # noqa: ARG002
+    async def count(self, name: str, exact: bool = True) -> Any:
         namespace = name.rsplit("_", 1)[-1]
         return type("Count", (), {"count": self._counts.get(namespace, 0)})()
 

@@ -11,6 +11,7 @@ physical cleanup is never part of this flow.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import logging
@@ -1890,7 +1891,16 @@ class IncrementalUpdateService:
 
     async def _materialise_graph_file(self, settings: Any, storage_root: Path) -> Path:
         """Write the generation's graph projection next to its workspace."""
-        graph, _ = await load_graph_from_qdrant(settings)
+        # Reuse the instance's client (which tests replace with a fake) instead of
+        # letting the reader open its own connection to settings.qdrant_url.
+        client = self._new_qdrant_client()
+        try:
+            graph, _ = await load_graph_from_qdrant(settings, client=client)
+        finally:
+            close = getattr(client, "close", None)
+            if close is not None:
+                with contextlib.suppress(Exception):
+                    await close()
         if graph.number_of_nodes() == 0:
             raise RuntimeError(
                 "Index health: refusing to materialise an empty graph file"
