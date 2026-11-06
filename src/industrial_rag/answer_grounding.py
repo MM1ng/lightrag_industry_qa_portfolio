@@ -186,13 +186,32 @@ def _claim_tokens(text: str) -> set[str]:
     }
 
 
+_NUMERIC_SPACING = re.compile(r"\s*([.,])\s*")
+# OCR drops the leading zero in values below one: the manual prints ". 012".
+_LEADING_ZERO = re.compile(r"(?<![\d])\.(\d)")
+
+
+def _normalize_numeric_spacing(text: str) -> str:
+    """Normalise OCR numeric artefacts so equivalent values compare equal.
+
+    The manuals are OCR-derived and print values as ``. 012 (. 30)`` — decimal
+    point separated from its digits, and no leading zero. A model correctly
+    answering "0.012 (0.30)" was rejected by the numeric gate while the
+    idiosyncratic ".012 (.30)" form passed. Normalising both sides removes the
+    artefact instead of rewarding it.
+    """
+
+    collapsed = _NUMERIC_SPACING.sub(r"\1", text.casefold()).replace(" ", "")
+    return _LEADING_ZERO.sub(r"0.\1", collapsed)
+
+
 def _has_numeric_support(claim: str, evidence: str) -> bool:
     numbers = _NUMBER.findall(_PROVENANCE.sub("", claim))
     if not numbers:
         return True
-    evidence_folded = evidence.casefold().replace(" ", "")
+    evidence_folded = _normalize_numeric_spacing(evidence)
     for number in numbers:
-        if number.casefold().replace(" ", "") not in evidence_folded:
+        if _normalize_numeric_spacing(number) not in evidence_folded:
             return False
     claim_has_unit = bool(_UNIT.search(claim))
     return not claim_has_unit or bool(_UNIT.search(evidence))
@@ -226,11 +245,12 @@ def _unverified_identifiers(claim: str, evidence: str) -> set[str]:
     }
     if not asserted:
         return set()
-    evidence_folded = evidence_text.replace(" ", "")
+    # Same OCR normalisation as the numeric gate: ". 012" must match "0.012".
+    evidence_folded = _normalize_numeric_spacing(evidence_text)
     return {
         token
         for token in asserted
-        if token.replace(" ", "") not in evidence_folded
+        if _normalize_numeric_spacing(token) not in evidence_folded
     }
 
 

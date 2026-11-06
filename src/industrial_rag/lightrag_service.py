@@ -749,15 +749,14 @@ def _unsupported_assertion_audit(
 
     if grounded is None or not candidates:
         return ()
-    evidence_texts = tuple(candidate.text for candidate in candidates)
+    # Judge against the whole selected evidence pool, not one citation at a time:
+    # an answer legitimately synthesises several chunks, so a term present in any
+    # selected chunk is supported (e.g. "SUMMIT 手册规定…" where the cited page-14
+    # snippet lacks the brand name but another selected page-14 chunk carries it).
+    pooled = "\n".join(candidate.text for candidate in candidates)
     audit: list[dict[str, object]] = []
     for point in grounded.answer_points:
-        # An identifier is only flagged when NO candidate contains it; a single
-        # supporting chunk is enough evidence for the assertion.
-        unverified: set[str] | None = None
-        for text in evidence_texts:
-            missing = _unverified_identifiers(point.content, text)
-            unverified = missing if unverified is None else (unverified & missing)
+        unverified = _unverified_identifiers(point.content, pooled)
         if unverified:
             audit.append(
                 {

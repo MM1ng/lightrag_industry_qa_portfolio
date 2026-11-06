@@ -135,3 +135,42 @@ def test_unrelated_sentence_sharing_only_the_corpus_noun_is_rejected():
 
     assert result.status == "insufficient_evidence"
     assert result.citations == ()
+
+
+def test_ocr_spaced_decimal_matches_model_percentages() -> None:
+    """Regression: the manual prints ". 012 (. 30)"; answering "0.012 (0.30)"
+    was rejected as unsupported while the idiosyncratic spacing passed."""
+
+    from industrial_rag.answer_grounding import _has_numeric_support
+
+    evidence = "最高 300° F (149° C) . 009 (. 23) . 012 (. 30) . 019 (. 48)"
+
+    assert _has_numeric_support("叶轮间隙应设为 0.012 英寸（0.30 毫米）。", evidence) is True
+    assert _has_numeric_support("叶轮间隙应设为 .012 (.30)。", evidence) is True
+
+
+def test_fabricated_number_is_still_rejected_after_normalisation() -> None:
+    from industrial_rag.answer_grounding import _has_numeric_support
+
+    evidence = "最高 300° F (149° C) . 009 (. 23) . 012 (. 30) . 019 (. 48)"
+
+    assert _has_numeric_support("叶轮间隙应设为 0.999 英寸。", evidence) is False
+    assert _has_numeric_support("叶轮间隙应设为 0.777 英寸。", evidence) is False
+
+
+def test_normalisation_does_not_merge_distinct_values() -> None:
+    from industrial_rag.answer_grounding import _has_numeric_support
+
+    evidence = "间隙设置为 .015 (. 38)"
+
+    assert _has_numeric_support("间隙为 0.015 英寸。", evidence) is True
+    assert _has_numeric_support("间隙为 0.019 英寸。", evidence) is False
+
+
+def test_unverified_identifier_accepts_ocr_leading_zero_variant() -> None:
+    from industrial_rag.answer_grounding import _unverified_identifiers
+
+    evidence = "表6 叶轮间隙 . 012 (. 30)"
+
+    assert _unverified_identifiers("应设为 0.012 英寸。", evidence) == set()
+    assert _unverified_identifiers("应设为 0.777 英寸。", evidence) == {"0.777"}
