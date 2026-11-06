@@ -1,1 +1,11 @@
-{"contract":"g1-acceptance-v1","suites":[]}
+{
+  "contract": "g1-acceptance-v1",
+  "suites": [
+    {
+      "suite_id": "iteration1-pump-manuals-v1",
+      "sha256": "e835c2d3e0e6bb01a5eafdc33c3396fd078daefd38be801ba372870369ae0410",
+      "approved_by": "dsh-review-pdf-verified-2026-11-06",
+      "approved_at": "2026-11-06T17:10:00+08:00"
+    }
+  ]
+}
