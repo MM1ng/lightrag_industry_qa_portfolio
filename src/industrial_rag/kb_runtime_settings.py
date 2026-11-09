@@ -10,6 +10,39 @@ from industrial_rag.config import Settings
 from industrial_rag.vector_collections import VectorBackend
 
 
+def _resolve_workspace(
+    record_workspace: Path | None,
+    knowledge_base: Any,
+    active_generation: str | None,
+    backend: VectorBackend,
+) -> Path:
+    """Return a workspace path that is usable on this host.
+
+    ``vector_index_generations.workspace_path`` stores an absolute path captured
+    when the generation was built. That path is meaningless after moving the
+    data (or inside a container), so when it is not a *valid* workspace the
+    layout is rebuilt from ``KB_DATA_ROOT`` plus the KB id and generation name.
+    Use the shared validity check so a stray directory created from a Windows
+    path on Linux cannot be mistaken for the real workspace.
+    """
+
+    from industrial_rag.storage_layout import (
+        is_valid_generation_workspace,
+        kb_qdrant_generation_workspace,
+    )
+
+    if record_workspace is not None and is_valid_generation_workspace(record_workspace):
+        return record_workspace
+    fallback = Path(knowledge_base.workspace_path)
+    if is_valid_generation_workspace(fallback):
+        return fallback
+    if backend is VectorBackend.qdrant and active_generation:
+        derived = kb_qdrant_generation_workspace(knowledge_base.id, active_generation)
+        if is_valid_generation_workspace(derived):
+            return derived
+    return record_workspace or fallback
+
+
 def settings_for_knowledge_base(
     base: Settings,
     knowledge_base: Any,
@@ -37,7 +70,12 @@ def settings_for_knowledge_base(
         base,
         embedding_model=knowledge_base.embedding_model,
         embedding_dim=knowledge_base.embedding_dimension,
-        working_dir=(working_dir or record_workspace or Path(knowledge_base.workspace_path)).resolve(),
+        working_dir=(
+            working_dir
+            or _resolve_workspace(
+                record_workspace, knowledge_base, active_generation, selected_backend
+            )
+        ).resolve(),
         vector_backend=selected_backend,
         qdrant_generation=(
             active_generation if selected_backend is VectorBackend.qdrant else None

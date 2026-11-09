@@ -14,16 +14,20 @@
 
 | 项目 | 当前结果 |
 | --- | --- |
-| Active Knowledge Base | `Internal QA Bootstrap KB` |
-| Active Generation | `g9b05e83c30b45eb7da1c5224` |
+| Active Knowledge Base | `Demo Bootstrap KB 2`（`c6e9f2fb…`） |
+| Active Generation | `g907761ec7e5a5d2528c3c90b`（epoch 3） |
 | 文档数 | **2** |
 | Child chunks | **453** |
+| Entities / Relationships | **1117 / 1559** |
 | Canonical validation | **PASS** |
-| Final smoke | **7/8 PASS** |
+| Frozen acceptance suite | **18/18 positive, 2/2 negative** |
+| Python tests | **1429 passed, 28 skipped, 0 failed** |
 | Reranker | 关闭 |
-| Vector backend | Qdrant |
+| Vector backend | Qdrant（单实例） |
 
-Final smoke 的唯一已知失败是 D005：DESMI 手册中“维护、检查或安装前泵组必须处于停止状态”的证据位于 `t1739cn.pdf` 第 12 页，但当前 dense/mix 配置下该正确 chunk 未进入 initial top-20，因此请求返回 `insufficient_evidence`。这属于已知 retrieval recall edge case，不应解读为 citation 伪造、Generation lifecycle 或 validation threshold 问题。其余第一份手册、第二份手册、跨文档和 negative 场景均通过。
+上表数据来自当前活跃代际的实测：`/graph/overview` 返回 50 节点 / 105 边；验收题库 `iteration1-pump-manuals-v1`（v1.2.0，已在 `approved_suites.json` 登记）命中 18/18 正例、2/2 负例全部拒答。
+
+此前记录的 D005 recall edge case（`t1739cn.pdf` 第 12 页证据未进入 initial top-20）在本次检索链路修复后未再复现；该结论仅基于当前代际的复测，未在其他代际上验证。
 
 ## 内部工具工作流
 
@@ -237,14 +241,64 @@ Phase16 不修改 Retrieval Foundation 算法、golden questions、Development d
 
 ## Quick Start
 
-### Prerequisites
+### Docker（推荐：一条命令起完整栈）
+
+需要 Docker 24+ 与 Docker Compose v2。
+
+```bash
+cp .env.docker.example .env.docker
+# 填入真实值：DASHSCOPE_API_KEY、SERVICE_API_KEY、ADMIN_API_KEY（后两者 >=32 字符且互不相同）
+docker compose up -d --build
+curl -fsS http://127.0.0.1:8000/health
+```
+
+该命令启动两个服务：
+
+| 服务 | 端口 | 说明 |
+| --- | --- | --- |
+| `qdrant` | 16333 → 6333 | 向量库，数据存于命名卷 `qdrant_storage` |
+| `backend` | 8000 | FastAPI，启动前自动执行 `alembic upgrade head` |
+
+知识库数据通过卷挂载，默认取 `D:/ira_demo_data`；若数据在其他位置，启动前设置环境变量：
+
+```bash
+IRA_KB_DATA=/srv/ira_data docker compose up -d
+```
+
+**重要：向量库数据需要单独指定。** 新建的 Qdrant 卷是空的，后端会返回 0 个检索结果。若已有填充好的 Qdrant 数据卷，用 `QDRANT_STORAGE_SOURCE` 指向它的宿主路径：
+
+```bash
+# 查看现有卷的宿主路径
+docker inspect ira-qdrant-16333-recovered --format '{{range .Mounts}}{{.Source}}{{end}}'
+# 例如 /var/lib/docker/volumes/ira-qdrant-16333-recovered-data/_data
+QDRANT_STORAGE_SOURCE=/var/lib/docker/volumes/ira-qdrant-16333-recovered-data/_data \
+  docker compose up -d
+```
+
+同理，业务数据库通过 `IRA_DB_FILE` 复用宿主 `data/db`（其中含 KB 记录与活跃代际指针）；代际工作区固定为 `g907761ec7e5a5d2528c3c90b`，如需换代际须同步修改 `docker-compose.yml` 中的 `QDRANT_GENERATION` 与 `LIGHTRAG_WORKING_DIR`。
+
+运行冻结验收题库（需栈已启动）：
+
+```bash
+docker compose --profile acceptance run --rm acceptance
+# 期望输出：positive matches: 18/18 / negative refusals: 2/2 / ACCEPTANCE: PASS
+```
+
+镜像要点：
+- 以非 root 用户 `appuser`（uid 10001）运行
+- 内置 `HEALTHCHECK`，`docker compose ps` 可直接看到健康状态
+- `.env.docker` 已被 `.gitignore` 排除，不会入库
+
+### 本地进程（开发调试用）
+
+#### Prerequisites
 
 - Python `3.11`
 - Node.js + npm
 - 一个 OpenAI-compatible LLM/Embedding Provider
 - 可选：Qdrant；默认 `VECTOR_BACKEND=nano` 可先完成轻量启动
 
-### 1. Clone and install
+#### 1. Clone and install
 
 ```bash
 git clone https://github.com/MM1ng/lightrag_industry_qa.git
@@ -276,7 +330,7 @@ cp .env.example .env
 pip install -e ".[dev,evaluation]"
 ```
 
-### 2. Configure
+#### 2. Configure
 
 编辑本地 `.env`，至少填写：
 
@@ -294,7 +348,7 @@ ADMIN_API_KEY=
 
 保持空占位符的 `.env.example` 可以提交；真实 `.env`、Token 和 Provider Key 不得进入 Git。
 
-### 3. Initialize and start the API
+#### 3. Initialize and start the API
 
 内部工具受控验证环境的标准启动方式是使用工作台脚本。脚本会读取 `.env.local_staging`、检查并启动项目使用的 Qdrant Docker 容器、执行数据库迁移、启动 API 和 Vue 前端，并检查 `/readyz` 与 `/chat`。请先确保 Docker Desktop 已运行：
 
@@ -324,7 +378,7 @@ GET http://127.0.0.1:8000/health
 GET http://127.0.0.1:8000/readyz
 ```
 
-### 4. Start the Vue workbench
+#### 4. Start the Vue workbench
 
 ```bash
 npm --prefix frontend install
@@ -333,7 +387,7 @@ npm --prefix frontend run dev
 
 打开 `http://127.0.0.1:5173/chat`。管理员入口为 `/admin/login`；凭据只保存在页面内存中，所有管理请求仍由后端鉴权。
 
-### 5. Add your documents
+#### 5. Add your documents
 
 原始工业手册不随仓库分发。进入管理端创建 Knowledge Base 并上传自己的 PDF，或参考 [`data/manuals/README.md`](data/manuals/README.md)。解析、Parent–Child Chunking、索引和 Generation 激活通过文档生命周期任务执行。
 

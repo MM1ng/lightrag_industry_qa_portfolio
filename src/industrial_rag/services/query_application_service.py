@@ -29,6 +29,7 @@ from industrial_rag.services.generation_artifacts import (
     GenerationArtifactError,
     GenerationArtifactResolver,
 )
+from industrial_rag.storage_layout import resolve_generation_workspace
 from industrial_rag.vector_collections import VectorBackend
 
 
@@ -172,7 +173,14 @@ class QueryApplicationService:
             )
         try:
             chunk_registry = self._artifact_resolver.resolve_registry(
-                Path(generation.workspace_path),
+                # The recorded workspace path is absolute and host-specific; it
+                # dangles after moving the data or inside a container. Fall back
+                # to the KB_DATA_ROOT-derived layout when it is missing.
+                resolve_generation_workspace(
+                    generation.workspace_path,
+                    kb_id=kb.id,
+                    generation=generation.generation,
+                ),
                 expected_generation_id=generation.generation,
                 expected_child_manifest_hash=generation.child_chunks_manifest_hash,
             )
