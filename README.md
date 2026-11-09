@@ -422,6 +422,33 @@ python -m pytest -q --basetemp=.run/pytest-tmp -p no:cacheprovider \
 
 HTML 报告在 `.run/coverage/html/index.html`（不入库），XML 在 `.run/coverage/coverage.xml`。服务生命周期类模块（cleanup/index/rebuild/document/kb）覆盖偏低是当前已知局限，主要原因是这些路径需要真实 Qdrant 与多步任务编排，计划通过集成级测试补齐。
 
+### 并发压测
+
+`scripts/benchmark_http.py` 使用标准库实现，支持两种模式：默认 GET（如 `/health`），以及传 `--query` 时的 POST `/v1/knowledge-bases/{kb}/query`。query 模式同时记录 HTTP 状态与业务 `status`，避免把「200 但 `insufficient_evidence`」误判为健康响应。
+
+```bash
+# GET 基线
+python scripts/benchmark_http.py --requests 50 --concurrency 10
+
+# Query 模式（需 ADMIN_API_KEY；可用 env 传入）
+IRA_BENCH_KB_ID=<kb-id> IRA_BENCH_ADMIN_KEY=<admin-key> \
+  python scripts/benchmark_http.py --query "泵的轴承温度上限是多少？" \
+    --requests 16 --concurrency 8 --timeout 120 --max-p95-ms 60000 \
+    --json-out .run/bench_query.json
+```
+
+实测基线（2026-11-09，Docker Compose 栈，单一 Provider 账号，同一问题，未控制 LLM 缓存命中差异）：
+
+| 并发 | 请求数 | 成功 | P50 | P95 | P99 | 吞吐 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 3 | 3/3 | 3006 ms | 3006 ms | 3006 ms | 0.31 RPS |
+| 4 | 8 | 8/8 | 9138 ms | 13701 ms | 13701 ms | 0.38 RPS |
+| 8 | 16 | 16/16 | 11891 ms | 20939 ms | 20939 ms | 0.57 RPS |
+
+三组均无失败、无 429，业务状态全部为 `success`，每个答案 1–2 条引用。但结论需要如实说明：**提高并发几乎不提升吞吐（0.31 → 0.57 RPS），只是把延迟成倍堆积**。瓶颈在 LLM 推理（单请求约占 83.6% 端到端耗时），加并发只会让请求在 Provider 侧排队。因此该系统的优化方向应是缓存、批处理与 Provider 配额，而非增加工作线程。
+
+> 局限：样本量小（每组 3–16 请求）、单一 Provider 账号、同一问题重复提问，且未控制缓存命中差异。该结果用于识别瓶颈形态，不能作为容量规划依据。
+
 
 ## Current Boundaries
 
