@@ -98,6 +98,10 @@ evaluation/**
 !evaluation/bootstrap_suites/
 !evaluation/bootstrap_suites/README.md
 !evaluation/bootstrap_suites/approved_suites.json
+# RAGAS development summary: small aggregate recomputed by
+# tools/summarize_ragas.py; README cites its numbers, so it must be checkable.
+!evaluation/phase10/
+!evaluation/phase10/ragas_summary_development.json
 # The aggregate metric files cited by README's Evaluation section are small and
 # carry no manual text; without them the published numbers cannot be checked.
 !evaluation/experiments/

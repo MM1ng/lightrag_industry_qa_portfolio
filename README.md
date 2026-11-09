@@ -449,6 +449,43 @@ IRA_BENCH_KB_ID=<kb-id> IRA_BENCH_ADMIN_KEY=<admin-key> \
 
 > 局限：样本量小（每组 3–16 请求）、单一 Provider 账号、同一问题重复提问，且未控制缓存命中差异。该结果用于识别瓶颈形态，不能作为容量规划依据。
 
+### RAGAS 语义评估（Development-only）
+
+`evaluation` 可选依赖提供 `ragas==0.3.9` 与 langchain 组件。安装方式：
+
+```bash
+pip install -e ".[dev,evaluation]"
+pytest -q tests/evaluation/            # 51 passed（未装依赖时这些模块会 skip）
+```
+
+仓库中已存在两份**前人真实跑过的** Development 制品：
+
+| 制品 | 内容 | 状态 |
+| --- | --- | --- |
+| `conversation_retrieval_development_report.json` | 会话改写前后的检索基线 | `READY` |
+| `ragas_migration_development_report.json` | ragas ID-based 指标迁移（无 LLM judge） | `MIGRATION_PASS`，parity 通过 |
+| `conversation_e2e_ragas_development_report.json` | Faithfulness / ResponseRelevancy（LLM judge） | `R3_MIXED` |
+
+`tools/summarize_ragas.py` 从持久化的 18 个 per-case 行重算聚合值，产出
+`evaluation/phase10/ragas_summary_development.json`（含 sanity 断言）：
+
+| 指标 | baseline | candidate |
+| --- | --- | --- |
+| Faithfulness（mean, n=18） | 0.9402 | 0.9215 |
+| ResponseRelevancy（mean, n=18） | 0.5676 | 0.7322 |
+| hit_recall@5 / @10（after） | — | 0.9444 / 1.0000 |
+| MRR@5 / @10（after） | — | 0.7593 / 0.7662 |
+
+结论：candidate 的 ResponseRelevancy 明显提升（+0.165），但 Faithfulness 略降
+（-0.019），因此 E2E gate 为 `R3_MIXED`，原因含 `faithfulness_regressed`。
+这是**已知且未解决**的质量回退，不应把 `R3_MIXED` 解读为验收通过。
+
+**重要说明**：本次工作**没有重跑 LLM judge**。其模型为 `qwen-plus-2025-07-28`，
+不在当前 Provider 免费额度内，重跑会返回 403。上表是从已持久化制品重算的核对结果，
+不是新一轮评估；且 `validation_holdout_accessed=false`，未触碰 validation/holdout 数据。
+`migration_runner` 使用 ID-based 检索指标（不需要 LLM），其报告明确标注
+`no_llm_semantic_metrics=true`——两个实验的口径不同，不要混为一谈。
+
 
 ## Current Boundaries
 
