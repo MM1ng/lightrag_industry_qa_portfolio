@@ -401,6 +401,28 @@ npm --prefix frontend run build
 
 真实 MinerU、Qdrant 和 Provider E2E 测试是显式 opt-in；普通单元测试通过不等于真实外部集成已执行。
 
+### 测试覆盖率
+
+覆盖率基于 `pytest-cov`（branch 模式，度量范围 `src/industrial_rag`）。全量回归 + 覆盖率一条命令：
+
+```bash
+python -m pytest -q --basetemp=.run/pytest-tmp -p no:cacheprovider \
+  --cov=src/industrial_rag --cov-report=term-missing \
+  --cov-report=xml:.run/coverage/coverage.xml --cov-report=html:.run/coverage/html
+```
+
+基线数据（2026-11-09，`dev/iteration-1` @ `fdb419da`，1432 passed / 28 skipped / 0 failed）：
+
+| 指标 | 数值 |
+| --- | --- |
+| 总覆盖率（branch 模式） | **80%**（13725 语句，缺失 2266） |
+| 覆盖 100% 的模块 | 包括 `vector_collections.py`、`errors.py`、`kb_lease_service.py`、`generation_fingerprint_service.py` 等 |
+| 覆盖为 0% 的模块 | `observability.py`、`qdrant_compatibility.py`、`retrieval_context.py`、`services/rebuild_service.py` |
+| 覆盖偏低（已知短板） | `services/cleanup_service.py` 18%、`services/index_service.py` 27%、`services/document_service.py` 40%、`services/knowledge_base_service.py` 40% |
+
+HTML 报告在 `.run/coverage/html/index.html`（不入库），XML 在 `.run/coverage/coverage.xml`。服务生命周期类模块（cleanup/index/rebuild/document/kb）覆盖偏低是当前已知局限，主要原因是这些路径需要真实 Qdrant 与多步任务编排，计划通过集成级测试补齐。
+
+
 ## Current Boundaries
 
 ## Phase16 Known Limitations

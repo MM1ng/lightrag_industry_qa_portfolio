@@ -35,6 +35,7 @@ dependencies = [
 dev = [
   "pytest>=8.4,<10",
   "pytest-asyncio>=1.0,<2",
+  "pytest-cov>=7,<8",
   "ruff>=0.12,<1",
 ]
 evaluation = [
@@ -58,6 +59,21 @@ addopts = [
 testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "strict"
+
+[tool.coverage.run]
+source = ["src/industrial_rag"]
+branch = true
+omit = ["*/__main__.py"]
+
+[tool.coverage.report]
+show_missing = false
+sort = "cover"
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+]
 
 [tool.ruff]
 target-version = "py311"
