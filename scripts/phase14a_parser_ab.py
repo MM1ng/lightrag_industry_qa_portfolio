@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -54,6 +55,56 @@ def load(path: Path) -> Any:
 
 def sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def resolve_manifest_sources(
+    sources: list[dict],
+    *,
+    search_roots: list[Path] | None = None,
+) -> dict[str, Path]:
+    """Map file_name -> an on-disk path whose bytes match the recorded sha256.
+
+    ``source_manifest.json`` records machine-specific absolute paths captured on
+    the machine that built the generation. Those paths do not survive a fresh
+    clone or a different checkout location, which made every identity test skip.
+    The sha256 is content-addressed and therefore portable: when the recorded
+    path is gone, search ``search_roots`` for a file with the same digest.
+
+    The upload pipeline renames files by appending a hash suffix
+    (``t1739cn_77fd7ebf.pdf``), so resolution matches on content, not on the
+    manifest's ``file_name``.
+
+    Entries that cannot be matched are omitted; callers decide how to fail.
+    """
+
+    roots = [Path(root) for root in (search_roots or [])]
+    resolved: dict[str, Path] = {}
+
+    def find(expected: str) -> Path | None:
+        for root in roots:
+            if not root.is_dir():
+                continue
+            for candidate in root.rglob("*.pdf"):
+                if candidate.is_file() and sha(candidate) == expected:
+                    return candidate
+        return None
+
+    for item in sources:
+        name = str(item.get("file_name") or "")
+        if not name:
+            continue
+        expected = str(item.get("sha256") or "")
+        recorded = Path(str(item.get("path") or ""))
+        if recorded.is_file() and (not expected or sha(recorded) == expected):
+            resolved[name] = recorded
+            continue
+        if not expected:
+            continue
+        match = find(expected)
+        if match is not None:
+            resolved[name] = match
+    return resolved
+
 
 
 def write(path: Path, value: Any) -> None:
@@ -355,8 +406,19 @@ def identity() -> tuple[dict, list[dict], list[dict], set[tuple[str, str]]]:
             or snapshot.generation_id != "dev-v2-20260902"):
         raise ValueError("BLOCKED_EXPERIMENT_IDENTITY: Development")
     sources = load(GENERATION / "source_manifest.json")
+    # The manifest records absolute paths captured on the build machine, which
+    # do not survive a fresh clone. Resolve by content hash before verifying, so
+    # a portable checkout can still run the identity checks.
+    resolved = resolve_manifest_sources(
+        sources,
+        search_roots=[ROOT, Path(os.environ.get("IRA_SOURCE_MANUALS_ROOT", ""))
+                      if os.environ.get("IRA_SOURCE_MANUALS_ROOT") else ROOT,
+                      Path(os.environ.get("IRA_KB_DATA_ROOT", ""))
+                      if os.environ.get("IRA_KB_DATA_ROOT") else ROOT],
+    )
     for s in sources:
-        verify_pdf(Path(s["path"]), s["sha256"], PAGE_COUNTS[s["document_id"]])
+        target = resolved.get(s["file_name"], Path(s["path"]))
+        verify_pdf(target, s["sha256"], PAGE_COUNTS[s["document_id"]])
     b = load(BASE / "phase13b_multi_query_ablation_2026-09-03.json")
     missing = {(r["question_id"], eid) for r in b["phase13a_six_miss_recovery"]["questions"]
                for eid in r["a2_missing_gold"]}

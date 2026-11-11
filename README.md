@@ -397,9 +397,28 @@ npm --prefix frontend run dev
 python -m pytest -q
 python -m ruff check .
 npm --prefix frontend run build
+npm --prefix frontend run e2e      # 前端 e2e（Playwright，需先装 chromium）
 ```
 
 真实 MinerU、Qdrant 和 Provider E2E 测试是显式 opt-in；普通单元测试通过不等于真实外部集成已执行。
+
+### 受保护手册与 phase14a 身份断言
+
+`tests/test_phase14a_parser_ab.py` 中有两条断言需要原始 PDF 才能执行（SHA256/页数身份校验）。这些 PDF 是受保护资产，不随仓库分发，因此断言采用**动态条件 skip**：
+
+- 手册可定位 → 断言真实执行；
+- 手册不可定位 → skip，并在 `-rs` 输出里说明原因。
+
+定位不依赖 `source_manifest.json` 里记录的绝对路径（那是构建机的机器相关路径，换机器即失效），而是按 manifest 记录的 **sha256 内容指纹**在 `IRA_SOURCE_MANUALS_ROOT` / `IRA_KB_DATA_ROOT` 下搜索。上传流程会给文件名追加哈希后缀，所以匹配按内容而非文件名。
+
+```bash
+# 有手册时两条断言会真跑（29 passed, 0 skipped）
+IRA_KB_DATA_ROOT=/path/to/manuals python -m pytest tests/test_phase14a_parser_ab.py -q -rs
+```
+
+### 前端 e2e
+
+`frontend/e2e/chat-workbench.spec.ts` 全部通过 `page.route` mock，不依赖真实后端或 API Key，因此可在 CI 无凭据环境运行。注意工作台走的是 **SSE 端点 `/query/stream`**，只 mock `/query` 会导致请求穿透到真实后端并显示其错误文案。
 
 ### 测试覆盖率
 
@@ -411,16 +430,21 @@ python -m pytest -q --basetemp=.run/pytest-tmp -p no:cacheprovider \
   --cov-report=xml:.run/coverage/coverage.xml --cov-report=html:.run/coverage/html
 ```
 
-基线数据（2026-11-09，`dev/iteration-1` @ `fdb419da`，1432 passed / 28 skipped / 0 failed）：
+基线数据（2026-11-11，`dev/iteration-1`，1512 passed / 23 skipped / 0 failed）：
 
 | 指标 | 数值 |
 | --- | --- |
-| 总覆盖率（branch 模式） | **80%**（13725 语句，缺失 2266） |
-| 覆盖 100% 的模块 | 包括 `vector_collections.py`、`errors.py`、`kb_lease_service.py`、`generation_fingerprint_service.py` 等 |
-| 覆盖为 0% 的模块 | `observability.py`、`qdrant_compatibility.py`、`retrieval_context.py`、`services/rebuild_service.py` |
-| 覆盖偏低（已知短板） | `services/cleanup_service.py` 18%、`services/index_service.py` 27%、`services/document_service.py` 40%、`services/knowledge_base_service.py` 40% |
+| 总覆盖率（branch 模式） | **82.42%**（13725 语句，缺失 1892） |
+| 覆盖 100% 的模块 | 含 `vector_collections.py`、`errors.py`、`kb_lease_service.py`、`generation_fingerprint_service.py`、`qdrant_compatibility.py` 等 |
+| 覆盖为 0% 的模块 | **无**（此前 `observability.py`、`retrieval_context.py`、`qdrant_compatibility.py` 为 0%） |
+| 覆盖偏低（已知短板） | `services/index_service.py` 31%；其余服务模块已由集成测试补齐 |
 
-HTML 报告在 `.run/coverage/html/index.html`（不入库），XML 在 `.run/coverage/coverage.xml`。服务生命周期类模块（cleanup/index/rebuild/document/kb）覆盖偏低是当前已知局限，主要原因是这些路径需要真实 Qdrant 与多步任务编排，计划通过集成级测试补齐。
+HTML 报告在 `.run/coverage/html/index.html`（不入库），XML 在 `.run/coverage/coverage.xml`。
+
+关于两个此前为 0% 的模块：
+
+- `observability.py`（脱敏追踪记录）与 `retrieval_context.py`（父块上下文扩展）**尚未接入请求链路**，属于已设计未上线的功能。它们不是死代码：`retrieval_context.py` 的集成障碍记录在 `docs/parent-child-chunking-design.md` §14（需重构 `LightRAGService.query()` 调用链），`observability.py` 的脱敏规则是安全属性。
+- 因此处理方式是**用测试固化其行为契约**（`tests/test_observability_trace.py` 10 项、`tests/test_retrieval_context_expansion.py` 9 项），而非删除。`retrieval_context.py` 中「安全警告扫描」仍为空实现，`test_safety_warning_scan_is_a_documented_gap` 把这一缺口钉成显式断言——将来实现时会强制同步更新设计与测试。
 
 ### 并发压测
 

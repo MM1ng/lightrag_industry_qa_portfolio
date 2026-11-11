@@ -7,6 +7,7 @@ import pytest
 from scripts.phase14a_parser_ab import (
     DATASET,
     GENERATION,
+    ROOT,
     canonical_parser_record,
     classify_evidence_match,
     compare_evidence,
@@ -15,26 +16,48 @@ from scripts.phase14a_parser_ab import (
     load,
     normalize_text,
     parser_artifact_fingerprint,
+    resolve_manifest_sources,
     table_cells,
     validate_records,
     verify_pdf,
 )
 
 
+def _source_search_roots() -> list[Path]:
+    """Directories searched for the protected source manuals.
+
+    The project tree never contains the PDFs; they live wherever the operator
+    keeps the demo corpus. ``IRA_SOURCE_MANUALS_ROOT`` points at it explicitly,
+    and ``IRA_KB_DATA_ROOT`` is honoured because the upload pipeline stores the
+    manuals under that root.
+    """
+    import os
+
+    roots = [ROOT]
+    for env_name in ("IRA_SOURCE_MANUALS_ROOT", "IRA_KB_DATA_ROOT"):
+        value = os.environ.get(env_name, "").strip()
+        if value:
+            roots.append(Path(value))
+    return roots
+
+
 def _protected_source_manuals_present() -> bool:
-    """Return whether every manifest-referenced source manual exists on disk.
+    """Return whether every manifest-referenced source manual can be located.
 
     The original PDFs are protected assets: only ``data/manuals/README.md`` is
-    distributed, so the SHA256/page-count identity checks cannot run in a fresh
-    clone.  Assets are located through ``source_manifest.json`` exactly like
-    ``scripts.phase14a_parser_ab.identity`` does, so the check stays accurate
-    when the PDFs are present and the tests still execute for real.
+    distributed. The manifest records absolute paths from the machine that built
+    the generation, so those paths are checked first and then resolved by content
+    hash. The tests execute for real whenever the PDFs are reachable, instead of
+    silently skipping because of a stale path.
     """
     try:
         sources = load(GENERATION / "source_manifest.json")
     except (OSError, ValueError, KeyError):
         return False
-    return bool(sources) and all(Path(str(item["path"])).is_file() for item in sources)
+    if not sources:
+        return False
+    resolved = resolve_manifest_sources(sources, search_roots=_source_search_roots())
+    return len(resolved) == len(sources)
 
 
 requires_source_manuals = pytest.mark.skipif(
@@ -214,6 +237,53 @@ def test_fractional_inch_unit_cannot_disappear():
 def test_compound_velocity_unit_cannot_disappear():
     assert exact_numeric_tokens("振动值≤7 mm/s") == ["≤7mm/s"]
     assert not classify_evidence_match("振动值≤7 mm/s", "振动值≤7 mm", page_overlap=True)["numeric_exact"]
+
+
+def test_manifest_path_is_resolved_by_content_hash(tmp_path):
+    """A manifest that records a stale absolute path must still resolve by sha256.
+
+    The committed manifest stores machine-specific absolute paths, so a fresh
+    clone or a different checkout location made every identity test skip. The
+    hash is content-addressed and therefore portable; resolution must fall back
+    to it before giving up.
+    """
+    from scripts.phase14a_parser_ab import resolve_manifest_sources
+
+    payload = b"%PDF-1.4 portable-content"
+    digest = hashlib.sha256(payload).hexdigest()
+    manual = tmp_path / "somewhere" / "manual.pdf"
+    manual.parent.mkdir(parents=True)
+    manual.write_bytes(payload)
+
+    sources = [
+        {
+            "file_name": "manual.pdf",
+            "path": str(tmp_path / "does-not-exist" / "manual.pdf"),
+            "size_bytes": len(payload),
+            "sha256": digest,
+            "readable": True,
+        }
+    ]
+    resolved = resolve_manifest_sources(sources, search_roots=[tmp_path])
+    assert resolved["manual.pdf"] == manual
+
+
+def test_manifest_resolution_keeps_original_when_hash_unknown(tmp_path):
+    """No matching file on disk must leave the entry unresolved, not invent one."""
+    from scripts.phase14a_parser_ab import resolve_manifest_sources
+
+    sources = [
+        {
+            "file_name": "missing.pdf",
+            "path": str(tmp_path / "missing.pdf"),
+            "size_bytes": 4,
+            "sha256": hashlib.sha256(b"other").hexdigest(),
+            "readable": True,
+        }
+    ]
+    resolved = resolve_manifest_sources(sources, search_roots=[tmp_path])
+    assert resolved == {}
+
 
 
 def test_replay_rejects_unscored_block_tampering():

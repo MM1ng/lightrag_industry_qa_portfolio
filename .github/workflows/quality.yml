@@ -43,3 +43,10 @@ jobs:
       - run: npm ci
       - run: npm run test -- --run
       - run: npm run build
+      # The workbench answers through the SSE endpoint and resolves the KB via a
+      # detail call; both are mocked inside the specs, so no backend or API key
+      # is needed. Running this in CI is what keeps those mocks from rotting.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Frontend e2e
+        run: npm run e2e
