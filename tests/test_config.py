@@ -213,3 +213,16 @@ def test_llm_enable_thinking_is_read_from_environment(raw: str, expected) -> Non
 def test_llm_enable_thinking_rejects_unknown_values() -> None:
     with pytest.raises(ValueError, match="LLM_ENABLE_THINKING"):
         Settings.from_mapping({**_valid_values(), "LLM_ENABLE_THINKING": "maybe"})
+
+def test_voice_settings_defaults() -> None:
+    from industrial_rag.config import Settings
+
+    settings = Settings.from_env()
+    assert settings.voice_enabled is False
+    assert settings.voice_asr_model == "qwen3-asr-flash"
+    assert settings.voice_tts_model == "qwen3-tts-flash"
+    assert settings.voice_tts_voice == "Cherry"
+    assert settings.voice_max_audio_bytes == 5_242_880
+    assert settings.voice_max_audio_seconds == 60
+    assert settings.voice_tts_max_chars == 600
+    assert settings.voice_rate_limit_per_minute == 10

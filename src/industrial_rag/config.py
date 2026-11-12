@@ -51,6 +51,13 @@ KEY_LENGTH_ENFORCED_ENVIRONMENTS = frozenset({"local_staging", "staging", "produ
 DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE = 30
 DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE = 5
 
+# Voice defaults. ASR and TTS are billed per call, so the feature ships off and
+# carries its own tighter budget when enabled.
+DEFAULT_VOICE_RATE_LIMIT_PER_MINUTE = 10
+DEFAULT_VOICE_MAX_AUDIO_BYTES = 5_242_880
+DEFAULT_VOICE_MAX_AUDIO_SECONDS = 60
+DEFAULT_VOICE_TTS_MAX_CHARS = 600
+
 
 def validate_api_key_length(name: str, value: str | None, environment: str) -> None:
     """Enforce the minimum API key length policy.
@@ -157,6 +164,16 @@ class Settings:
     # Anonymous browser surface limits (requests/minute/client, 0 disables).
     public_rate_limit_per_minute: int = DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE
     feedback_rate_limit_per_minute: int = DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE
+    # Voice (speech input / spoken answers). Disabled by default because ASR and
+    # TTS are billed per call.
+    voice_enabled: bool = False
+    voice_asr_model: str = "qwen3-asr-flash"
+    voice_tts_model: str = "qwen3-tts-flash"
+    voice_tts_voice: str = "Cherry"
+    voice_max_audio_bytes: int = DEFAULT_VOICE_MAX_AUDIO_BYTES
+    voice_max_audio_seconds: int = DEFAULT_VOICE_MAX_AUDIO_SECONDS
+    voice_tts_max_chars: int = DEFAULT_VOICE_TTS_MAX_CHARS
+    voice_rate_limit_per_minute: int = DEFAULT_VOICE_RATE_LIMIT_PER_MINUTE
     # Off by default: trusting ``X-Forwarded-For`` without a sanitising proxy in
     # front of the API lets a client forge its own rate-limit identity.
     trust_proxy_headers: bool = False
@@ -421,6 +438,44 @@ class Settings:
             raise ValueError("IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE 必须是整数") from error
         if feedback_rate_limit_per_minute < 0:
             raise ValueError("IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE 不能为负数")
+
+        def _voice_bool(name: str, default: bool) -> bool:
+            raw = (values.get(name) or "").strip().lower()
+            if not raw:
+                return default
+            return raw in {"1", "true", "yes", "on"}
+
+        def _voice_int(name: str, default: int, *, minimum: int) -> int:
+            raw = (values.get(name) or "").strip()
+            if not raw:
+                return default
+            try:
+                parsed = int(raw)
+            except ValueError as error:
+                raise ValueError(f"{name} 必须是整数") from error
+            if parsed < minimum:
+                raise ValueError(f"{name} 不能小于 {minimum}")
+            return parsed
+
+        voice_enabled = _voice_bool("IRA_VOICE_ENABLED", False)
+        voice_asr_model = (values.get("IRA_VOICE_ASR_MODEL") or "qwen3-asr-flash").strip()
+        voice_tts_model = (values.get("IRA_VOICE_TTS_MODEL") or "qwen3-tts-flash").strip()
+        voice_tts_voice = (values.get("IRA_VOICE_TTS_VOICE") or "Cherry").strip()
+        voice_max_audio_bytes = _voice_int(
+            "IRA_VOICE_MAX_AUDIO_BYTES", DEFAULT_VOICE_MAX_AUDIO_BYTES, minimum=1024
+        )
+        voice_max_audio_seconds = _voice_int(
+            "IRA_VOICE_MAX_AUDIO_SECONDS", DEFAULT_VOICE_MAX_AUDIO_SECONDS, minimum=1
+        )
+        voice_tts_max_chars = _voice_int(
+            "IRA_VOICE_TTS_MAX_CHARS", DEFAULT_VOICE_TTS_MAX_CHARS, minimum=1
+        )
+        voice_rate_limit_per_minute = _voice_int(
+            "IRA_VOICE_RATE_LIMIT_PER_MINUTE",
+            DEFAULT_VOICE_RATE_LIMIT_PER_MINUTE,
+            minimum=0,
+        )
+
         trust_proxy_headers = (
             values.get("IRA_TRUST_PROXY_HEADERS") or ""
         ).strip().lower() in {"1", "true", "yes", "on"}
@@ -510,6 +565,14 @@ class Settings:
             retrieval_trace_ttl_seconds=retrieval_trace_ttl_seconds,
             public_rate_limit_per_minute=public_rate_limit_per_minute,
             feedback_rate_limit_per_minute=feedback_rate_limit_per_minute,
+            voice_enabled=voice_enabled,
+            voice_asr_model=voice_asr_model,
+            voice_tts_model=voice_tts_model,
+            voice_tts_voice=voice_tts_voice,
+            voice_max_audio_bytes=voice_max_audio_bytes,
+            voice_max_audio_seconds=voice_max_audio_seconds,
+            voice_tts_max_chars=voice_tts_max_chars,
+            voice_rate_limit_per_minute=voice_rate_limit_per_minute,
             trust_proxy_headers=trust_proxy_headers,
             mineru_enabled=mineru_enabled,
             mineru_api_base_url=mineru_api_base_url,
