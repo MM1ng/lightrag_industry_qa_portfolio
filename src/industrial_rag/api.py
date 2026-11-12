@@ -58,6 +58,7 @@ from industrial_rag.routers import (
     knowledge_bases,
     tasks,
     update_jobs,
+    voice,
 )
 from industrial_rag.runtime import LightRAGRuntime
 from industrial_rag.services.answer_feedback_service import (
@@ -925,6 +926,7 @@ def create_app(
     *,
     settings: Settings | None = None,
     runtime_factory: Callable[[Settings], QueryRuntime] = LightRAGRuntime,
+    voice_provider: object | None = None,
 ) -> FastAPI:
     """Create an API whose settings and runtime are resolved during lifespan startup."""
 
@@ -985,6 +987,28 @@ def create_app(
             )
             _runtime_manager = KnowledgeBaseRuntimeManager()
             application.state.runtime_manager = _runtime_manager
+
+            # Speech endpoints stay dormant unless explicitly enabled: ASR and
+            # TTS are billed per call. An injected provider wins so tests never
+            # touch the network.
+            if voice_provider is not None:
+                application.state.voice_provider = voice_provider
+            elif resolved_settings.voice_enabled:
+                from industrial_rag.voice_provider import DashScopeVoiceProvider
+
+                application.state.voice_provider = DashScopeVoiceProvider(
+                    api_key=resolved_settings.dashscope_api_key or "",
+                    base_url=(
+                        resolved_settings.llm_base_url
+                        or "https://dashscope.aliyuncs.com/api/v1"
+                    ),
+                    model=resolved_settings.voice_asr_model,
+                    tts_model=resolved_settings.voice_tts_model,
+                    voice=resolved_settings.voice_tts_voice,
+                )
+            else:
+                application.state.voice_provider = None
+
 
             # Start lifecycle task executor
             # Import handler impls so they self-register
@@ -1712,6 +1736,7 @@ def create_app(
     application.include_router(evaluation.router)
     application.include_router(feedback.compat_router)
     application.include_router(graph.router)
+    application.include_router(voice.router)
     application.include_router(knowledge_bases.router)
     application.include_router(documents.router)
     application.include_router(tasks.router)
