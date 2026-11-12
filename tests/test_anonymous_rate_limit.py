@@ -181,3 +181,35 @@ def test_missing_peer_address_shares_one_bucket() -> None:
     assert _anonymous_client_key(request, trust_proxy_headers=False) == "unknown"
     # Even a forged header must not buy a private bucket while trust is off.
     assert _anonymous_client_key(request, trust_proxy_headers=True) == "203.0.113.7"
+
+def test_voice_bucket_is_independent_from_default_and_feedback() -> None:
+    """Voice has its own budget; exhausting it must not affect the others."""
+    from industrial_rag.rate_limit import BUCKET_DEFAULT, BUCKET_FEEDBACK, BUCKET_VOICE
+
+    limiter = AnonymousRateLimiter(
+        default_limit=3, feedback_limit=2, voice_limit=1, window_seconds=60
+    )
+    assert limiter.allow("ip", bucket=BUCKET_VOICE) is True
+    assert limiter.allow("ip", bucket=BUCKET_VOICE) is False
+    # Other buckets are untouched.
+    assert limiter.allow("ip", bucket=BUCKET_DEFAULT) is True
+    assert limiter.allow("ip", bucket=BUCKET_FEEDBACK) is True
+
+
+def test_voice_limit_defaults_to_zero_when_not_configured() -> None:
+    from industrial_rag.rate_limit import BUCKET_VOICE
+
+    limiter = AnonymousRateLimiter(default_limit=5, window_seconds=60)
+    # voice_limit omitted -> 0 -> unlimited for that bucket
+    assert limiter.limit_for(BUCKET_VOICE) == 0
+    assert limiter.allow("ip", bucket=BUCKET_VOICE) is True
+
+
+def test_voice_bucket_reports_retry_after() -> None:
+    from industrial_rag.rate_limit import BUCKET_VOICE
+
+    limiter = AnonymousRateLimiter(
+        default_limit=10, voice_limit=1, window_seconds=60
+    )
+    limiter.allow("ip", bucket=BUCKET_VOICE)
+    assert limiter.retry_after("ip", bucket=BUCKET_VOICE) >= 1

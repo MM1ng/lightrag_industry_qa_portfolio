@@ -30,6 +30,9 @@ DEFAULT_MAX_TRACKED_KEYS = 4096
 
 BUCKET_DEFAULT = "default"
 BUCKET_FEEDBACK = "feedback"
+# Speech endpoints cost more per call than a text query, so they get their own
+# tighter budget rather than sharing the default bucket.
+BUCKET_VOICE = "voice"
 
 
 class AnonymousRateLimiter:
@@ -53,6 +56,7 @@ class AnonymousRateLimiter:
         *,
         default_limit: int,
         feedback_limit: int | None = None,
+        voice_limit: int | None = None,
         window_seconds: float = 60.0,
         max_keys: int = DEFAULT_MAX_TRACKED_KEYS,
         clock: Callable[[], float] | None = None,
@@ -61,6 +65,12 @@ class AnonymousRateLimiter:
         self._feedback_limit = max(
             0, int(default_limit if feedback_limit is None else feedback_limit)
         )
+        self._voice_limit = max(0, int(voice_limit or 0))
+        self._limits = {
+            BUCKET_DEFAULT: self._default_limit,
+            BUCKET_FEEDBACK: self._feedback_limit,
+            BUCKET_VOICE: self._voice_limit,
+        }
         self._window_seconds = float(window_seconds)
         self._max_keys = max(1, int(max_keys))
         self._clock = clock or time.monotonic
@@ -69,11 +79,11 @@ class AnonymousRateLimiter:
     @property
     def enabled(self) -> bool:
         """Whether any bucket actually limits traffic."""
-        return self._default_limit > 0 or self._feedback_limit > 0
+        return any(limit > 0 for limit in self._limits.values())
 
     def limit_for(self, bucket: str = BUCKET_DEFAULT) -> int:
         """Return the per-window budget for ``bucket``."""
-        return self._feedback_limit if bucket == BUCKET_FEEDBACK else self._default_limit
+        return self._limits.get(bucket, self._default_limit)
 
     def allow(self, key: str, *, bucket: str = BUCKET_DEFAULT) -> bool:
         """Record one hit and report whether it fits inside the budget."""
