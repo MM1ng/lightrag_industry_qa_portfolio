@@ -635,6 +635,28 @@ def _is_public_browser_request(request: Request) -> bool:
     return method == "POST" and _is_public_kb_query_path(path)
 
 
+def _dashscope_native_base_url(settings: Settings) -> str:
+    """Return the DashScope native API base for the speech endpoints.
+
+    ``llm_base_url`` points at the OpenAI-compatible surface
+    (``.../compatible-mode/v1``), which has no multimodal-generation route. The
+    speech API lives under ``.../api/v1`` on the same host, so the host is kept
+    and the path replaced. A custom base that already ends in ``/api/v1`` is
+    passed through unchanged.
+    """
+
+    configured = (settings.llm_base_url or "").strip()
+    if not configured:
+        return "https://dashscope.aliyuncs.com/api/v1"
+    trimmed = configured.rstrip("/")
+    if trimmed.endswith("/api/v1"):
+        return trimmed
+    marker = "/compatible-mode"
+    if marker in trimmed:
+        return trimmed.split(marker, 1)[0] + "/api/v1"
+    return trimmed + "/api/v1"
+
+
 def _insecure_local_dev_enabled(settings: Settings | None) -> bool:
     """Uncredentialed admin access requires an explicit local-only opt-in.
 
@@ -1002,11 +1024,12 @@ def create_app(
                 from industrial_rag.voice_provider import DashScopeVoiceProvider
 
                 application.state.voice_provider = DashScopeVoiceProvider(
-                    api_key=resolved_settings.dashscope_api_key or "",
-                    base_url=(
-                        resolved_settings.llm_base_url
-                        or "https://dashscope.aliyuncs.com/api/v1"
-                    ),
+                    api_key=resolved_settings.api_key or "",
+                    # The voice API lives on the DashScope native endpoint, not
+                    # the OpenAI-compatible one used for chat completions. Derive
+                    # it from the configured host instead of reusing llm_base_url,
+                    # which ends in /compatible-mode/v1 and would 404 here.
+                    base_url=_dashscope_native_base_url(resolved_settings),
                     model=resolved_settings.voice_asr_model,
                     tts_model=resolved_settings.voice_tts_model,
                     voice=resolved_settings.voice_tts_voice,

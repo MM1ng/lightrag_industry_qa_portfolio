@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Form, Request, Response, UploadFile
+from fastapi import APIRouter, Body, Form, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
 
 from industrial_rag.errors import AppError
@@ -133,7 +133,7 @@ async def transcribe(
 
 
 @router.post("/speak")
-async def speak(request: Request, payload: dict) -> Response:
+async def speak(request: Request, payload: dict = Body(...)) -> Response:
     """Synthesize the answer text and stream the audio back.
 
     The upstream returns a temporary URL; the audio is downloaded here so the

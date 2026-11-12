@@ -160,3 +160,67 @@ def test_speak_upstream_failure_is_503() -> None:
     with TestClient(app) as client:
         response = client.post("/v1/voice/speak", json={"text": "x"})
     assert response.status_code == 503
+
+
+def test_disabled_speak_returns_404_not_422() -> None:
+    """The feature switch must answer first, before body validation.
+
+    Regression guard: with a bare ``payload: dict`` annotation FastAPI treated
+    the body as a query parameter and answered 422 before the handler could
+    report VOICE_DISABLED. A disabled deployment must look "not there" (404),
+    not "your request is malformed" (422).
+    """
+    app = make_app(enabled=False)
+    with TestClient(app) as client:
+        for body in ({"text": "x"}, {}, {"text": ""}):
+            response = client.post("/v1/voice/speak", json=body)
+            assert response.status_code == 404, body
+            assert response.json()["code"] == "VOICE_DISABLED"
+
+
+def test_enabling_voice_builds_a_real_provider_at_startup() -> None:
+    """Startup must construct the DashScope provider when voice is enabled.
+
+    Regression guard: the first draft read ``settings.dashscope_api_key``, a
+    field that does not exist (the real one is ``api_key``). Tests that inject a
+    provider never reached that branch, so the crash only appeared on a real
+    start-up with IRA_VOICE_ENABLED=true.
+    """
+    settings = Settings(api_key="offline-test-key", voice_enabled=True)
+    app = create_app(settings=settings, runtime_factory=lambda _: NoRuntime())
+    with TestClient(app) as client:
+        provider = app.state.voice_provider
+        assert provider is not None
+        assert provider.__class__.__name__ == "DashScopeVoiceProvider"
+        # The route is reachable; the upstream call itself is out of scope here.
+        assert client.post("/v1/voice/speak", json={"text": "x"}).status_code in {502, 503}
+
+
+class TestNativeBaseUrl:
+    """The speech API is not on the OpenAI-compatible path used for chat.
+
+    Regression guard: reusing ``llm_base_url`` verbatim made every voice call
+    return upstream 404, because ``/compatible-mode/v1`` has no
+    multimodal-generation route.
+    """
+
+    def test_replaces_compatible_mode_path(self) -> None:
+        from industrial_rag.api import _dashscope_native_base_url
+
+        settings = Settings(
+            api_key="k",
+            llm_base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        )
+        assert _dashscope_native_base_url(settings) == "https://dashscope.aliyuncs.com/api/v1"
+
+    def test_passes_through_native_path(self) -> None:
+        from industrial_rag.api import _dashscope_native_base_url
+
+        settings = Settings(api_key="k", llm_base_url="https://example.invalid/api/v1")
+        assert _dashscope_native_base_url(settings) == "https://example.invalid/api/v1"
+
+    def test_defaults_when_unset(self) -> None:
+        from industrial_rag.api import _dashscope_native_base_url
+
+        settings = Settings(api_key="k", llm_base_url="")
+        assert _dashscope_native_base_url(settings) == "https://dashscope.aliyuncs.com/api/v1"

@@ -420,6 +420,30 @@ IRA_KB_DATA_ROOT=/path/to/manuals python -m pytest tests/test_phase14a_parser_ab
 
 `frontend/e2e/chat-workbench.spec.ts` 全部通过 `page.route` mock，不依赖真实后端或 API Key，因此可在 CI 无凭据环境运行。注意工作台走的是 **SSE 端点 `/query/stream`**，只 mock `/query` 会导致请求穿透到真实后端并显示其错误文案。
 
+### 语音输入与朗读
+
+语音功能默认关闭（`IRA_VOICE_ENABLED=false`），因为 ASR 与 TTS 按调用计费。开启后工作台会显示麦克风与朗读按钮。
+
+```bash
+# .env.docker 中开启
+IRA_VOICE_ENABLED=true
+```
+
+| 能力 | 模型 | 说明 |
+| --- | --- | --- |
+| 语音转写 | `qwen3-asr-flash` | 上传浏览器原生 `audio/webm`，后端代理 |
+| 朗读回答 | `qwen3-tts-flash` | 音色 `Cherry`，仅朗读答案正文 |
+
+设计要点：
+
+- 识别结果**填入输入框而非自动发送**，工业术语需人工校对
+- 朗读前剥离 `[1]` 引用标记并转换单位（`°C`→`摄氏度`），否则会念出「方括号一」
+- **ASR 对无效音频不报错而是幻觉出文字**（实测：随机字节返回「啊。」），因此有三道防线：前端最短时长（500ms）、后端文件头校验（415）、结果低置信度判定
+- 音频不落盘，仅在请求内存中中转；日志只记字节数与字符数，不记识别文本原文
+- 两个端点匿名公开（与 `POST /query` 同一模型），靠 `BUCKET_VOICE` 限流（默认 10 次/分钟）
+
+设计文档见 `docs/specs/2026-11-12-voice-io-design.md`，实现计划见 `docs/plans/2026-11-12-voice-io.md`。
+
 ### 测试覆盖率
 
 覆盖率基于 `pytest-cov`（branch 模式，度量范围 `src/industrial_rag`）。全量回归 + 覆盖率一条命令：
