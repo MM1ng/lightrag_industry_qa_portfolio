@@ -8,12 +8,18 @@ import HighFrequencyPrompts from '../components/chat/HighFrequencyPrompts.vue'
 import ChatTimeline from '../components/chat/ChatTimeline.vue'
 import ChatComposer from '../components/chat/ChatComposer.vue'
 import EvidenceDrawer from '../components/chat/EvidenceDrawer.vue'
+import { useSpeech } from '../composables/useSpeech'
+import { useVoiceRecorder } from '../composables/useVoiceRecorder'
 import type { QueryResult } from '../types/api'
 
 const session = useSessionStore()
 const error = ref('')
 const selectedCitationId = ref<string | null>(null)
 const selectedAssistantId = ref<string | null>(null)
+const voiceNotice = ref('')
+const voicePrefill = ref('')
+const recorder = useVoiceRecorder()
+const speech = useSpeech((text) => apiClient.synthesizeSpeech(text))
 // Unvalidated preview streamed while the answer is generated. It is replaced by
 // the validated result as soon as the final event arrives, so it is styled as a
 // draft rather than an answer.
@@ -59,6 +65,50 @@ async function submitQuestion(question: string) {
 
 // 提示词只负责提交，不回填输入框：回填会在提交后留下上一轮文本。
 function handlePrompt(question: string) { submitQuestion(question) }
+
+/**
+ * One button toggles recording. The transcript goes into the composer for
+ * review instead of being submitted: ASR mishears industrial terms and also
+ * invents a short phrase when the audio is unusable.
+ */
+async function toggleRecording() {
+  if (recorder.state.value === 'recording') {
+    const recorded = await recorder.stop()
+    if (!recorded) { voiceNotice.value = recorder.errorMessage.value; return }
+    voiceNotice.value = '正在识别…'
+    try {
+      const result = await apiClient.transcribeAudio(recorded.blob, recorded.durationMs)
+      if (result.low_confidence || !result.text.trim()) {
+        voiceNotice.value = '未识别清楚，请重新录音。'
+        return
+      }
+      voicePrefill.value = result.text
+      voiceNotice.value = ''
+    } catch (cause) {
+      voiceNotice.value = cause instanceof ApiClientError ? cause.message : '语音识别失败，请重试。'
+    }
+    return
+  }
+  voiceNotice.value = ''
+  await recorder.start()
+  if (recorder.state.value === 'denied') voiceNotice.value = recorder.errorMessage.value
+}
+
+const latestAnswer = computed(() => {
+  for (let index = session.messages.length - 1; index >= 0; index -= 1) {
+    const message = session.messages[index]
+    if (message.role === 'assistant') return (message as AssistantMessage).result.answer
+  }
+  return ''
+})
+
+async function toggleSpeech() {
+  if (speech.state.value === 'playing') { speech.stop(); voiceNotice.value = ''; return }
+  if (!latestAnswer.value) return
+  await speech.speak(latestAnswer.value)
+  if (speech.state.value === 'error') voiceNotice.value = speech.errorMessage.value
+}
+
 function selectCitation(messageId: string, citationId: string) { selectedAssistantId.value = messageId; selectedCitationId.value = citationId }
 function handleFeedback(messageId: string, payload: { type: 'helpful' | 'unhelpful'; reason?: string; comment?: string }) {
   const message = session.messages.find((item): item is AssistantMessage => item.id === messageId && item.role === 'assistant')
@@ -75,12 +125,16 @@ function handleFeedback(messageId: string, payload: { type: 'helpful' | 'unhelpf
     <ChatTimeline v-else :messages="session.messages" @select-citation="selectCitation" @retry="submitQuestion" @feedback="handleFeedback" />
     <div v-if="session.chatStatus === 'loading'" class="loading-row" role="status"><span class="loading-dot" />{{ streamStage === 'generating' ? '正在生成回答，完成后核对引用…' : '正在检索当前手册…' }}</div>
     <div v-if="draft" class="draft-answer" aria-live="polite"><span class="draft-flag">生成中 · 未校验</span><p>{{ draft }}</p></div>
-    <ChatComposer :disabled="session.chatStatus === 'loading' || !session.canQueryActiveKnowledgeBase" :error="error || readinessMessage" @submit="submitQuestion" />
+    <div v-if="latestAnswer && !draft" class="speak-row"><button type="button" class="speak" :aria-label="speech.state.value === 'playing' ? '停止朗读' : '朗读回答'" @click="toggleSpeech">{{ speech.state.value === 'playing' ? '停止朗读' : speech.state.value === 'synthesizing' ? '正在合成…' : '朗读回答' }}</button><span v-if="speech.state.value === 'playing'" class="speak-hint">正在朗读最新回答</span></div>
+    <ChatComposer :disabled="session.chatStatus === 'loading' || !session.canQueryActiveKnowledgeBase" :error="error || readinessMessage" :prefill="voicePrefill" :recording="recorder.state.value === 'recording'" :voice-notice="voiceNotice" @submit="submitQuestion" @toggle-recording="toggleRecording" />
     <p class="scope-note">当前范围：离心泵知识问答 · 只读图谱 · 管理功能需要单独验证</p>
     <EvidenceDrawer :visible="Boolean(selectedCitationId)" :evidence="selectedEvidence" :selected-citation-id="selectedCitationId" @close="selectedCitationId = null" @select="selectedCitationId = $event" />
   </section>
 </template>
 
 <style scoped>
+.speak-row { display: flex; align-items: center; gap: 10px; margin: 10px 0 14px; }
+.speak { padding: 7px 14px; border: 1px solid var(--color-line); border-radius: var(--radius-control); color: var(--color-cobalt); background: var(--color-surface); font-size: 13px; font-weight: 700; }
+.speak-hint { color: var(--color-muted); font-size: 12px; }
 .chat-view { max-width: 1180px; margin: 0 auto; } .chat-intro { display: flex; justify-content: space-between; align-items: end; gap: 30px; margin-bottom: 28px; } .eyebrow, .empty-index { color: var(--color-cobalt); font: 11px Bahnschrift, monospace; letter-spacing: .12em; } h1 { margin: 10px 0 8px; font-size: clamp(30px, 5vw, 54px); letter-spacing: -.06em; line-height: 1.12; } h1 em { color: var(--color-cobalt); font-style: normal; } .chat-intro p, .empty-copy p { max-width: 570px; margin: 0; color: var(--color-muted); line-height: 1.7; } .intro-mark { display: grid; place-items: center; width: 86px; height: 86px; border: 1px solid #b9cdf3; border-radius: 50%; color: var(--color-cobalt); background: var(--color-cobalt-soft); text-align: center; transform: rotate(-9deg); } .intro-mark span { font-size: 25px; } .intro-mark small { font: 9px Bahnschrift, monospace; letter-spacing: .12em; } .readiness-panel { margin: 0 0 18px; padding: 14px 16px; border: 1px solid #f1d294; border-left: 3px solid var(--color-amber); border-radius: 7px; background: var(--color-amber-soft); line-height: 1.6; } .readiness-panel.danger { border-color: #f4c5bf; border-left-color: var(--color-danger); background: #fff0ee; } .readiness-panel p { margin: 4px 0 0; color: var(--color-muted); } .readiness-panel a { display: inline-flex; margin-top: 9px; color: var(--color-cobalt); font-weight: 700; } .empty-state { margin-bottom: 26px; } .empty-copy { margin-bottom: 22px; } .empty-copy h2 { margin: 7px 0 7px; font-size: 22px; } .loading-row { display: flex; align-items: center; gap: 9px; margin: 13px 0; color: var(--color-cobalt); font-size: 13px; } .loading-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--color-cobalt); animation: pulse 1s infinite ease-in-out; } .draft-answer { margin: 12px 0 4px; padding: 14px 16px; border: 1px dashed var(--color-line); border-radius: var(--radius-panel); color: var(--color-muted); background: repeating-linear-gradient(135deg, #fafbfc, #fafbfc 10px, #f4f6f8 10px, #f4f6f8 20px); } .draft-flag { display: inline-block; margin-bottom: 8px; padding: 1px 8px; border-radius: 999px; color: #8a6d1f; background: var(--color-amber-soft); font: 10px Bahnschrift, monospace; letter-spacing: .08em; } .draft-answer p { margin: 0; white-space: pre-wrap; line-height: 1.75; } .scope-note { color: #8895a1; font-size: 11px; text-align: center; } @keyframes pulse { 50% { opacity: .3; transform: scale(.7); } } @media (max-width: 600px) { .chat-intro { align-items: start; } .intro-mark { width: 66px; height: 66px; flex: 0 0 auto; } }
 </style>
