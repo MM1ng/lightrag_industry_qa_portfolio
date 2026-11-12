@@ -12,6 +12,7 @@ from industrial_rag.db.session import get_session
 from industrial_rag.routers.schemas import (
     GenerationActionResponse,
     GenerationSummary,
+    GenerationValidateRequest,
     GenerationValidateResponse,
 )
 from industrial_rag.services.incremental_update_service import IncrementalUpdateService
@@ -53,6 +54,7 @@ async def validate_generation(
     kb_id: str,
     generation_id: str,
     request: Request,
+    body: GenerationValidateRequest | None = None,
     actor: AuthenticatedActor = Depends(require_admin_actor),
     session: AsyncSession = Depends(get_session),
 ) -> GenerationValidateResponse:
@@ -61,6 +63,8 @@ async def validate_generation(
         kb_id,
         generation_id,
         approved_by=actor.actor,
+        suite_id=body.suite_id if body else None,
+        suite_sha256=body.suite_sha256 if body else None,
     )
     return GenerationValidateResponse(**result)
 

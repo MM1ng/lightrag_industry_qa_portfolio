@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import os
 import uuid
 from pathlib import Path
@@ -97,11 +98,19 @@ class FakeQdrant:
 class FakeLightRAGService:
     """Records ainsert calls and stores chunk points in the fake Qdrant."""
 
-    def __init__(self, qdrant: FakeQdrant, names: dict[str, str], kb_id: str, generation: str) -> None:
+    def __init__(
+        self,
+        qdrant: FakeQdrant,
+        names: dict[str, str],
+        kb_id: str,
+        generation: str,
+        storage_root: Path,
+    ) -> None:
         self.qdrant = qdrant
         self.names = names
         self.kb_id = kb_id
         self.generation = generation
+        self.storage_root = storage_root
         self._backend = FakeBackend(self)
         self.calls: list[dict] = []
 
@@ -128,10 +137,24 @@ class FakeBackend:
             {"input": input, "ids": ids, "file_paths": file_paths}
         )
         doc_token = ids[0]
-        for i, part in enumerate(input[0].split(split_by_character)):
-            part = part.strip()
-            if not part:
-                continue
+        parts = [part.strip() for part in input[0].split(split_by_character) if part.strip()]
+        status_path = self.service.storage_root / "kv_store_doc_status.json"
+        self.service.storage_root.mkdir(parents=True, exist_ok=True)
+        status = (
+            json.loads(status_path.read_text(encoding="utf-8"))
+            if status_path.is_file()
+            else {}
+        )
+        status[doc_token] = {
+            "status": "processing",
+            "chunks_count": len(parts),
+            "chunks_list": [f"{doc_token}-chunk-{i:03d}" for i in range(len(parts))],
+        }
+        status_path.write_text(
+            json.dumps(status),
+            encoding="utf-8",
+        )
+        for i, part in enumerate(parts):
             chunk_id = f"{doc_token}-chunk-{i:03d}"
             point_id = _point_id(chunk_id)
             payload = {
@@ -148,6 +171,60 @@ class FakeBackend:
                 [models.PointStruct(id=point_id, vector=[0.1] * 1024, payload=payload)],
                 wait=True,
             )
+            # Real LightRAG extraction also writes one entity and one relationship
+            # per chunk; the fake must do the same or graph verification would
+            # fail for a reason production never sees.  Payloads must follow the
+            # real contract consumed by qdrant_graph_reader: entities carry
+            # ``entity_name`` (the graph node key) and relationships carry
+            # ``src_id``/``tgt_id``.
+            entity_name = f"{chunk_id}-ent"
+            related_name = f"{chunk_id}-rel-target"
+            await self.service.qdrant.upsert(
+                self.service.names["entities"],
+                [
+                    models.PointStruct(
+                        id=_point_id(entity_name),
+                        vector=[0.2] * 1024,
+                        payload={"id": entity_name, "kb_id": self.service.kb_id,
+                                 "generation": self.service.generation,
+                                 "entity_name": entity_name,
+                                 "content": f"{entity_name}\n{part}",
+                                 "source_id": chunk_id,
+                                 "file_path": "test.pdf"},
+                    ),
+                    models.PointStruct(
+                        id=_point_id(related_name),
+                        vector=[0.2] * 1024,
+                        payload={"id": related_name, "kb_id": self.service.kb_id,
+                                 "generation": self.service.generation,
+                                 "entity_name": related_name,
+                                 "content": f"{related_name}\n{part}",
+                                 "source_id": chunk_id,
+                                 "file_path": "test.pdf"},
+                    )
+                ],
+                wait=True,
+            )
+            await self.service.qdrant.upsert(
+                self.service.names["relationships"],
+                [
+                    models.PointStruct(
+                        id=_point_id(f"{chunk_id}-rel"),
+                        vector=[0.3] * 1024,
+                        payload={"id": f"{chunk_id}-rel", "kb_id": self.service.kb_id,
+                                 "generation": self.service.generation,
+                                 "src_id": entity_name,
+                                 "tgt_id": related_name,
+                                 "content": f"relates_to\t{part}",
+                                 "source_id": chunk_id,
+                                 "file_path": "test.pdf"},
+                    )
+                ],
+                wait=True,
+            )
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+        status[doc_token]["status"] = "processed"
+        status_path.write_text(json.dumps(status), encoding="utf-8")
 
 
 def _write_pdf(path: Path, text: str) -> str:
@@ -185,7 +262,9 @@ def _isolated_env(tmp_path_factory):
 
 
 @pytest.fixture(autouse=True)
-def _fresh_db(tmp_path):
+def _fresh_db(tmp_path, monkeypatch):
+    from g1_test_support import stub_lifecycle_policy
+    stub_lifecycle_policy(monkeypatch)
     reset_for_testing()
 
     async def _init():
@@ -216,11 +295,15 @@ class Phase9Ctx:
                 kb_id=candidate_settings.qdrant_kb_id,
                 generation=candidate_settings.qdrant_generation,
             )
+            storage_root = Path(candidate_settings.working_dir)
+            if candidate_settings.vector_workspace:
+                storage_root = storage_root / candidate_settings.vector_workspace
             return FakeLightRAGService(
                 self.qdrant,
                 resolved,
                 candidate_settings.qdrant_kb_id,
                 candidate_settings.qdrant_generation,
+                storage_root,
             )
 
         return IncrementalUpdateService(
@@ -258,6 +341,7 @@ class Phase9Ctx:
     async def validate(self, kb_id: str, generation_id: str, runner=None) -> dict:
         async def passing_runner(kb, generation):
             return {
+                "results": __import__("g1_test_support").passing_records(generation.id),
                 "http_success_rate": 1.0,
                 "trace_complete_rate": 1.0,
                 "negative_unsupported_answer_rate": 0.0,
@@ -346,13 +430,57 @@ def test_lightrag_close_timeout_does_not_block_candidate_completion(
     _run(_test())
 
 
-def test_lightrag_insert_timeout_requires_durable_candidate_chunks(
+def test_rebuild_clears_inherited_document_registry_before_insert(
     ctx: Phase9Ctx, monkeypatch
 ):
+    """A rebuild must not inherit "this document is already processed".
+
+    The candidate workspace is a copy of the active generation, so LightRAG would
+    treat the re-insert as a duplicate and skip entity extraction — the exact
+    reason a re-indexed knowledge base kept its empty graph.
+    """
+    from industrial_rag.services.incremental_update_service import (
+        IncrementalUpdateService,
+    )
+
+    purged: list[str] = []
+    original_purge = IncrementalUpdateService._purge_workspace_references
+
+    async def recording_purge(self, storage_root, removed, *, internal_doc_id):
+        purged.append(internal_doc_id)
+        return await original_purge(
+            self, storage_root, removed, internal_doc_id=internal_doc_id
+        )
+
+    monkeypatch.setattr(
+        IncrementalUpdateService, "_purge_workspace_references", recording_purge
+    )
+
+    async def _test():
+        kb_id = await ctx.create_kb()
+        result = await ctx.add(kb_id, "P9-PURGE 泵额定功率 7.5 kW。", "purge.pdf")
+        assert result["status"] == "candidate_built"
+        assert purged, "the inherited document registry must be cleared before insert"
+
+    _run(_test())
+
+
+def test_lightrag_insert_timeout_discards_candidate_generation(
+    ctx: Phase9Ctx, monkeypatch
+):
+    """A timed-out insert must never be promoted as a "buildable" candidate.
+
+    Durability of the chunks is not enough: the merge stage writes the graph, so
+    an aborted insert would ship a generation whose knowledge graph is empty.
+    """
     original_insert = FakeBackend.ainsert
 
     async def durable_then_hanging_insert(self, *args, **kwargs) -> None:
         await original_insert(self, *args, **kwargs)
+        status_path = self.service.storage_root / "kv_store_doc_status.json"
+        status = json.loads(status_path.read_text(encoding="utf-8"))
+        status[kwargs["ids"][0]]["status"] = "processing"
+        status_path.write_text(json.dumps(status), encoding="utf-8")
         await asyncio.Event().wait()
 
     monkeypatch.setattr(FakeBackend, "ainsert", durable_then_hanging_insert)
@@ -363,8 +491,91 @@ def test_lightrag_insert_timeout_requires_durable_candidate_chunks(
 
     async def _test():
         kb_id = await ctx.create_kb()
-        result = await ctx.add(kb_id, "P9-INSERT-TIMEOUT 已持久化构建。", "insert.pdf")
+        with pytest.raises(RuntimeError, match="LightRAG insert exceeded"):
+            await ctx.add(kb_id, "P9-INSERT-TIMEOUT 已持久化构建。", "insert.pdf")
+
+    _run(_test())
+
+
+def test_insert_retries_when_lightrag_leaves_document_failed(
+    ctx: Phase9Ctx, monkeypatch
+):
+    """``ainsert`` returns normally after a per-document extraction failure.
+
+    LightRAG logs the error, marks the document ``failed`` in its sidecar status
+    and returns — so awaiting the insert is not proof that the graph was merged.
+    The build must notice and retry instead of promoting a half-extracted
+    candidate.
+    """
+    original_insert = FakeBackend.ainsert
+    attempts = {"n": 0}
+
+    async def fail_once_then_succeed(self, *args, **kwargs) -> None:
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            status_path = self.service.storage_root / "kv_store_doc_status.json"
+            status_path.parent.mkdir(parents=True, exist_ok=True)
+            status_path.write_text(
+                json.dumps(
+                    {
+                        kwargs["ids"][0]: {
+                            "status": "failed",
+                            "chunks_count": 1,
+                            "chunks_list": [f"{kwargs['ids'][0]}-chunk-000"],
+                            "error_msg": "extract LLM func: Worker execution timeout",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return
+        await original_insert(self, *args, **kwargs)
+
+    monkeypatch.setattr(FakeBackend, "ainsert", fail_once_then_succeed)
+
+    async def _test():
+        kb_id = await ctx.create_kb()
+        result = await ctx.add(kb_id, "P9-RETRY 泵额定功率 7.5 kW。", "retry.pdf")
         assert result["status"] == "candidate_built"
+        assert attempts["n"] == 2, "the failed document must be retried exactly once"
+
+    _run(_test())
+
+
+def test_insert_failure_discards_candidate_after_retries(
+    ctx: Phase9Ctx, monkeypatch
+):
+    attempts = {"n": 0}
+
+    async def always_fail(self, *args, **kwargs) -> None:
+        attempts["n"] += 1
+        status_path = self.service.storage_root / "kv_store_doc_status.json"
+        status_path.parent.mkdir(parents=True, exist_ok=True)
+        status_path.write_text(
+            json.dumps(
+                {
+                    kwargs["ids"][0]: {
+                        "status": "failed",
+                        "chunks_count": 1,
+                        "chunks_list": [f"{kwargs['ids'][0]}-chunk-000"],
+                        "error_msg": "extract LLM func: Worker execution timeout",
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    monkeypatch.setattr(FakeBackend, "ainsert", always_fail)
+    monkeypatch.setattr(
+        "industrial_rag.services.incremental_update_service._LIGHTRAG_INSERT_ATTEMPTS",
+        2,
+    )
+
+    async def _test():
+        kb_id = await ctx.create_kb()
+        with pytest.raises(RuntimeError, match="partially extracted"):
+            await ctx.add(kb_id, "P9-RETRY-FAIL 泵额定功率 7.5 kW。", "retry-fail.pdf")
+        assert attempts["n"] == 2
 
     _run(_test())
 
@@ -594,6 +805,7 @@ def test_11_validation_failure_blocks_promote(ctx: Phase9Ctx):
                 "secret_leak": 0,
                 "old_document_references": 1,
                 "citation_traceability": False,
+                "results": [{**r, "status_code": 500} for r in __import__("g1_test_support").passing_records(generation.id)],
                 "golden_subset_regression": False,
                 "add_specific": False,
                 "replace_specific": True,
@@ -730,6 +942,126 @@ def test_15_generation_mixing_is_detected(ctx: Phase9Ctx):
             gate = await validator._payload_gate(kb_id, generation, generation_mix_only=True)
             assert gate["passed"] is False
             assert any("generation mix" in p for p in gate["detail"]["problems"])
+
+    _run(_test())
+
+
+def test_actual_build_activate_rollback_runtime_uses_g1_snapshot_after_current_mutates(
+    ctx: Phase9Ctx,
+) -> None:
+    """Rollback query construction must remain viable after all mutable parsed artifacts disappear."""
+    class Runtime:
+        def __init__(self, _settings) -> None:
+            self.initialized = False
+            self.chunk_registry = None
+
+        def bind_chunk_registry(self, registry) -> None:
+            self.chunk_registry = registry
+
+        async def initialize(self) -> None:
+            self.initialized = True
+
+        async def close(self) -> None:
+            self.initialized = False
+
+        async def query(self, question: str, *, mode: str):
+            from industrial_rag.lightrag_service import QueryResult
+
+            return QueryResult(answer=f"runtime:{question}", citations=(), mode=mode)
+
+    async def _test():
+        from industrial_rag.config import Settings
+        from industrial_rag.services.query_application_service import QueryApplicationService
+        from industrial_rag.services.runtime_manager import KnowledgeBaseRuntimeManager
+
+        kb_id = await ctx.create_kb()
+        g1 = await ctx.add(kb_id, "G1-SNAPSHOT retained value", "manual.pdf")
+        await ctx.promote(kb_id, g1["candidate_generation_id"])
+        g2 = await ctx.replace(kb_id, g1["document_id"], "G2-CURRENT replacement value", "manual.pdf")
+        await ctx.promote(kb_id, g2["candidate_generation_id"])
+        await ctx.rollback(kb_id, g1["candidate_generation_id"])
+
+        parsed_documents = Path(os.environ["KB_DATA_ROOT"]) / kb_id / "parsed" / "documents"
+        for current in parsed_documents.rglob("current"):
+            for artifact in current.glob("*.jsonl"):
+                artifact.unlink()
+
+        manager = KnowledgeBaseRuntimeManager(service_factory=Runtime)
+        async with ctx.factory() as session:
+            result = await QueryApplicationService(
+                session,
+                base_settings=Settings.from_env(),
+                runtime_manager=manager,
+            ).query_active(kb_id, "what does G1 say?")
+        await manager.close_all()
+
+        assert result.generation_id == g1["candidate_generation_id"]
+        assert result.result.answer == "runtime:what does G1 say?"
+
+    _run(_test())
+
+
+def test_validation_rejects_a_tampered_frozen_child_snapshot(ctx: Phase9Ctx) -> None:
+    async def _test():
+        kb_id = await ctx.create_kb()
+        candidate = await ctx.add(kb_id, "P9-SNAPSHOT generation artifact integrity", "snapshot.pdf")
+        async with ctx.factory() as session:
+            generation = await ctx.service(session)._generation_repo.get(
+                candidate["candidate_generation_id"]
+            )
+            snapshot = Path(generation.workspace_path) / "retrieval" / "child_chunks.jsonl"
+            snapshot.write_text('{"chunk_id":"tampered"}\n', encoding="utf-8")
+        report = await ctx.validate(kb_id, candidate["candidate_generation_id"])
+        assert report["passed"] is False
+        assert report["gates"]["frozen_snapshot_consistency"]["passed"] is False
+
+    _run(_test())
+
+
+def test_promotion_rechecks_snapshot_after_validation_before_pointer_switch(
+    ctx: Phase9Ctx,
+) -> None:
+    async def _test():
+        from industrial_rag.errors import AppError
+
+        kb_id = await ctx.create_kb()
+        candidate = await ctx.add(kb_id, "P9-PROMOTE snapshot verification", "promote.pdf")
+        validation = await ctx.validate(kb_id, candidate["candidate_generation_id"])
+        assert validation["passed"] is True
+        async with ctx.factory() as session:
+            generation = await ctx.service(session)._generation_repo.get(
+                candidate["candidate_generation_id"]
+            )
+            snapshot = Path(generation.workspace_path) / "retrieval" / "child_chunks.jsonl"
+            snapshot.write_text('{"chunk_id":"tampered"}\n', encoding="utf-8")
+            with pytest.raises(AppError) as caught:
+                await ctx.service(session).promote_generation(
+                    kb_id, candidate["candidate_generation_id"]
+                )
+        assert caught.value.code == "generation_validation_stale"
+
+    _run(_test())
+
+
+def test_promotion_rejects_manifest_byte_changes_after_validation(ctx: Phase9Ctx) -> None:
+    async def _test():
+        from industrial_rag.errors import AppError
+
+        kb_id = await ctx.create_kb()
+        candidate = await ctx.add(kb_id, "P9-PROMOTE manifest byte evidence", "manifest.pdf")
+        validation = await ctx.validate(kb_id, candidate["candidate_generation_id"])
+        assert validation["passed"] is True
+        async with ctx.factory() as session:
+            generation = await ctx.service(session)._generation_repo.get(
+                candidate["candidate_generation_id"]
+            )
+            manifest = Path(generation.workspace_path) / "retrieval" / "chunk_manifest.json"
+            manifest.write_text("\n" + manifest.read_text(encoding="utf-8"), encoding="utf-8")
+            with pytest.raises(AppError) as caught:
+                await ctx.service(session).promote_generation(
+                    kb_id, candidate["candidate_generation_id"]
+                )
+        assert caught.value.code == "generation_validation_stale"
 
     _run(_test())
 

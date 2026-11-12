@@ -21,6 +21,7 @@ from industrial_rag.db.models import (
 from industrial_rag.errors import AppError, AppErrorCode
 from industrial_rag.repositories.validation_run_repository import ValidationRunRepository
 from industrial_rag.services.canonical_validation_runner import CanonicalValidationRunner
+from industrial_rag.services.generation_artifacts import freeze_generation_child_chunks
 from industrial_rag.services.generation_content_fingerprint import (
     GenerationContentFingerprintService,
     stable_hash,
@@ -70,6 +71,9 @@ async def validation_state(tmp_path):
         validation_artifact_dir=tmp_path / "validation",
     )
     kb_id, generation_id = "a" * 32, "b" * 32
+    snapshot = freeze_generation_child_chunks(
+        tmp_path / "workspace", generation_id="g1", document_children=[]
+    )
     async with factory() as session:
         session.add_all(
             [
@@ -81,6 +85,13 @@ async def validation_state(tmp_path):
                     upload_path=str(tmp_path / "uploads"),
                     parsed_path=str(tmp_path / "parsed"),
                     vector_backend="qdrant",
+                    active_vector_generation_id="c" * 32,
+                ),
+                VectorIndexGeneration(
+                    id="c" * 32, knowledge_base_id=kb_id, backend="qdrant", generation="g0",
+                    status=VectorIndexGenerationStatus.active, workspace_path=str(tmp_path / "workspace"),
+                    document_manifest_hash="1" * 64, child_chunks_manifest_hash="2" * 64,
+                    embedding_config_hash="3" * 64, chunking_config_hash="4" * 64,
                 ),
                 VectorIndexGeneration(
                     id=generation_id,
@@ -91,7 +102,7 @@ async def validation_state(tmp_path):
                     workspace_path=str(tmp_path / "workspace"),
                     collections={"chunks": "chunks-g1"},
                     document_manifest_hash="1" * 64,
-                    child_chunks_manifest_hash="2" * 64,
+                    child_chunks_manifest_hash=snapshot.child_manifest_hash,
                     embedding_config_hash="3" * 64,
                     chunking_config_hash="4" * 64,
                 ),
@@ -168,9 +179,7 @@ async def test_canonical_http_record_contains_required_trace_and_safety_fields(
                 "id": "T001",
                 "question": "test",
                 "expects_evidence": True,
-                "expected_citations": [
-                    {"source_file": "source.pdf", "page_number": 1}
-                ],
+                "expected_citations": [{"source_file": "source.pdf", "page_number": 1}],
             },
         ),
         source_sha256="1" * 64,
@@ -196,6 +205,69 @@ async def test_canonical_http_record_contains_required_trace_and_safety_fields(
 
 
 @pytest.mark.asyncio
+async def test_negative_refusal_status_passes_without_answer_text_or_citations(
+    tmp_path, monkeypatch
+) -> None:
+    response = httpx.Response(
+        200,
+        json={
+            "request_id": "req-negative",
+            "trace_id": "trace-negative",
+            "status": "insufficient_evidence",
+            "answer": "",
+            "generation_id": "b" * 32,
+            "citations": [],
+        },
+    )
+
+    class _HTTPClient:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args) -> None:
+            return None
+
+        async def post(self, *_args, **_kwargs):
+            return response
+
+    monkeypatch.setattr(
+        "industrial_rag.services.canonical_validation_runner.AsyncClient",
+        _HTTPClient,
+    )
+    policy = GoldenSetPolicy(
+        questions=(
+            {
+                "id": "N001",
+                "question": "unsupported",
+                "expects_evidence": False,
+                "expected_citations": [],
+            },
+        ),
+        source_sha256="1" * 64,
+        source_path=tmp_path / "test-golden.json",
+        version="test",
+    )
+    settings = Settings(
+        api_key="provider-test-key",
+        admin_api_key="admin-test-key",
+        validation_base_url="http://validation.invalid",
+        working_dir=tmp_path,
+    )
+    report = await CanonicalValidationRunner(settings, policy)(
+        "a" * 32,
+        SimpleNamespace(id="b" * 32),
+    )
+    record = report["results"][0]
+    assert record["answer_status"] == "insufficient_evidence"
+    assert record["citation_trace"] == []
+    assert record["negative_case_passed"] is True
+    assert report["negative_unsupported_answer_rate"] == 0.0
+
+
+@pytest.mark.asyncio
 async def test_promote_gate_rejects_missing_validation(validation_state) -> None:
     factory, settings, qdrant, kb_id, generation_id, _ = validation_state
     async with factory() as session:
@@ -217,12 +289,26 @@ async def _record_valid_run(state) -> Path:
     artifact.write_text('{"id":"S001","status_code":200}\n', encoding="utf-8")
     async with factory() as session:
         generation = await session.get(VectorIndexGeneration, generation_id)
+        from industrial_rag.services.canonical_validation_runner import write_validation_artifact
+        from industrial_rag.services.validation_policy import (
+            REQUIRED_GATES,
+            resolve_validation_policy,
+        )
+
+        from g1_test_support import passing_records
+        resolved = await resolve_validation_policy(session, kb_id, generation)
+        generation.accepted_policy_snapshot = resolved.snapshot
+        records = passing_records(generation_id)
+        summary = {"passed": True, "outcome": "PASSED", "policy_snapshot": resolved.snapshot,
+                   "gates": {name: {"status": "PASS", "passed": True} for name in REQUIRED_GATES}}
+        write_validation_artifact(artifact, [{"schema": "g1-validation-v1", "summary": summary}, *records])
         evidence = await GenerationContentFingerprintService(
             session,
             settings=settings,
             qdrant_client_factory=lambda: qdrant,
         ).calculate(kb_id, generation)
         fingerprint_payload = {
+            "validation_policy": resolved.fingerprint,
             "app_git_commit": evidence.app_git_commit,
             "strategy": evidence.strategy_fingerprint,
             "generation_manifest": evidence.generation_manifest_hash,
@@ -239,6 +325,9 @@ async def _record_valid_run(state) -> Path:
             golden_set_version=policy.version,
             golden_set_sha256=policy.source_sha256,
             runner_version=RUNNER_VERSION,
+            policy_snapshot=resolved.snapshot,
+            validation_policy_fingerprint=resolved.fingerprint,
+            effective_questions_sha256=resolved.snapshot["effective_questions_sha256"],
             app_git_commit=evidence.app_git_commit,
             configured_model=settings.llm_model,
             strategy_fingerprint=evidence.strategy_fingerprint,
@@ -303,6 +392,27 @@ async def test_qdrant_change_after_validation_blocks_promote(validation_state) -
 
 
 @pytest.mark.asyncio
+async def test_lexical_artifact_byte_change_after_validation_blocks_promote(
+    validation_state,
+) -> None:
+    """Validation evidence must bind the exact lexical artifact that was approved."""
+    factory, settings, qdrant, kb_id, generation_id, tmp_path = validation_state
+    await _record_valid_run(validation_state)
+    lexical = tmp_path / "workspace" / "retrieval" / "lexical_index.json"
+    lexical.write_text("\n" + lexical.read_text(encoding="utf-8"), encoding="utf-8")
+
+    async with factory() as session:
+        generation = await session.get(VectorIndexGeneration, generation_id)
+        with pytest.raises(AppError) as caught:
+            await ValidationGateService(
+                session,
+                settings=settings,
+                qdrant_client_factory=lambda: qdrant,
+            ).require_eligible(kb_id, generation)
+    assert caught.value.code == AppErrorCode.generation_validation_stale
+
+
+@pytest.mark.asyncio
 async def test_golden_policy_change_invalidates_previous_run(validation_state, monkeypatch) -> None:
     factory, settings, qdrant, kb_id, generation_id, _ = validation_state
     await _record_valid_run(validation_state)
@@ -314,7 +424,7 @@ async def test_golden_policy_change_invalidates_previous_run(validation_state, m
         questions=original.questions,
     )
     monkeypatch.setattr(
-        "industrial_rag.services.validation_gate_service.load_canonical_policy",
+        "industrial_rag.services.validation_policy.load_canonical_policy",
         lambda: changed,
     )
     async with factory() as session:
@@ -325,4 +435,4 @@ async def test_golden_policy_change_invalidates_previous_run(validation_state, m
                 settings=settings,
                 qdrant_client_factory=lambda: qdrant,
             ).require_eligible(kb_id, generation)
-    assert caught.value.code == AppErrorCode.generation_validation_required
+    assert caught.value.code == AppErrorCode.generation_validation_stale

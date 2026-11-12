@@ -40,11 +40,11 @@
   "child_chunk_artifacts": [
     {
       "path": "evaluation/experiments/parser_backend/P0/2196-ANSI-Manual-Chinese.pdf/child_chunks.jsonl",
-      "sha256": "1c13df50995743f53ab0be41e66c5f6e2756b515f6a2aa7dd09ed2b491d3d8e0"
+      "sha256": "a129273a61e82a34a1f13646b236eb542a201132b0db6cc0ab5e01c3491b0616"
     },
     {
       "path": "evaluation/experiments/parser_backend/P0/t1739cn.pdf/child_chunks.jsonl",
-      "sha256": "be38970c1538dc884e190f760de5058bf77657a7cdad38fded7cb5685433c620"
+      "sha256": "0722dae24fdbb6bdf6fe177bfafc32382cdaf49819af89a093b5fcf543695c8d"
     }
   ],
   "creation_commit": "98173cc436dd189cc0274cdca9d682e525d3b583",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -12,6 +13,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from industrial_rag.vector_collections import VectorBackend
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BAILIAN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -31,6 +34,67 @@ DEFAULT_LLM_MODELS = (
     "qwen3.5-flash-2026-02-23",
 )
 
+# Minimum bearer-token length for ``SERVICE_API_KEY`` / ``ADMIN_API_KEY``.
+# 32 characters matches the 256-bit entropy produced by
+# ``secrets.token_urlsafe(32)`` and is the smallest value that keeps a
+# brute-force/length-extension resistant token in every deployed environment.
+API_KEY_MIN_LENGTH = 32
+
+# Environments where a too-short key refuses to start.  ``local_dev`` is
+# intentionally excluded: it only warns so that local iteration and the
+# existing short-key test fixtures keep working.
+KEY_LENGTH_ENFORCED_ENVIRONMENTS = frozenset({"local_staging", "staging", "production"})
+
+# Anonymous (uncredentialed) browser surface rate limits, per client IP per
+# minute.  0 disables the corresponding bucket.  Feedback gets a tighter budget
+# because it writes rows; the rest of the anonymous surface shares one bucket.
+DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE = 30
+DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE = 5
+
+# Voice defaults. ASR and TTS are billed per call, so the feature ships off and
+# carries its own tighter budget when enabled.
+DEFAULT_VOICE_RATE_LIMIT_PER_MINUTE = 10
+DEFAULT_VOICE_MAX_AUDIO_BYTES = 5_242_880
+DEFAULT_VOICE_MAX_AUDIO_SECONDS = 60
+DEFAULT_VOICE_TTS_MAX_CHARS = 600
+
+
+def validate_api_key_length(name: str, value: str | None, environment: str) -> None:
+    """Enforce the minimum API key length policy.
+
+    ``None`` never participates in the length check: an absent key is a
+    fail-closed condition handled by the API authentication middleware, not a
+    "weak secret" condition.  Enforced environments raise, ``local_dev`` only
+    logs a warning so local development stays frictionless.
+
+    Args:
+        name: Environment variable name, used in the error/log message.
+        value: Configured key value, or ``None`` when unset.
+        environment: ``IRA_DEPLOYMENT_ENVIRONMENT`` value.
+
+    Raises:
+        ValueError: If the key is shorter than ``API_KEY_MIN_LENGTH`` and the
+            deployment environment requires a strong key.
+    """
+    if value is None:
+        return
+    if len(value) >= API_KEY_MIN_LENGTH:
+        return
+    if environment in KEY_LENGTH_ENFORCED_ENVIRONMENTS:
+        raise ValueError(
+            f"{name} 长度必须不少于 {API_KEY_MIN_LENGTH} 个字符"
+            f"（当前长度 {len(value)}，IRA_DEPLOYMENT_ENVIRONMENT={environment}）；"
+            '可用 python -c "import secrets;print(secrets.token_urlsafe(32))" 生成'
+        )
+    logger.warning(
+        "%s is shorter than the recommended %d characters (current length %d); "
+        "allowed only when IRA_DEPLOYMENT_ENVIRONMENT=%s",
+        name,
+        API_KEY_MIN_LENGTH,
+        len(value),
+        environment,
+    )
+
 
 class StorageCompatibilityError(RuntimeError):
     """Existing LightRAG data cannot safely be reused by this embedding configuration."""
@@ -48,6 +112,12 @@ class Settings:
     llm_model: str = "kimi-k2.6"
     llm_fallback_models: tuple[str, ...] = ()
     model_fallback_enabled: bool = True
+    llm_max_async: int = 8
+    # ``None`` keeps the provider default; ``False`` asks hybrid-reasoning models
+    # (Qwen3 family) to answer without a thinking phase.  Thinking models spend
+    # the completion budget on ``reasoning_content`` first, which can leave the
+    # visible answer empty and starve the grounding layer.
+    llm_enable_thinking: bool | None = None
     embedding_model: str = "text-embedding-v4"
     embedding_dim: int = 1024
     chunk_token_size: int = 1600
@@ -81,10 +151,32 @@ class Settings:
     phase10b_query_mode: str = "mix"
     phase10b_top_k: int = 12
     phase10b_chunk_top_k: int = 20
+    sparse_retrieval_enabled: bool = False
+    sparse_top_k: int = 20
+    rrf_k: int = 60
+    reranker_enabled: bool = False
+    reranker_timeout_seconds: float = 2.0
+    qa_request_timeout_seconds: float = 180.0
     validation_base_url: str | None = None
     validation_artifact_dir: Path = PROJECT_ROOT / "artifacts" / "validation-runs"
     validation_max_age_seconds: int = 3600
     retrieval_trace_ttl_seconds: int = 86_400
+    # Anonymous browser surface limits (requests/minute/client, 0 disables).
+    public_rate_limit_per_minute: int = DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE
+    feedback_rate_limit_per_minute: int = DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE
+    # Voice (speech input / spoken answers). Disabled by default because ASR and
+    # TTS are billed per call.
+    voice_enabled: bool = False
+    voice_asr_model: str = "qwen3-asr-flash"
+    voice_tts_model: str = "qwen3-tts-flash"
+    voice_tts_voice: str = "Cherry"
+    voice_max_audio_bytes: int = DEFAULT_VOICE_MAX_AUDIO_BYTES
+    voice_max_audio_seconds: int = DEFAULT_VOICE_MAX_AUDIO_SECONDS
+    voice_tts_max_chars: int = DEFAULT_VOICE_TTS_MAX_CHARS
+    voice_rate_limit_per_minute: int = DEFAULT_VOICE_RATE_LIMIT_PER_MINUTE
+    # Off by default: trusting ``X-Forwarded-For`` without a sanitising proxy in
+    # front of the API lets a client forge its own rate-limit identity.
+    trust_proxy_headers: bool = False
     # LightRAG per-generation isolation token. Derived per knowledge base by
     # settings_for_knowledge_base(); None keeps the legacy layout (workspace="")
     # used by pre-generation knowledge bases.
@@ -111,6 +203,10 @@ class Settings:
             self.service_api_key is None or self.admin_api_key is None
         ):
             raise ValueError("staging/production 必须同时配置 SERVICE_API_KEY 和 ADMIN_API_KEY")
+        validate_api_key_length(
+            "SERVICE_API_KEY", self.service_api_key, self.deployment_environment
+        )
+        validate_api_key_length("ADMIN_API_KEY", self.admin_api_key, self.deployment_environment)
         if not isinstance(self.vector_backend, VectorBackend):
             object.__setattr__(self, "vector_backend", VectorBackend(self.vector_backend))
         if self.vector_backend is VectorBackend.qdrant and not self.qdrant_url:
@@ -133,6 +229,12 @@ class Settings:
             raise ValueError("LLM_FALLBACK_MODELS 不能包含空模型名")
         if len(set(self.llm_models)) != len(self.llm_models):
             raise ValueError("LLM_MODEL 与 LLM_FALLBACK_MODELS 不能重复")
+        if self.qa_request_timeout_seconds <= 0:
+            raise ValueError("qa_request_timeout_seconds 必须为正数")
+        if self.public_rate_limit_per_minute < 0:
+            raise ValueError("IRA_PUBLIC_RATE_LIMIT_PER_MINUTE 不能为负数")
+        if self.feedback_rate_limit_per_minute < 0:
+            raise ValueError("IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE 不能为负数")
 
     @property
     def llm_models(self) -> tuple[str, ...]:
@@ -169,6 +271,21 @@ class Settings:
             raise ValueError("LIGHTRAG_CHUNK_TOKEN_SIZE 必须是整数") from error
         if chunk_token_size < 512:
             raise ValueError("LIGHTRAG_CHUNK_TOKEN_SIZE 不能小于 512")
+        try:
+            llm_max_async = int(values.get("LLM_MAX_ASYNC") or "8")
+        except ValueError as error:
+            raise ValueError("LLM_MAX_ASYNC 必须是整数") from error
+        if not 1 <= llm_max_async <= 32:
+            raise ValueError("LLM_MAX_ASYNC 必须在 1 到 32 之间")
+        raw_enable_thinking = (values.get("LLM_ENABLE_THINKING") or "").strip().lower()
+        if raw_enable_thinking in ("", "auto"):
+            llm_enable_thinking: bool | None = None
+        elif raw_enable_thinking in ("true", "1", "yes"):
+            llm_enable_thinking = True
+        elif raw_enable_thinking in ("false", "0", "no"):
+            llm_enable_thinking = False
+        else:
+            raise ValueError("LLM_ENABLE_THINKING 必须是 true/false 或留空")
         raw_working_dir = values.get("LIGHTRAG_WORKING_DIR") or "./lightrag_storage"
         working_dir = Path(raw_working_dir)
         if not working_dir.is_absolute():
@@ -241,6 +358,12 @@ class Settings:
             .lower()
             == "true"
         )
+        sparse_retrieval_enabled = (
+            (values.get("QA_SPARSE_RETRIEVAL_ENABLED") or "false").strip().lower() == "true"
+        )
+        reranker_enabled = (
+            (values.get("QA_RERANKER_ENABLED") or "false").strip().lower() == "true"
+        )
         try:
             evidence_completion_max = int(values.get("QA_EVIDENCE_COMPLETION_MAX") or "2")
         except ValueError as error:
@@ -251,8 +374,23 @@ class Settings:
         try:
             phase10b_top_k = int(values.get("PHASE10B_TOP_K") or "12")
             phase10b_chunk_top_k = int(values.get("PHASE10B_CHUNK_TOP_K") or "20")
+            sparse_top_k = int(values.get("QA_SPARSE_TOP_K") or "20")
+            rrf_k = int(values.get("QA_RRF_K") or "60")
+            reranker_timeout_seconds = float(values.get("QA_RERANKER_TIMEOUT_SECONDS") or "2.0")
         except ValueError as error:
-            raise ValueError("PHASE10B_TOP_K 和 PHASE10B_CHUNK_TOP_K 必须是整数") from error
+            raise ValueError("检索 top-k、RRF k 和 reranker timeout 配置格式无效") from error
+        if phase10b_top_k <= 0 or phase10b_chunk_top_k < phase10b_top_k:
+            raise ValueError("PHASE10B_TOP_K 和 PHASE10B_CHUNK_TOP_K 配置无效")
+        if sparse_top_k <= 0 or rrf_k < 0 or reranker_timeout_seconds <= 0:
+            raise ValueError("Sparse/RRF/Reranker 配置必须为有效正数")
+        try:
+            qa_request_timeout_seconds = float(
+                values.get("QA_REQUEST_TIMEOUT_SECONDS") or "180"
+            )
+        except ValueError as error:
+            raise ValueError("QA_REQUEST_TIMEOUT_SECONDS 必须是数字") from error
+        if qa_request_timeout_seconds <= 0:
+            raise ValueError("QA_REQUEST_TIMEOUT_SECONDS 必须为正数")
         validation_base_url = (
             values.get("VALIDATION_BASE_URL") or ""
         ).strip().rstrip("/") or None
@@ -282,6 +420,65 @@ class Settings:
             raise ValueError(
                 "RETRIEVAL_TRACE_TTL_SECONDS 必须在 60 到 604800 之间"
             )
+        try:
+            public_rate_limit_per_minute = int(
+                values.get("IRA_PUBLIC_RATE_LIMIT_PER_MINUTE")
+                or str(DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE)
+            )
+        except ValueError as error:
+            raise ValueError("IRA_PUBLIC_RATE_LIMIT_PER_MINUTE 必须是整数") from error
+        if public_rate_limit_per_minute < 0:
+            raise ValueError("IRA_PUBLIC_RATE_LIMIT_PER_MINUTE 不能为负数")
+        try:
+            feedback_rate_limit_per_minute = int(
+                values.get("IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE")
+                or str(DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE)
+            )
+        except ValueError as error:
+            raise ValueError("IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE 必须是整数") from error
+        if feedback_rate_limit_per_minute < 0:
+            raise ValueError("IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE 不能为负数")
+
+        def _voice_bool(name: str, default: bool) -> bool:
+            raw = (values.get(name) or "").strip().lower()
+            if not raw:
+                return default
+            return raw in {"1", "true", "yes", "on"}
+
+        def _voice_int(name: str, default: int, *, minimum: int) -> int:
+            raw = (values.get(name) or "").strip()
+            if not raw:
+                return default
+            try:
+                parsed = int(raw)
+            except ValueError as error:
+                raise ValueError(f"{name} 必须是整数") from error
+            if parsed < minimum:
+                raise ValueError(f"{name} 不能小于 {minimum}")
+            return parsed
+
+        voice_enabled = _voice_bool("IRA_VOICE_ENABLED", False)
+        voice_asr_model = (values.get("IRA_VOICE_ASR_MODEL") or "qwen3-asr-flash").strip()
+        voice_tts_model = (values.get("IRA_VOICE_TTS_MODEL") or "qwen3-tts-flash").strip()
+        voice_tts_voice = (values.get("IRA_VOICE_TTS_VOICE") or "Cherry").strip()
+        voice_max_audio_bytes = _voice_int(
+            "IRA_VOICE_MAX_AUDIO_BYTES", DEFAULT_VOICE_MAX_AUDIO_BYTES, minimum=1024
+        )
+        voice_max_audio_seconds = _voice_int(
+            "IRA_VOICE_MAX_AUDIO_SECONDS", DEFAULT_VOICE_MAX_AUDIO_SECONDS, minimum=1
+        )
+        voice_tts_max_chars = _voice_int(
+            "IRA_VOICE_TTS_MAX_CHARS", DEFAULT_VOICE_TTS_MAX_CHARS, minimum=1
+        )
+        voice_rate_limit_per_minute = _voice_int(
+            "IRA_VOICE_RATE_LIMIT_PER_MINUTE",
+            DEFAULT_VOICE_RATE_LIMIT_PER_MINUTE,
+            minimum=0,
+        )
+
+        trust_proxy_headers = (
+            values.get("IRA_TRUST_PROXY_HEADERS") or ""
+        ).strip().lower() in {"1", "true", "yes", "on"}
 
         if not api_key:
             raise ValueError("必须通过环境变量 DASHSCOPE_API_KEY 提供百炼密钥")
@@ -328,6 +525,8 @@ class Settings:
             embedding_model=embedding_model,
             embedding_dim=embedding_dim,
             chunk_token_size=chunk_token_size,
+            llm_max_async=llm_max_async,
+            llm_enable_thinking=llm_enable_thinking,
             working_dir=working_dir.resolve(),
             vector_backend=vector_backend,
             qdrant_url=qdrant_url,
@@ -354,10 +553,27 @@ class Settings:
             phase10b_query_mode=phase10b_query_mode,
             phase10b_top_k=phase10b_top_k,
             phase10b_chunk_top_k=phase10b_chunk_top_k,
+            sparse_retrieval_enabled=sparse_retrieval_enabled,
+            sparse_top_k=sparse_top_k,
+            rrf_k=rrf_k,
+            reranker_enabled=reranker_enabled,
+            reranker_timeout_seconds=reranker_timeout_seconds,
+            qa_request_timeout_seconds=qa_request_timeout_seconds,
             validation_base_url=validation_base_url,
             validation_artifact_dir=validation_artifact_dir.resolve(),
             validation_max_age_seconds=validation_max_age_seconds,
             retrieval_trace_ttl_seconds=retrieval_trace_ttl_seconds,
+            public_rate_limit_per_minute=public_rate_limit_per_minute,
+            feedback_rate_limit_per_minute=feedback_rate_limit_per_minute,
+            voice_enabled=voice_enabled,
+            voice_asr_model=voice_asr_model,
+            voice_tts_model=voice_tts_model,
+            voice_tts_voice=voice_tts_voice,
+            voice_max_audio_bytes=voice_max_audio_bytes,
+            voice_max_audio_seconds=voice_max_audio_seconds,
+            voice_tts_max_chars=voice_tts_max_chars,
+            voice_rate_limit_per_minute=voice_rate_limit_per_minute,
+            trust_proxy_headers=trust_proxy_headers,
             mineru_enabled=mineru_enabled,
             mineru_api_base_url=mineru_api_base_url,
             mineru_api_key=mineru_api_key,
@@ -381,6 +597,8 @@ class Settings:
         """Sanitized experimental flags suitable for traces and diagnostics."""
 
         return {
+            "QA_SPARSE_RETRIEVAL_ENABLED": self.sparse_retrieval_enabled,
+            "QA_RERANKER_ENABLED": self.reranker_enabled,
             "QA_SUPPORT_VALIDATOR_V2_ENABLED": self.support_validator_v2_enabled,
             "QA_STRUCTURED_GENERATION_ENABLED": self.structured_generation_enabled,
             "QA_SUPPLEMENTAL_RETRIEVAL_ENABLED": self.supplemental_retrieval_enabled,

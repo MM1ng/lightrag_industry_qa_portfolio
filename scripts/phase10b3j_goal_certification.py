@@ -39,6 +39,8 @@ from industrial_rag.db.models import (
 from industrial_rag.db.session import close_db, get_session_factory, init_db, reset_for_testing
 from industrial_rag.errors import AppError
 from industrial_rag.lightrag_service import QueryResult
+from industrial_rag.parser_models import ChildChunk
+from industrial_rag.services.generation_artifacts import freeze_generation_child_chunks
 from industrial_rag.services.query_application_service import QueryApplicationService
 
 R1 = ROOT / "evaluation" / "phase10b3j_r1"
@@ -55,6 +57,11 @@ ACTIVE_GENERATION_ID = "a2d1c77ce08b414495e9d845cc42f799"
 
 def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _portable_sha256(path: Path) -> str:
+    """Hash text artifacts consistently across Windows and Linux checkouts."""
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -225,7 +232,7 @@ def _quality_metrics(
         {
             "method": "J0 captured claims/citations/grounding audit plus immutable development evidence sidecar",
             "sidecar_path": "evaluation/phase10b3c/golden_evidence_mapping_g10b3c20260803.json",
-            "sidecar_sha256": hashlib.sha256(SIDECAR_PATH.read_bytes()).hexdigest(),
+            "sidecar_sha256": _portable_sha256(SIDECAR_PATH),
             "sidecar_development_record_count": len(mapping),
             "j0_matrix_inputs": {
                 "grounding_removal_matrix_record_count": len(grounding_matrix),
@@ -328,13 +335,13 @@ def build_j0_development_metrics() -> dict[str, Any]:
         "metric_definition": {
             "definition_version": policy["definition_version"],
             "source_path": "evaluation/phase10b3d/metric_policy.json",
-            "source_sha256": hashlib.sha256(POLICY_PATH.read_bytes()).hexdigest(),
+            "source_sha256": _portable_sha256(POLICY_PATH),
         },
         "input_evidence": {
             "j0_results_path": "evaluation/phase10b3j_r1/j0_development_results.jsonl",
-            "j0_results_sha256": hashlib.sha256((R1 / "j0_development_results.jsonl").read_bytes()).hexdigest(),
+            "j0_results_sha256": _portable_sha256(R1 / "j0_development_results.jsonl"),
             "r2_reference_path": "evaluation/phase10b3i_r2/i0_development_metrics.json",
-            "r2_reference_sha256": hashlib.sha256((R2 / "i0_development_metrics.json").read_bytes()).hexdigest(),
+            "r2_reference_sha256": _portable_sha256(R2 / "i0_development_metrics.json"),
             "golden_set_read": False,
             "development_golden_sidecar_read": True,
             "j0_embedded_development_expectations_read": True,
@@ -406,20 +413,28 @@ class _FixtureRuntimeManager:
     def __init__(self) -> None:
         self.runtime = _FixtureRuntime()
 
-    async def get_runtime(self, _kb_id: str, _settings: Settings) -> _FixtureRuntime:
+    async def get_runtime(
+        self, _kb_id: str, _settings: Settings, *, chunk_registry: Any = None
+    ) -> _FixtureRuntime:
         return self.runtime
 
 
-def _fixture_generation(generation_id: str, kb_id: str, status: VectorIndexGenerationStatus) -> VectorIndexGeneration:
+def _fixture_generation(
+    generation_id: str,
+    kb_id: str,
+    status: VectorIndexGenerationStatus,
+    workspace_path: Path,
+    child_manifest_hash: str,
+) -> VectorIndexGeneration:
     return VectorIndexGeneration(
         id=generation_id,
         knowledge_base_id=kb_id,
         backend="nano",
         generation=f"fixture-{status.value}",
         status=status,
-        workspace_path=".",
+        workspace_path=str(workspace_path),
         document_manifest_hash="a" * 64,
-        child_chunks_manifest_hash="b" * 64,
+        child_chunks_manifest_hash=child_manifest_hash,
         embedding_config_hash="c" * 64,
         chunking_config_hash="d" * 64,
     )
@@ -436,6 +451,36 @@ async def _run_lifecycle_contract() -> dict[str, Any]:
             await init_db(drop_all=True)
             factory = get_session_factory()
             async with factory() as session:
+                workspace_root = Path(temporary) / "generation-workspaces"
+                active_workspace = workspace_root / "active"
+                artifact_document = type(
+                    "ArtifactDocument",
+                    (),
+                    {
+                        "id": "m" * 32,
+                        "version": 1,
+                        "file_hash": "a" * 64,
+                        "original_file_name": "fixture.pdf",
+                    },
+                )()
+                active_manifest = freeze_generation_child_chunks(
+                    active_workspace,
+                    generation_id="fixture-active",
+                    document_children=[
+                        (
+                            artifact_document,
+                            ChildChunk(
+                                chunk_id="fixture-chunk",
+                                parent_chunk_id="fixture-parent",
+                                document_id=artifact_document.id,
+                                document_name="fixture.pdf",
+                                page_start=1,
+                                page_end=1,
+                                content="fixture answer",
+                            ),
+                        )
+                    ],
+                )
                 kb = KnowledgeBase(
                     id="k" * 32,
                     name="isolated lifecycle fixture",
@@ -447,10 +492,10 @@ async def _run_lifecycle_contract() -> dict[str, Any]:
                 )
                 session.add(kb)
                 await session.flush()
-                active = _fixture_generation("a" * 32, kb.id, VectorIndexGenerationStatus.active)
-                building = _fixture_generation("b" * 32, kb.id, VectorIndexGenerationStatus.building)
-                failed = _fixture_generation("f" * 32, kb.id, VectorIndexGenerationStatus.failed)
-                deleted = _fixture_generation("d" * 32, kb.id, VectorIndexGenerationStatus.deleted)
+                active = _fixture_generation("a" * 32, kb.id, VectorIndexGenerationStatus.active, active_workspace, active_manifest.child_manifest_hash)
+                building = _fixture_generation("b" * 32, kb.id, VectorIndexGenerationStatus.building, workspace_root / "building", "b" * 64)
+                failed = _fixture_generation("f" * 32, kb.id, VectorIndexGenerationStatus.failed, workspace_root / "failed", "f" * 64)
+                deleted = _fixture_generation("d" * 32, kb.id, VectorIndexGenerationStatus.deleted, workspace_root / "deleted", "d" * 64)
                 session.add_all([active, building, failed, deleted])
                 await session.flush()
                 kb.active_vector_generation_id = active.id

@@ -42,12 +42,88 @@ describe('ApiClient', () => {
 
   it('normalizes public 503 errors without exposing the raw body', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('secret traceback', { status: 503 }))
-    await expect(new ApiClient().getGraphOverview()).rejects.toMatchObject({ code: 'http_503', retryable: true, message: '服务暂时不可用，请稍后重试。' } satisfies Partial<ApiClientError>)
+    await expect(new ApiClient().getGraphOverview('kb-1')).rejects.toMatchObject({ code: 'http_503', retryable: true, message: '服务暂时不可用，请稍后重试。' } satisfies Partial<ApiClientError>)
   })
 
   it('submits feedback with the request id', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 204 }))
     await new ApiClient().submitFeedback({ request_id: 'req-1', feedback_type: 'helpful' })
     expect(fetchMock).toHaveBeenCalledWith('/v1/feedback', expect.objectContaining({ method: 'POST', body: JSON.stringify({ request_id: 'req-1', feedback_type: 'helpful' }) }))
+  })
+
+  it('streams deltas and resolves the validated final payload', async () => {
+    const frames = [
+      { type: 'stage', stage: 'retrieving' },
+      { type: 'delta', text: '结论：' },
+      { type: 'delta', text: '请先停机。' },
+      { type: 'final', payload: { request_id: 'r1', status: 'success', answer: '结论：请先停机。', citations: [], claims: [], evidence: [], latency_ms: 12 } },
+    ]
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join(''), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
+
+    const stages: string[] = []
+    let preview = ''
+    const result = await new ApiClient().queryKnowledgeBaseStream('kb-1', '问题', [], {
+      onStage: (stage) => stages.push(stage),
+      onDelta: (text) => { preview += text },
+    })
+
+    expect(stages).toEqual(['retrieving'])
+    expect(preview).toBe('结论：请先停机。')
+    expect(result.answer).toBe('结论：请先停机。')
+  })
+
+  it('turns a streamed error frame into a retryable client error', async () => {
+    const frames = [{ type: 'error', code: 'QA_TIMEOUT', message: '问答请求超时，请稍后重试。' }]
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join(''), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
+
+    await expect(
+      new ApiClient().queryKnowledgeBaseStream('kb-1', '问题', []),
+    ).rejects.toMatchObject({ code: 'QA_TIMEOUT', retryable: true } satisfies Partial<ApiClientError>)
+  })
+})
+describe('voice methods', () => {
+  it('transcribeAudio posts multipart and returns text', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ text: '泵的温度是多少？', language: 'zh', low_confidence: false }),
+      { status: 200 },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' })
+    const result = await new ApiClient().transcribeAudio(blob, 1500)
+
+    expect(result.text).toBe('泵的温度是多少？')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/v1/voice/transcribe')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeInstanceOf(FormData)
+  })
+
+  it('transcribeAudio surfaces http errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ code: 'VOICE_AUDIO_UNRECOGNISED', message: '无法识别音频格式' }),
+      { status: 415 },
+    )))
+
+    const blob = new Blob([new Uint8Array([1])], { type: 'audio/webm' })
+    await expect(new ApiClient().transcribeAudio(blob, 1500)).rejects.toMatchObject({
+      code: 'VOICE_AUDIO_UNRECOGNISED',
+    })
+  })
+
+  it('synthesizeSpeech returns an audio blob', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      new Uint8Array([9, 9]).buffer,
+      { status: 200, headers: { 'content-type': 'audio/wav' } },
+    )))
+
+    const audio = await new ApiClient().synthesizeSpeech('温度 85 摄氏度')
+    // Assert the blob contract, not constructor identity: under Node 20 the
+    // Blob returned by Response.blob() comes from a different realm than the
+    // global Blob, so `toBeInstanceOf(Blob)` fails there while passing on
+    // Node 24. Size and type are what the caller actually relies on.
+    expect(audio.size).toBe(2)
+    expect(audio.type).toContain('audio')
+    expect(Object.prototype.toString.call(audio)).toBe('[object Blob]')
   })
 })

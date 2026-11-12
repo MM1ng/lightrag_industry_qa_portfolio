@@ -1,0 +1,6 @@
+{"question":"用塞尺法设置 2196-R 型泵叶轮间隙时，最终塞尺厚度如何确定？","question_type":"model","relevant_chunk_ids":["2196-ansi-manual-chinese-p20-c1-91c4558ce4"]}
+{"question":"SUMMIT 手册中，泵不输送液体的常见原因和对应处理方法有哪些？","question_type":"part_number","relevant_chunk_ids":["2196-ansi-manual-chinese-p23-c1-ab3dea34f3"]}
+{"question":"SUMMIT 手册规定的最高轴承工作温度是多少？","question_type":"parameter","relevant_chunk_ids":["2196-ansi-manual-chinese-p14-c1-44bb480c09"]}
+{"question":"SUMMIT 2196 系列泵出口管路中的止回阀、隔离阀和异径接头应怎样布置？","question_type":"semantic","relevant_chunk_ids":["2196-ansi-manual-chinese-p10-c1-83a4f22b28"]}
+{"question":"SUMMIT 手册中，轴承高温运行通常由什么原因造成，如何处理？","question_type":"fault","relevant_chunk_ids":["2196-ansi-manual-chinese-p24-c1-0e01b780ef"]}
+{"question":"按 SUMMIT 手册，离心泵的标准启动步骤是什么？","question_type":"procedure","relevant_chunk_ids":["2196-ansi-manual-chinese-p17-c1-ccbbfadbcf","2196-ansi-manual-chinese-p18-c1-767a46d97c"]}

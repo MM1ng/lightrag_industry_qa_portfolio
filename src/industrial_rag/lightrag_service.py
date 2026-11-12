@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import partial
 from typing import Any, Literal, Protocol, cast
@@ -15,6 +14,7 @@ from industrial_rag.answer_grounding import (
     AnswerPoint,
     GroundedAnswer,
     GroundingAudit,
+    _unverified_identifiers,
     build_answer_plan,
     build_non_generation_audit,
     classify_question_type,
@@ -23,6 +23,7 @@ from industrial_rag.citation_formatter import (
     Citation,
     collect_citations,
     encode_chunk_header,
+    encode_source_ref,
     is_provenance_only_fragment,
     strip_provenance_metadata,
 )
@@ -53,6 +54,14 @@ from industrial_rag.retrieval_trace import (
     SelectedEvidenceTrace,
     feature_flag_retrieval_config,
 )
+from industrial_rag.runtime_chunk_hydration import ChunkRegistry
+from industrial_rag.services.generation_artifacts import (
+    generation_artifact_evidence,
+    generation_retrieval_dir,
+)
+from industrial_rag.services.lexical_retrieval import BM25Index, load_lexical_index
+from industrial_rag.services.reranker_runtime import RerankerRuntime, RerankProvider
+from industrial_rag.services.retrieval_fusion import HybridRetriever
 from industrial_rag.structured_citation_output import (
     RequirementRegistry,
     SourceRegistry,
@@ -132,6 +141,7 @@ class LightRAGBackend(Protocol):
         system_prompt: str,
         *,
         response_format: dict[str, str] | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> str: ...
 
 
@@ -180,12 +190,35 @@ class _OfficialBackend:
         system_prompt: str,
         *,
         response_format: dict[str, str] | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> str:
+        """Generate one answer.
+
+        When ``on_delta`` is provided the upstream model is asked to stream and
+        every fragment is reported as it arrives.  The validated answer is still
+        built from the complete text: citation grounding needs the whole answer,
+        so the fragments are a preview, not the result.
+        """
         options = {"response_format": response_format} if response_format else {}
-        result = await self._llm_model_func(question, system_prompt=system_prompt, **options)
-        if not isinstance(result, str):
-            raise RuntimeError("LightRAG LLM returned a streaming response unexpectedly")
-        return result
+        if on_delta is None:
+            result = await self._llm_model_func(question, system_prompt=system_prompt, **options)
+            if not isinstance(result, str):
+                raise RuntimeError("LightRAG LLM returned a streaming response unexpectedly")
+            return result
+        stream = await self._llm_model_func(
+            question, system_prompt=system_prompt, stream=True, **options
+        )
+        if isinstance(stream, str):
+            if stream:
+                on_delta(stream)
+            return stream
+        pieces: list[str] = []
+        async for chunk in stream:
+            text = chunk if isinstance(chunk, str) else ""
+            if text:
+                pieces.append(text)
+                on_delta(text)
+        return "".join(pieces)
 
 
 def _register_project_qdrant_storage() -> None:
@@ -236,6 +269,13 @@ def build_official_backend(
         ) -> str:
             nonlocal active_model_index
             kwargs.pop("model", None)
+            if settings.llm_enable_thinking is not None:
+                # DashScope compatible-mode takes this as an extra body field.
+                # Hybrid-reasoning models otherwise spend the completion budget
+                # on ``reasoning_content`` and can return an empty answer.
+                kwargs.setdefault(
+                    "extra_body", {"enable_thinking": settings.llm_enable_thinking}
+                )
             configured_models = (
                 settings.llm_models
                 if settings.model_fallback_enabled
@@ -287,6 +327,7 @@ def build_official_backend(
         llm_model_name=settings.llm_model,
         embedding_func=embedding_func,
         chunk_token_size=settings.chunk_token_size,
+        llm_model_max_async=settings.llm_max_async,
         enable_llm_cache=settings.enable_llm_cache,
         enable_content_headings=True,
         entity_extract_max_gleaning=0,
@@ -379,11 +420,59 @@ def _extract_retrieved(evidence: dict[str, Any]) -> list[dict[str, Any]]:
                     "score": score if isinstance(score, (int, float)) else None,
                     "rank": len(out) + 1,
                     "retrieval_source": retrieval_source,
-                    "section_path": tuple(str(part) for part in section_path if str(part)),
-                    "content": value.get("content") if isinstance(value.get("content"), str) else "",
+                "section_path": tuple(str(part) for part in section_path if str(part)),
+                "content": value.get("content") if isinstance(value.get("content"), str) else "",
+                "reranked_rank": value.get("reranked_rank"),
+                "reranked_score": value.get("reranked_score"),
                 }
             )
     return out
+
+
+def _fused_evidence_payload(
+    fused: Sequence[Any],
+    registry: ChunkRegistry | None,
+    *,
+    rerank_scores: Mapping[str, tuple[int, float]] | None = None,
+) -> dict[str, Any]:
+    """Adapt RRF candidates back to the existing evidence payload contract."""
+    if registry is None:
+        return {"data": {"chunks": [], "references": []}}
+    rows: list[dict[str, Any]] = []
+    for candidate in fused:
+        record = registry.record_for_chunk(candidate.child_chunk_id)
+        if record is None:
+            continue
+        document_name = str(record.get("document_name") or "")
+        page_number = int(record.get("page_start") or 1)
+        contributions = {item.source: item for item in candidate.contributions}
+        dense = contributions.get("lightrag")
+        sparse = contributions.get("sparse")
+        rerank = (rerank_scores or {}).get(candidate.child_chunk_id)
+        citation = Citation(document_name, page_number, candidate.child_chunk_id)
+        rows.append(
+            {
+                "child_chunk_id": candidate.child_chunk_id,
+                "chunk_id": candidate.child_chunk_id,
+                "document_id": str(record.get("document_id") or ""),
+                "document_name": document_name,
+                "page_start": page_number,
+                "section_path": tuple(str(item) for item in record.get("section_path", ()) or ()),
+                "content": str(record.get("content") or ""),
+                "file_path": encode_source_ref(citation),
+                "score": candidate.rrf_score,
+                "retrieval_source": "rrf",
+                "rrf_rank": candidate.rrf_rank,
+                "rrf_score": candidate.rrf_score,
+                "dense_rank": dense.original_rank if dense else None,
+                "dense_score": dense.original_score if dense else None,
+                "sparse_rank": sparse.original_rank if sparse else None,
+                "sparse_score": sparse.original_score if sparse else None,
+                "reranked_rank": rerank[0] if rerank else None,
+                "reranked_score": rerank[1] if rerank else None,
+            }
+        )
+    return {"data": {"chunks": rows, "references": []}}
 
 
 def _build_retrieval_trace(
@@ -449,6 +538,7 @@ def _build_retrieval_trace(
     grounding_removed_answer_points: Sequence[str] = (),
     grounding_removal_reasons: Sequence[dict[str, object]] = (),
     grounding_false_negative_diagnostics: Sequence[dict[str, object]] = (),
+    unsupported_assertion_audit: Sequence[dict[str, object]] = (),
     structured_citation_flag: bool = False,
     json_mode_enabled: bool = False,
     source_registry_count: int = 0,
@@ -462,6 +552,12 @@ def _build_retrieval_trace(
     structured_citation_fallback_mode: str | None = None,
     structured_citation_fallback_reason: str | None = None,
     backend_generate_call_count: int = 0,
+    rerank_enabled: bool = False,
+    rerank_provider: str | None = None,
+    rerank_latency_ms: float = 0.0,
+    rerank_candidate_count: int = 0,
+    rerank_final_count: int = 0,
+    rerank_fallback_reason: str | None = None,
 ) -> RetrievalExecutionTrace:
     selected_identities = {
         (item.citation.source_file, item.citation.page_number, item.citation.chunk_id)
@@ -491,6 +587,14 @@ def _build_retrieval_trace(
                 used_for_answer=identity in selected_identities,
                 cited_in_answer=identity in cited_identities,
                 content_excerpt=_bounded_content_excerpt(item.get("content") or ""),
+                sparse_rank=item.get("sparse_rank"),
+                sparse_score=item.get("sparse_score"),
+                rrf_rank=item.get("rrf_rank"),
+                rrf_score=item.get("rrf_score"),
+                reranked_rank=item.get("reranked_rank"),
+                reranked_score=item.get("reranked_score"),
+                selected=identity in selected_identities,
+                rejected_reason=None if identity in selected_identities else "evidence_not_selected",
             )
         )
     final_selected = tuple(
@@ -543,6 +647,12 @@ def _build_retrieval_trace(
         retrieval_ms=retrieval_ms,
         rerank_ms=0.0,
         evidence_selection_ms=evidence_selection_ms,
+        rerank_enabled=rerank_enabled,
+        rerank_provider=rerank_provider,
+        rerank_latency_ms=rerank_latency_ms,
+        rerank_candidate_count=rerank_candidate_count,
+        rerank_final_count=rerank_final_count,
+        rerank_fallback_reason=rerank_fallback_reason,
         feature_flags=tuple(feature_flags),
         detected_model=normalization.detected_model if normalization else None,
         detected_component=normalization.detected_component if normalization else None,
@@ -608,6 +718,7 @@ def _build_retrieval_trace(
         grounding_removed_answer_points=tuple(grounding_removed_answer_points),
         grounding_removal_reasons=tuple(grounding_removal_reasons),
         grounding_false_negative_diagnostics=tuple(grounding_false_negative_diagnostics),
+        unsupported_assertion_audit=tuple(unsupported_assertion_audit),
         generated_answer_points=tuple(generated_answer_points),
         rejected_answer_points=tuple(rejected_answer_points),
         support_validation_reason_codes=tuple(support_validation_reason_codes),
@@ -618,6 +729,43 @@ def _build_retrieval_trace(
 
 def _generation_system_prompt(context: str) -> str:
     return _SYSTEM_PROMPT_BASE + _SELECTED_CONTEXT_LABEL + context
+
+
+def _unsupported_assertion_audit(
+    grounded: GroundedAnswer | None,
+    candidates: Sequence[EvidenceCandidate],
+) -> tuple[dict[str, object], ...]:
+    """Record answer points asserting identifiers their evidence never contains.
+
+    This is observation only.  It does not drop points, change the status or
+    alter citations — enforcement needs a semantic (not token-overlap) judgement,
+    because the current gate cannot tell a faithful paraphrase from an invented
+    qualifier: "保持充足的汽蚀余量" scores 0.50 against "确保始终有足够的有效汽蚀余量"
+    while "(DNS标准结构)" scores 0.90 against evidence that never mentions DNS.
+
+    The operator measures real-world frequency here first; only then is it safe
+    to decide whether a paid semantic check per answer is worth its latency.
+    """
+
+    if grounded is None or not candidates:
+        return ()
+    # Judge against the whole selected evidence pool, not one citation at a time:
+    # an answer legitimately synthesises several chunks, so a term present in any
+    # selected chunk is supported (e.g. "SUMMIT 手册规定…" where the cited page-14
+    # snippet lacks the brand name but another selected page-14 chunk carries it).
+    pooled = "\n".join(candidate.text for candidate in candidates)
+    audit: list[dict[str, object]] = []
+    for point in grounded.answer_points:
+        unverified = _unverified_identifiers(point.content, pooled)
+        if unverified:
+            audit.append(
+                {
+                    "point_id": point.point_id,
+                    "unverified_identifiers": sorted(unverified)[:10],
+                    "evidence_ids": list(point.evidence_ids),
+                }
+            )
+    return tuple(audit)
 
 
 def _structured_citation_system_prompt(
@@ -646,6 +794,16 @@ def _structured_citation_system_prompt(
         + "请只输出合法JSON，不要输出Markdown代码块或其他文字。\n"
         + "只能使用下列 Source ID；不要输出数据库 Chunk ID。每个 answer_point 必须有 1 到 2 个不同 source_ids。\n"
         + "Source 足够时不要添加第二个；没有直接证据的答案点不要输出。\n"
+        # The strict "no direct evidence -> no point" rule alone made the model
+        # return zero answer points whenever the evidence was fragmented (parts
+        # tables, troubleshooting rows), even though those rows did answer the
+        # question.  Measured on the packing-seal question: 4 of 5 identical
+        # calls returned an empty answer_points list, while the same evidence
+        # answered normally without the JSON contract.  State the positive
+        # obligation explicitly so partial evidence is used instead of skipped.
+        + "只要 Source 中包含与问题相关的事实，就必须输出答案点，即使证据只覆盖问题的一部分。\n"
+        + "证据来自零件表、故障排查表或零散条目时，也要据此归纳作答，不要因为格式零散而拒绝。\n"
+        + "只有当所有 Source 都与问题完全无关、不具备任何可用信息时，才输出空的 answer_points 并标记 insufficient_evidence。\n"
         + "若有答案点且有未解决项，使用 partial_answer；没有答案点时使用 insufficient_evidence。\n"
         + "输出格式：{\"status\":\"success|partial_answer|insufficient_evidence\",\"answer_points\":[{\"text\":\"...\",\"source_ids\":[\"S1\"]}],\"unresolved_requirement_ids\":[\"R1\"]}\n"
         + f"当前 Requirement IDs：{unresolved}\n\n"
@@ -662,60 +820,30 @@ def _phase10b3i_trace_flags(settings: Settings) -> tuple[tuple[str, object], ...
     )
 
 
-def _load_context_registry(settings: Settings) -> dict[str, ContextRecord]:
-    """Load the immutable generation registry; never scan source PDFs at query time."""
-    candidates = (
-        settings.working_dir.parent / "context_registry" / "chunks.jsonl",
-        settings.working_dir / "context_registry" / "chunks.jsonl",
-    )
-    path = next((item for item in candidates if item.is_file()), None)
-    if path is None:
-        return {}
-    records: dict[str, ContextRecord] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        row = json.loads(line)
-        records[str(row["chunk_id"])] = ContextRecord(
-            knowledge_base_id=str(row.get("knowledge_base_id") or settings.qdrant_kb_id or ""),
-            generation_id=str(row.get("generation_id") or settings.qdrant_generation or ""),
-            document_id=str(row.get("document_id") or ""),
-            document_name=str(row.get("document_name") or ""),
-            chunk_id=str(row["chunk_id"]),
-            text=str(row.get("content") or ""),
-            page_start=int(row.get("page_start") or 1),
-            section_path=tuple(str(item) for item in row.get("section_path", ()) or ()),
-            parent_chunk_id=row.get("parent_chunk_id"),
-            previous_chunk_id=row.get("previous_chunk_id"),
-            next_chunk_id=row.get("next_chunk_id"),
-            table_id=row.get("table_id"),
-            table_header_chunk_id=row.get("table_header_chunk_id"),
-        )
-    parent_path = path.with_name("parents.jsonl")
-    if parent_path.is_file():
-        for line in parent_path.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            row = json.loads(line)
-            parent_id = str(row["parent_chunk_id"])
-            records[parent_id] = ContextRecord(
-                knowledge_base_id=str(row.get("knowledge_base_id") or settings.qdrant_kb_id or ""),
-                generation_id=str(row.get("generation_id") or settings.qdrant_generation or ""),
-                document_id=str(row.get("document_id") or ""),
-                document_name=str(row.get("document_name") or ""),
-                chunk_id=parent_id,
-                text=str(row.get("content") or ""),
-                page_start=int(row.get("page_start") or 1),
-                section_path=tuple(str(item) for item in row.get("section_path", ()) or ()),
-            )
-    return records
-
-
 class LightRAGService:
-    def __init__(self, settings: Settings, *, backend: LightRAGBackend | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        backend: LightRAGBackend | None = None,
+        chunk_registry: ChunkRegistry | None = None,
+        reranker_provider: RerankProvider | None = None,
+    ) -> None:
         self.settings = settings
         self._backend: LightRAGBackend | None = backend
+        self._chunk_registry = chunk_registry
+        self._sparse_index: BM25Index | None = None
+        self._reranker = RerankerRuntime(
+            provider=reranker_provider,
+            timeout_seconds=self.settings.reranker_timeout_seconds,
+        )
         self._initialized = False
+
+    def bind_chunk_registry(self, registry: ChunkRegistry) -> None:
+        """Bind the verified generation snapshot before runtime initialization."""
+        if self._initialized:
+            raise RuntimeError("cannot replace a chunk registry on an initialized runtime")
+        self._chunk_registry = registry
 
     async def initialize(self) -> None:
         check_storage_compatibility(
@@ -726,6 +854,20 @@ class LightRAGService:
         if self._backend is None:
             self._backend = build_official_backend(self.settings)
         await self._backend.initialize_storages()
+        if self.settings.sparse_retrieval_enabled:
+            if self._chunk_registry is None or not self.settings.qdrant_generation:
+                raise RuntimeError("Sparse retrieval requires a generation chunk registry")
+            artifact = generation_artifact_evidence(
+                self.settings.working_dir,
+                expected_generation_id=self.settings.qdrant_generation,
+            )
+            lexical_payload = (
+                generation_retrieval_dir(self.settings.working_dir) / "lexical_index.json"
+            ).read_bytes()
+            lexical = load_lexical_index(lexical_payload)
+            if lexical.child_manifest_hash != artifact.manifest.child_manifest_hash:
+                raise RuntimeError("Sparse lexical index does not match generation snapshot")
+            self._sparse_index = BM25Index.from_artifact(lexical)
         write_storage_metadata(
             self.settings.working_dir,
             self.settings.embedding_model,
@@ -783,6 +925,7 @@ class LightRAGService:
         mode: QueryMode = "mix",
         top_k: int = 12,
         chunk_top_k: int = 20,
+        on_delta: Callable[[str], None] | None = None,
     ) -> QueryResult:
         if not self._initialized:
             raise RuntimeError("LightRAG 尚未初始化")
@@ -807,7 +950,52 @@ class LightRAGService:
             raise ValueError("问题不能为空")
         options = QueryOptions(mode=mode, top_k=top_k, chunk_top_k=chunk_top_k)
         retrieval_started = time.perf_counter()
-        evidence = await self._backend.aquery_data(normalized_question, options)
+        rerank_result = None
+        if self._sparse_index is None:
+            evidence = await self._backend.aquery_data(normalized_question, options)
+            if self._chunk_registry is not None:
+                evidence = self._chunk_registry.hydrate_lightrag_evidence(evidence)
+        else:
+            async def dense_retriever(_query: str) -> list[dict[str, Any]]:
+                dense_payload = await self._backend.aquery_data(normalized_question, options)
+                if self._chunk_registry is not None:
+                    dense_payload = self._chunk_registry.hydrate_lightrag_evidence(dense_payload)
+                return _extract_retrieved(dense_payload)
+
+            fused = await HybridRetriever(
+                dense_retriever=dense_retriever,
+                sparse_index=self._sparse_index,
+                rrf_k=self.settings.rrf_k,
+            ).retrieve(
+                normalized_question,
+                top_k=max(options.chunk_top_k, self.settings.sparse_top_k),
+            )
+            rerank_scores: dict[str, tuple[int, float]] = {}
+            if self.settings.reranker_enabled and fused:
+                rerank_candidates = []
+                for candidate in fused:
+                    record = self._chunk_registry.record_for_chunk(candidate.child_chunk_id) if self._chunk_registry else None
+                    rerank_candidates.append(
+                        {
+                            "child_chunk_id": candidate.child_chunk_id,
+                            "content": str((record or {}).get("content") or ""),
+                            "rrf_score": candidate.rrf_score,
+                        }
+                    )
+                rerank_result = await self._reranker.rerank(
+                    normalized_question, rerank_candidates, limit=options.top_k
+                )
+                fused_by_id = {candidate.child_chunk_id: candidate for candidate in fused}
+                ordered = [fused_by_id[item["child_chunk_id"]] for item in rerank_result.candidates if item["child_chunk_id"] in fused_by_id]
+                rerank_scores = {
+                    str(item["child_chunk_id"]): (rank, float(item["rerank_score"]))
+                    for rank, item in enumerate(rerank_result.candidates, 1)
+                    if "rerank_score" in item
+                }
+                fused = tuple(ordered)
+            evidence = _fused_evidence_payload(
+                fused, self._chunk_registry, rerank_scores=rerank_scores
+            )
         retrieval_ms = (time.perf_counter() - retrieval_started) * 1000
         retrieved = _extract_retrieved(evidence)
         retrieval_chunk_ids = tuple(item["chunk_id"] for item in retrieved)
@@ -842,7 +1030,14 @@ class LightRAGService:
         supplemental_raw: list[dict[str, Any]] = []
         supplemental_grounding: tuple[EvidenceCandidate, ...] = ()
         if decision.allowed and self.settings.evidence_completion_enabled:
-            registry = _load_context_registry(self.settings)
+            registry = (
+                self._chunk_registry.context_records(
+                    knowledge_base_id=str(self.settings.qdrant_kb_id or ""),
+                    generation_id=str(self.settings.qdrant_generation or ""),
+                )
+                if self._chunk_registry is not None
+                else {}
+            )
             selected_context_records = [
                 registry[item.citation.chunk_id]
                 for item in decision.selected
@@ -908,13 +1103,17 @@ class LightRAGService:
                     supplemental_query.question,
                     QueryOptions(mode=options.mode, top_k=supplemental_query.top_k, chunk_top_k=supplemental_query.top_k),
                 )
+                if self._chunk_registry is not None:
+                    supplemental_payload = self._chunk_registry.hydrate_lightrag_evidence(
+                        supplemental_payload
+                    )
                 supplemental_raw = _extract_retrieved(supplemental_payload)
                 supplemental_raw = [
                     {
                         **item,
                         "knowledge_base_id": str(self.settings.qdrant_kb_id or ""),
                         "generation_id": str(self.settings.qdrant_generation or ""),
-                        "document_id": next((record.document_id for record in registry.values() if record.document_name == item["file"]), None),
+                        "document_id": item.get("document_id"),
                     }
                     for item in supplemental_raw
                 ]
@@ -1044,6 +1243,9 @@ class LightRAGService:
             )
         )
         requirement_registry = RequirementRegistry.from_requirements(coverage_requirements)
+        # Only pass the callback when streaming was requested: third-party
+        # backends implement the protocol without it.
+        generate_kwargs: dict[str, Any] = {} if on_delta is None else {"on_delta": on_delta}
         structured_decision: StructuredCitationDecision | None = None
         structured_forced_status: Literal["insufficient_evidence"] | None = None
         backend_generate_call_count = 1
@@ -1057,6 +1259,7 @@ class LightRAGService:
                     context,
                     system_prompt,
                     response_format={"type": "json_object"},
+                    **generate_kwargs,
                 )
             ).strip()
             structured_decision = validate_structured_citation_output(
@@ -1073,7 +1276,9 @@ class LightRAGService:
                     "未覆盖内容必须明确说明，不得补充常识或推断。\n"
                 )
             answer = (
-                await self._backend.generate(normalized_question, context, system_prompt)
+                await self._backend.generate(
+                    normalized_question, context, system_prompt, **generate_kwargs
+                )
             ).strip()
         if not answer:
             audit = (
@@ -1150,7 +1355,11 @@ class LightRAGService:
                     )
                 )
             answer = "\n".join(point.content for point in rendered_points)
-            citations = tuple(rendered_citations)
+            # Keep every selected, generation-local evidence item bound to the
+            # grounded answer.  Provider source IDs are advisory and may omit
+            # a context item even when it was used to produce the answer;
+            # dropping it here creates a false citation miss across generations.
+            citations = tuple(item.citation for item in grounding_candidates)
             grounded = GroundedAnswer(
                 answer=answer,
                 citations=citations,
@@ -1317,6 +1526,9 @@ class LightRAGService:
             ),
             completion_drop_reasons=completion_drop_reasons,
             coverage_requirement_ids=coverage_requirements,
+            unsupported_assertion_audit=_unsupported_assertion_audit(
+                grounded, grounding_candidates
+            ),
             coverage_funnel_stage=("supplemental" if supplemental_result and supplemental_result.triggered else ("completion" if completed_context else "initial")),
             supplemental_retrieval_triggered=bool(supplemental_result and supplemental_result.triggered),
             supplemental_query_text=(supplemental_result.supplemental_query.question if supplemental_result and supplemental_result.supplemental_query else None),
@@ -1374,6 +1586,12 @@ class LightRAGService:
                 else None
             ),
             backend_generate_call_count=backend_generate_call_count,
+            rerank_enabled=bool(rerank_result and rerank_result.enabled),
+            rerank_provider=(rerank_result.provider if rerank_result else None),
+            rerank_latency_ms=(rerank_result.latency_ms if rerank_result else 0.0),
+            rerank_candidate_count=(rerank_result.candidate_count if rerank_result else 0),
+            rerank_final_count=(rerank_result.final_count if rerank_result else 0),
+            rerank_fallback_reason=(rerank_result.fallback_reason if rerank_result else None),
             coverage_after_parent_adjacent=coverage_after,
             selected_coverage=selected_coverage,
             generated_coverage=tuple(point.point_id for point in (grounded.answer_points if grounded else ())),

@@ -95,6 +95,13 @@ class QueryRewriter:
         original = query.strip()
         bounded = _sanitize_history(history or ())
         independent = _is_independent(original)
+        # A pronoun form such as "这个泵的扬程是多少" is self-contained when it
+        # names its own subject.  Detecting a pronoun is only a signal that
+        # rewriting *might* help; without any history there is nothing to
+        # resolve against, so failing closed would reject a perfectly answerable
+        # first-turn question with HTTP 422.
+        if not independent and not bounded and _is_self_contained(original):
+            independent = True
         base = QueryRewriteResult(
             original_query=original,
             history_dependent=not independent,
@@ -240,6 +247,34 @@ def _sanitize_history(history: Sequence[HistoryItem]) -> list[dict[str, str]]:
 
 def _is_independent(query: str) -> bool:
     return bool(query) and not (_has_pronoun(query) or _is_constraint_ellipsis(query) or _is_property_ellipsis(query))
+
+
+# Demonstratives that can act as a determiner for their own noun phrase
+# ("这个泵的...", "该设备的最大流量...").  A bare pronoun such as "它多久维护一次"
+# or "其维护周期是多少" has nothing to bind to without history.
+_DETERMINER_NOUN_PATTERN = re.compile(r"(?:这个|那个|该|此|本)\s*([\u4e00-\u9fa5]{1,8})")
+_QUESTION_TAIL_PATTERN = re.compile(
+    r"(?:是多少|是什么|如何|怎么|多久|多少|哪些|为什么|什么|有没有)"
+)
+
+
+def _is_self_contained(query: str) -> bool:
+    """Return whether a pronoun form still names its own subject.
+
+    ``这个泵的安装步骤是什么`` names 泵, so it is answerable without history.
+    ``其维护周期是多少`` cannot be: the referent exists only in history, so
+    refusing to rewrite it without history stays correct.
+    """
+
+    text = query.strip()
+    if not text:
+        return False
+    match = _DETERMINER_NOUN_PATTERN.search(text)
+    if match is None:
+        return False
+    # "该设备" / "这个泵" alone is a subject only if the query also asks something
+    # about it and the determiner is not the whole subject.
+    return bool(_QUESTION_TAIL_PATTERN.search(text))
 
 
 def _has_pronoun(query: str) -> bool:

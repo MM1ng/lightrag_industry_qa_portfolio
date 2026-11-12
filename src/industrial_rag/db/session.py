@@ -11,6 +11,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from dotenv import load_dotenv
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from industrial_rag.db.models import Base
@@ -31,7 +32,7 @@ def _database_url() -> str:
     if url:
         return url
     load_dotenv(PROJECT_ROOT / ".env", override=False)
-    return os.environ.get("DATABASE_URL", DEFAULT_DB_URL)
+    return os.environ.get("DATABASE_URL", "").strip() or DEFAULT_DB_URL
 
 
 def get_engine():
@@ -40,11 +41,13 @@ def get_engine():
         url = _database_url()
         # SQLite needs check_same_thread=False for async
         connect_args: dict = {}
-        if url.startswith("sqlite"):
+        parsed = make_url(url)
+        if parsed.get_backend_name() == "sqlite":
             connect_args["check_same_thread"] = False
             # Ensure the directory exists
-            db_path = url.replace("sqlite+aiosqlite:///", "")
-            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+            database = parsed.database
+            if database and database != ":memory:" and not database.startswith("file:"):
+                Path(database).parent.mkdir(parents=True, exist_ok=True)
         _engine = create_async_engine(
             url,
             echo=False,
@@ -119,7 +122,10 @@ def reset_for_testing() -> None:
 # Import-time initialisation helpers (for alembic env.py and migrators)
 # ---------------------------------------------------------------------------
 
+
 def get_sync_url() -> str:
     """Return a synchronous URL for Alembic (swap aiosqlite → sqlite)."""
-    url = _database_url()
-    return url.replace("sqlite+aiosqlite:///", "sqlite:///")
+    url = make_url(_database_url())
+    if url.drivername == "sqlite+aiosqlite":
+        url = url.set(drivername="sqlite")
+    return url.render_as_string(hide_password=False)

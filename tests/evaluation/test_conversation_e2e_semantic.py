@@ -4,6 +4,9 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
+
+pytest.importorskip("ragas", reason="optional dependency: pip install -e '.[dev,evaluation]'")
+
 from evaluation.phase10.conversation_e2e_contracts import JudgeConfig
 from evaluation.phase10.conversation_e2e_semantic import (
     build_default_metrics,

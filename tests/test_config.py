@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 from industrial_rag.config import Settings
 
@@ -75,3 +77,158 @@ def test_direct_settings_constructor_applies_the_same_default_model_chain() -> N
 def test_model_chain_rejects_empty_or_duplicate_entries(fallbacks: str, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         Settings.from_mapping({**_valid_values(), "LLM_FALLBACK_MODELS": fallbacks})
+
+
+# ---------------------------------------------------------------------------
+# API key minimum length policy
+# ---------------------------------------------------------------------------
+
+_STRONG_SERVICE_KEY = "s" * 32
+_STRONG_ADMIN_KEY = "a" * 32
+
+
+def test_staging_rejects_short_service_api_key() -> None:
+    with pytest.raises(ValueError, match=r"SERVICE_API_KEY 长度必须不少于 32"):
+        Settings(
+            api_key="test-only-key",
+            deployment_environment="staging",
+            service_api_key="too-short",
+            admin_api_key=_STRONG_ADMIN_KEY,
+        )
+
+
+def test_production_rejects_short_admin_api_key() -> None:
+    with pytest.raises(ValueError, match=r"ADMIN_API_KEY 长度必须不少于 32"):
+        Settings(
+            api_key="test-only-key",
+            deployment_environment="production",
+            service_api_key=_STRONG_SERVICE_KEY,
+            admin_api_key="short",
+        )
+
+
+def test_local_dev_short_key_only_warns(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.WARNING, logger="industrial_rag.config")
+
+    settings = Settings(
+        api_key="test-only-key",
+        deployment_environment="local_dev",
+        service_api_key="short",
+        admin_api_key="also-short",
+    )
+
+    assert settings.service_api_key == "short"
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("SERVICE_API_KEY" in message for message in messages)
+    assert any("ADMIN_API_KEY" in message for message in messages)
+
+
+def test_length_check_ignores_absent_key() -> None:
+    # An absent key is exempt: fail-closed behaviour is the middleware's job.
+    settings = Settings(
+        api_key="test-only-key",
+        deployment_environment="local_dev",
+        service_api_key=None,
+        admin_api_key=None,
+    )
+    assert settings.service_api_key is None
+    assert settings.admin_api_key is None
+
+    # In enforced environments the absence is reported by the presence check,
+    # never as a length violation.
+    with pytest.raises(ValueError, match="必须同时配置"):
+        Settings(
+            api_key="test-only-key",
+            deployment_environment="staging",
+            service_api_key=_STRONG_SERVICE_KEY,
+            admin_api_key=None,
+        )
+
+
+# ---------------------------------------------------------------------------
+# Anonymous surface rate-limit configuration
+# ---------------------------------------------------------------------------
+
+
+def test_rate_limit_defaults_are_30_and_5_per_minute() -> None:
+    settings = Settings.from_mapping(_valid_values())
+
+    assert settings.public_rate_limit_per_minute == 30
+    assert settings.feedback_rate_limit_per_minute == 5
+    assert settings.trust_proxy_headers is False
+
+
+def test_rate_limit_rejects_negative_values() -> None:
+    with pytest.raises(ValueError, match="IRA_PUBLIC_RATE_LIMIT_PER_MINUTE 不能为负数"):
+        Settings.from_mapping({**_valid_values(), "IRA_PUBLIC_RATE_LIMIT_PER_MINUTE": "-1"})
+    with pytest.raises(ValueError, match="IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE 不能为负数"):
+        Settings.from_mapping({**_valid_values(), "IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE": "-1"})
+
+
+def test_rate_limit_zero_disables_and_proxy_headers_opt_in() -> None:
+    settings = Settings.from_mapping(
+        {
+            **_valid_values(),
+            "IRA_PUBLIC_RATE_LIMIT_PER_MINUTE": "0",
+            "IRA_FEEDBACK_RATE_LIMIT_PER_MINUTE": "0",
+            "IRA_TRUST_PROXY_HEADERS": "true",
+        }
+    )
+
+    assert settings.public_rate_limit_per_minute == 0
+    assert settings.feedback_rate_limit_per_minute == 0
+    assert settings.trust_proxy_headers is True
+
+
+def test_llm_max_async_defaults_to_eight() -> None:
+    settings = Settings.from_mapping(_valid_values())
+    assert settings.llm_max_async == 8
+
+
+def test_llm_max_async_is_read_from_environment() -> None:
+    settings = Settings.from_mapping({**_valid_values(), "LLM_MAX_ASYNC": "16"})
+    assert settings.llm_max_async == 16
+
+
+@pytest.mark.parametrize("raw", ["0", "33", "abc"])
+def test_llm_max_async_rejects_out_of_range_values(raw: str) -> None:
+    with pytest.raises(ValueError, match="LLM_MAX_ASYNC"):
+        Settings.from_mapping({**_valid_values(), "LLM_MAX_ASYNC": raw})
+
+
+def test_llm_enable_thinking_is_unset_by_default() -> None:
+    settings = Settings.from_mapping(_valid_values())
+    assert settings.llm_enable_thinking is None
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [("false", False), ("FALSE", False), ("true", True), ("auto", None), ("", None)],
+)
+def test_llm_enable_thinking_is_read_from_environment(raw: str, expected) -> None:
+    settings = Settings.from_mapping({**_valid_values(), "LLM_ENABLE_THINKING": raw})
+    assert settings.llm_enable_thinking is expected
+
+
+def test_llm_enable_thinking_rejects_unknown_values() -> None:
+    with pytest.raises(ValueError, match="LLM_ENABLE_THINKING"):
+        Settings.from_mapping({**_valid_values(), "LLM_ENABLE_THINKING": "maybe"})
+
+def test_voice_settings_defaults() -> None:
+    """Voice defaults must not require a provider key to be present.
+
+    This asserts the dataclass defaults directly. Calling ``Settings.from_env()``
+    here would fail on CI, where DASHSCOPE_API_KEY is absent, even though the
+    defaults themselves are correct.
+    """
+    from industrial_rag.config import Settings
+
+    settings = Settings(api_key="offline-test-key")
+    assert settings.voice_enabled is False
+    assert settings.voice_asr_model == "qwen3-asr-flash"
+    assert settings.voice_tts_model == "qwen3-tts-flash"
+    assert settings.voice_tts_voice == "Cherry"
+    assert settings.voice_max_audio_bytes == 5_242_880
+    assert settings.voice_max_audio_seconds == 60
+    assert settings.voice_tts_max_chars == 600
+    assert settings.voice_rate_limit_per_minute == 10

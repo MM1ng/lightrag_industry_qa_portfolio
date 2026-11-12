@@ -1,16 +1,46 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { AssistantMessage } from '../../app/stores/session'
 import FeedbackActions from './FeedbackActions.vue'
 import CitationTag from './CitationTag.vue'
-defineProps<{ message: AssistantMessage }>()
+const props = defineProps<{ message: AssistantMessage }>()
 const emit = defineEmits<{ selectCitation: [citationId: string]; retry: [question: string]; feedback: [payload: { type: 'helpful' | 'unhelpful'; reason?: string; comment?: string }] }>()
+
+/**
+ * Structured answers are assembled from the same `answer_points` that become
+ * `claims`, so `claim.text` is usually byte-identical to a paragraph of
+ * `answer`. Rendering both shows every sentence twice, so the verification
+ * block is limited to claims that actually add something the body does not
+ * already say.
+ */
+function normalizeSentence(value: string): string {
+  return value
+    .replace(/\[\d+\]/g, '')
+    .replace(/[*`]/g, '')
+    .replace(/^\s*(?:#{1,3}|[-*]|\d+[.)])\s*/, '')
+    .replace(/\s+/g, '')
+}
+
+const normalizedAnswer = computed(() => normalizeSentence(props.message.result.answer))
+const uniqueClaims = computed(() => {
+  const body = normalizedAnswer.value
+  return props.message.result.claims.filter((claim) => {
+    const text = normalizeSentence(claim.text)
+    return text.length > 0 && !body.includes(text)
+  })
+})
 const statusCopy: Record<string, string> = { success: '可执行回答', partial_answer: '部分回答', insufficient_evidence: '证据不足', safety_blocked: '安全拦截', failed: '查询失败', clarification_required: '需要澄清', out_of_scope: '超出当前手册范围' }
 const statusTone: Record<string, string> = { success: 'success', partial_answer: 'warning', insufficient_evidence: 'warning', safety_blocked: 'danger', failed: 'danger' }
 function renderAnswerMarkdown(markdown: string) {
   const lines = markdown.split(/\r?\n/)
   let html = ''; let list: 'ol' | 'ul' | null = null
   const closeList = () => { if (list) { html += `</${list}>`; list = null } }
-  const inline = (value: string) => value.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>')
+  const inline = (value: string) => value
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // Inline markers are the reader's fastest path to the source, so they stay
+    // clickable in the body instead of only inside the verification block.
+    .replace(/\[(\d+)\]/g, (_match, index: string) => `<button type="button" class="inline-citation" data-cite-index="${index}">[${index}]</button>`)
   for (const raw of lines) {
     const line = escapeHtml(raw.trim())
     if (!line) { closeList(); continue }
@@ -27,6 +57,13 @@ function renderAnswerMarkdown(markdown: string) {
   closeList(); return html
 }
 function escapeHtml(value: string) { return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') }
+
+function handleBodyClick(event: MouseEvent) {
+  const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('button[data-cite-index]')
+  if (!target) return
+  const citation = props.message.result.citations[Number(target.dataset.citeIndex) - 1]
+  if (citation) emit('selectCitation', citation.citation_id)
+}
 </script>
 
 <template>
@@ -36,13 +73,13 @@ function escapeHtml(value: string) { return value.replace(/&/g, '&amp;').replace
     <div v-if="message.result.status === 'insufficient_evidence'" class="state-note">当前手册没有足够证据支持可靠回答。可以换一种描述，或从下面的高频问题开始。</div>
     <div v-if="message.result.status === 'safety_blocked'" class="state-note">这个问题涉及高风险操作，系统不会提供可能导致误操作的步骤。请按现场安全规程执行。</div>
     <div v-if="message.result.status === 'failed'" class="state-note">查询没有完成，原问题仍保留，可以重新查询。</div>
-    <div class="answer-body" v-html="renderAnswerMarkdown(message.result.answer)" />
-    <div v-if="message.result.claims.length" class="claims"><span class="section-label">核验要点</span><p v-for="claim in message.result.claims" :key="claim.claim_id">{{ claim.text }} <button v-for="id in claim.citation_ids" :key="id" class="inline-citation" @click="emit('selectCitation', id)">[{{ message.result.citations.findIndex((citation) => citation.citation_id === id) + 1 }}]</button></p></div>
+    <div class="answer-body" v-html="renderAnswerMarkdown(message.result.answer)" @click="handleBodyClick" />
+    <div v-if="uniqueClaims.length" class="claims"><span class="section-label">核验要点</span><p v-for="claim in uniqueClaims" :key="claim.claim_id">{{ claim.text }} <button v-for="id in claim.citation_ids" :key="id" class="inline-citation" @click="emit('selectCitation', id)">[{{ message.result.citations.findIndex((citation) => citation.citation_id === id) + 1 }}]</button></p></div>
     <div v-if="message.result.citations.length" class="citations"><span class="section-label">依据</span><div class="citation-list"><CitationTag v-for="(citation, index) in message.result.citations" :key="citation.citation_id" :citation="citation" :index="index" @select="emit('selectCitation', $event)" /></div></div>
     <div class="answer-footer"><FeedbackActions :submitted="message.feedbackSubmitted" @submit="emit('feedback', $event)" /><button v-if="message.result.status === 'failed' || message.result.status === 'insufficient_evidence'" class="retry" @click="emit('retry', message.question)">重新查询 ↗</button></div>
   </article>
 </template>
 
 <style scoped>
-.answer-card { padding: 22px 24px; border: 1px solid var(--color-line); border-left: 4px solid var(--color-line); border-radius: var(--radius-panel); background: var(--color-surface); box-shadow: var(--shadow-panel); } .answer-card--success { border-left-color: var(--color-cobalt); } .answer-card--warning { border-left-color: var(--color-amber); } .answer-card--danger { border-left-color: var(--color-danger); } header { display: flex; justify-content: space-between; gap: 12px; align-items: start; } header div { display: grid; gap: 4px; } .answer-kicker, .section-label { color: var(--color-muted); font: 10px Bahnschrift, monospace; letter-spacing: .1em; text-transform: uppercase; } .answer-latency { color: var(--color-muted); font-size: 11px; } .answer-body { margin-top: 18px; font-size: 15px; line-height: 1.85; } .answer-body :deep(p) { margin: 0 0 12px; } .answer-body :deep(h3) { margin: 18px 0 8px; color: var(--color-ink); font-size: 15px; } .answer-body :deep(ol), .answer-body :deep(ul) { margin: 0 0 14px; padding-left: 22px; } .answer-body :deep(li) { margin: 5px 0; } .answer-body :deep(code) { padding: 2px 4px; border-radius: 4px; color: var(--color-cobalt); background: var(--color-cobalt-soft); font-family: Bahnschrift, monospace; font-size: .92em; } .state-note { margin-top: 14px; padding: 10px 12px; color: var(--color-amber); background: var(--color-amber-soft); font-size: 13px; line-height: 1.6; } .answer-card--danger .state-note { color: var(--color-danger); background: #fff0ee; } .claims, .citations { margin-top: 22px; } .claims p { margin: 9px 0 0; padding-left: 12px; border-left: 2px solid var(--color-line); line-height: 1.7; } .inline-citation { min-height: 24px; padding: 0 3px; border: 0; color: var(--color-cobalt); background: transparent; font-weight: 800; } .citation-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; } .citation-tag { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 10px; border: 1px solid var(--color-line); border-left: 3px solid var(--color-cobalt); border-radius: 7px; color: var(--color-ink); background: #fbfcfd; text-align: left; font-size: 12px; } .citation-tag:hover { border-color: #9ebcf1; background: var(--color-cobalt-soft); } .citation-tag b { color: var(--color-cobalt); } .answer-footer { display: flex; align-items: end; justify-content: space-between; gap: 10px; } .retry { min-height: 32px; border: 0; color: var(--color-cobalt); background: transparent; font-size: 12px; font-weight: 700; }
+.answer-card { padding: 22px 24px; border: 1px solid var(--color-line); border-left: 4px solid var(--color-line); border-radius: var(--radius-panel); background: var(--color-surface); box-shadow: var(--shadow-panel); } .answer-card--success { border-left-color: var(--color-cobalt); } .answer-card--warning { border-left-color: var(--color-amber); } .answer-card--danger { border-left-color: var(--color-danger); } header { display: flex; justify-content: space-between; gap: 12px; align-items: start; } header div { display: grid; gap: 4px; } .answer-kicker, .section-label { color: var(--color-muted); font: 10px Bahnschrift, monospace; letter-spacing: .1em; text-transform: uppercase; } .answer-latency { color: var(--color-muted); font-size: 11px; } .answer-body { margin-top: 18px; font-size: 15px; line-height: 1.85; } .answer-body :deep(p) { margin: 0 0 12px; } .answer-body :deep(h3) { margin: 18px 0 8px; color: var(--color-ink); font-size: 15px; } .answer-body :deep(ol), .answer-body :deep(ul) { margin: 0 0 14px; padding-left: 22px; } .answer-body :deep(li) { margin: 5px 0; } .answer-body :deep(code) { padding: 2px 4px; border-radius: 4px; color: var(--color-cobalt); background: var(--color-cobalt-soft); font-family: Bahnschrift, monospace; font-size: .92em; } .state-note { margin-top: 14px; padding: 10px 12px; color: var(--color-amber); background: var(--color-amber-soft); font-size: 13px; line-height: 1.6; } .answer-card--danger .state-note { color: var(--color-danger); background: #fff0ee; } .claims, .citations { margin-top: 22px; } .claims p { margin: 9px 0 0; padding-left: 12px; border-left: 2px solid var(--color-line); line-height: 1.7; } .inline-citation { min-height: 24px; padding: 0 3px; border: 0; color: var(--color-cobalt); background: transparent; font-weight: 800; } .answer-body :deep(.inline-citation) { min-height: 0; padding: 0 2px; border: 0; color: var(--color-cobalt); background: transparent; font: inherit; font-weight: 800; vertical-align: baseline; cursor: pointer; } .answer-body :deep(.inline-citation:hover) { background: var(--color-cobalt-soft); border-radius: 3px; } .citation-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; } .citation-tag { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 10px; border: 1px solid var(--color-line); border-left: 3px solid var(--color-cobalt); border-radius: 7px; color: var(--color-ink); background: #fbfcfd; text-align: left; font-size: 12px; } .citation-tag:hover { border-color: #9ebcf1; background: var(--color-cobalt-soft); } .citation-tag b { color: var(--color-cobalt); } .answer-footer { display: flex; align-items: end; justify-content: space-between; gap: 10px; } .retry { min-height: 32px; border: 0; color: var(--color-cobalt); background: transparent; font-size: 12px; font-weight: 700; }
 </style>

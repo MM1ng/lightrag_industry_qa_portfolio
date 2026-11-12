@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -23,6 +25,11 @@ from industrial_rag.repositories.vector_index_generation_repository import (
     VectorIndexGenerationRepository,
 )
 from industrial_rag.safety_policy import evaluate_input
+from industrial_rag.services.generation_artifacts import (
+    GenerationArtifactError,
+    GenerationArtifactResolver,
+)
+from industrial_rag.storage_layout import resolve_generation_workspace
 from industrial_rag.vector_collections import VectorBackend
 
 
@@ -35,6 +42,47 @@ class GenerationQueryResult:
     citation_document_ids: dict[str, str]
 
 
+async def _run_query_with_timeout(
+    runtime,
+    question: str,
+    *,
+    mode: str,
+    top_k: int,
+    chunk_top_k: int,
+    timeout_seconds: float,
+    on_delta: Callable[[str], None] | None = None,
+) -> QueryResult:
+    """Execute one runtime query under a hard deadline.
+
+    Without a deadline a stalled upstream model call holds the runtime query
+    lock indefinitely and serialises every later request in the same process.
+    """
+
+    query_kwargs: dict[str, object] = {
+        "mode": mode,
+        "top_k": top_k,
+        "chunk_top_k": chunk_top_k,
+    }
+    if on_delta is not None:
+        # Runtimes that predate streaming keep their original call shape.
+        query_kwargs["on_delta"] = on_delta
+    try:
+        async with asyncio.timeout(timeout_seconds):
+            try:
+                return await runtime.query(question, **query_kwargs)
+            except TypeError as error:
+                if "unexpected keyword argument" not in str(error):
+                    raise
+                return await runtime.query(question, mode=mode)
+    except TimeoutError as error:
+        raise AppError(
+            AppErrorCode.qa_timeout,
+            "问答请求超时，请稍后重试。",
+            status_code=504,
+            details={"timeout_seconds": timeout_seconds},
+        ) from error
+
+
 class QueryApplicationService:
     """Resolve trusted generation metadata before consulting process-local cache."""
 
@@ -45,11 +93,13 @@ class QueryApplicationService:
         base_settings: Settings,
         runtime_manager,
         query_rewriter: QueryRewriter | None = None,
+        artifact_resolver: GenerationArtifactResolver | None = None,
     ) -> None:
         self._session = session
         self._base_settings = base_settings
         self._runtime_manager = runtime_manager
         self._query_rewriter = query_rewriter or QueryRewriter()
+        self._artifact_resolver = artifact_resolver or GenerationArtifactResolver()
         self._kb_repository = KnowledgeBaseRepository(session)
         self._generation_repository = VectorIndexGenerationRepository(session)
         self._document_repository = DocumentRepository(session)
@@ -61,11 +111,18 @@ class QueryApplicationService:
         question: str,
         *,
         history: list[dict[str, str]] | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> GenerationQueryResult:
         kb = await self._require_kb(kb_id)
         if kb.active_vector_generation_id is None:
             raise AppError(AppErrorCode.index_not_ready, "知识库没有 Active Generation")
-        return await self._query(kb, kb.active_vector_generation_id, question, history=history)
+        return await self._query(
+            kb,
+            kb.active_vector_generation_id,
+            question,
+            history=history,
+            on_delta=on_delta,
+        )
 
     async def query_generation(
         self,
@@ -75,6 +132,7 @@ class QueryApplicationService:
         *,
         history: list[dict[str, str]] | None = None,
         disable_llm_cache: bool = False,
+        on_delta: Callable[[str], None] | None = None,
     ) -> GenerationQueryResult:
         kb = await self._require_kb(kb_id)
         return await self._query(
@@ -83,6 +141,7 @@ class QueryApplicationService:
             question,
             history=history,
             disable_llm_cache=disable_llm_cache,
+            on_delta=on_delta,
         )
 
     async def _query(
@@ -93,6 +152,7 @@ class QueryApplicationService:
         *,
         history: list[dict[str, str]] | None = None,
         disable_llm_cache: bool = False,
+        on_delta: Callable[[str], None] | None = None,
     ) -> GenerationQueryResult:
         generation = await self._generation_repository.get(generation_id)
         if generation is None or generation.knowledge_base_id != kb.id:
@@ -111,6 +171,37 @@ class QueryApplicationService:
                 "Generation 当前不可查询。",
                 status_code=409,
             )
+        try:
+            chunk_registry = self._artifact_resolver.resolve_registry(
+                # The recorded workspace path is absolute and host-specific; it
+                # dangles after moving the data or inside a container. Fall back
+                # to the KB_DATA_ROOT-derived layout when it is missing.
+                resolve_generation_workspace(
+                    generation.workspace_path,
+                    kb_id=kb.id,
+                    generation=generation.generation,
+                ),
+                expected_generation_id=generation.generation,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
+        except GenerationArtifactError as error:
+            raise AppError(
+                AppErrorCode.generation_invalid_state,
+                "Generation 的冻结检索快照不可验证。",
+                status_code=409,
+            ) from error
+        # Citation identity must come from the immutable generation snapshot.
+        # The update-job document snapshot can intentionally describe a failed
+        # predecessor as inactive while its replacement candidate is still the
+        # source of truth for validation.
+        citation_document_ids = {
+            str(record.document_name): str(record.document_id)
+            for record in chunk_registry.context_records(
+                knowledge_base_id=kb.id,
+                generation_id=generation.id,
+            ).values()
+            if record.document_name and record.document_id
+        }
         rewrite = await self._query_rewriter.rewrite(question, history)
         rewrite_details = rewrite.to_trace()
         if rewrite.status == "ambiguous":
@@ -149,23 +240,24 @@ class QueryApplicationService:
         )
         if disable_llm_cache:
             settings = replace(settings, enable_llm_cache=False)
-        runtime = await self._runtime_manager.get_runtime(kb.id, settings)
+        runtime = await self._runtime_manager.get_runtime(
+            kb.id,
+            settings,
+            chunk_registry=chunk_registry,
+        )
         operational_metrics.set(f"active_generation.{kb.id}", generation.id)
-        try:
-            result = await runtime.query(
-                retrieval_question,
-                mode=self._base_settings.phase10b_query_mode,  # type: ignore[arg-type]
-                top_k=self._base_settings.phase10b_top_k,
-                chunk_top_k=self._base_settings.phase10b_chunk_top_k,
-            )
-        except TypeError as error:
-            if "unexpected keyword argument" not in str(error):
-                raise
-            result = await runtime.query(
-                retrieval_question,
-                mode=self._base_settings.phase10b_query_mode,  # type: ignore[arg-type]
-            )
-        document_ids = await self._citation_document_ids(kb.id, generation)
+        result = await _run_query_with_timeout(
+            runtime,
+            retrieval_question,
+            mode=self._base_settings.phase10b_query_mode,
+            top_k=self._base_settings.phase10b_top_k,
+            chunk_top_k=self._base_settings.phase10b_chunk_top_k,
+            timeout_seconds=self._base_settings.qa_request_timeout_seconds,
+            on_delta=on_delta,
+        )
+        document_ids = await self._citation_document_ids(
+            kb.id, generation, snapshot_ids=citation_document_ids
+        )
         if result.retrieval_trace is not None:
             normalized_retrieval_query = result.retrieval_trace.normalized_query
             trace = result.retrieval_trace.with_query_rewrite(
@@ -184,16 +276,22 @@ class QueryApplicationService:
             citation_document_ids=document_ids,
         )
 
-    async def _citation_document_ids(self, kb_id: str, generation) -> dict[str, str]:
-        mapping: dict[str, str] = {}
+    async def _citation_document_ids(
+        self,
+        kb_id: str,
+        generation,
+        *,
+        snapshot_ids: dict[str, str] | None = None,
+    ) -> dict[str, str]:
+        mapping: dict[str, str] = dict(snapshot_ids or {})
         job = await self._job_repository.find_by_candidate(generation.id)
         snapshot = (job.result or {}).get("documents", []) if job is not None else []
         for entry in snapshot:
-            if entry.get("is_active") and entry.get("logical_name") and entry.get("document_id"):
+            if entry.get("logical_name") and entry.get("document_id"):
                 mapping[str(entry["logical_name"])] = str(entry["document_id"])
         docs = await self._document_repository.list_by_kb(kb_id, include_deleted=True)
         for doc in sorted(docs, key=lambda item: (item.version, item.created_at)):
-            if snapshot and doc.id not in {str(item.get("document_id")) for item in snapshot if item.get("is_active")}:
+            if snapshot and doc.id not in {str(item.get("document_id")) for item in snapshot if item.get("is_active")} and doc.id not in set(mapping.values()):
                 continue
             mapping[doc.original_file_name] = doc.id
             if doc.logical_name:

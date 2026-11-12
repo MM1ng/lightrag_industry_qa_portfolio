@@ -176,3 +176,63 @@ async def test_provider_failure_does_not_break_independent_query() -> None:
 
     assert result.status == "unchanged"
     assert result.standalone_query == "介绍一下液压系统。"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "question",
+    [
+        "这个泵的安装步骤是什么？",
+        "该设备的最大流量是多少？",
+        "这个泵的扬程是多少？",
+        "该泵的轴承温度上限是多少？",
+    ],
+)
+async def test_self_contained_demonstrative_query_is_not_history_dependent(
+    question: str,
+) -> None:
+    """Regression: a demonstrative + its own noun was rejected with HTTP 422.
+
+    ``这个泵的安装步骤`` names 泵, so it is answerable on the first turn.  The old
+    pronoun check matched the leading 这个/该 and marked the query history
+    dependent even when no history existed at all.
+    """
+
+    result = await QueryRewriter().rewrite(question, None)
+
+    assert result.status == "unchanged"
+    assert result.history_dependent is False
+    assert result.history_available is False
+    assert result.standalone_query == question
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "question",
+    [
+        "其维护周期是多少？",
+        "它多久维护一次？",
+        "这个呢？",
+    ],
+)
+async def test_bare_pronoun_without_history_still_requires_context(question: str) -> None:
+    """The fix must not turn a genuinely dangling pronoun into an answer."""
+
+    result = await QueryRewriter().rewrite(question, None)
+
+    assert result.status == "failed"
+    assert result.history_dependent is True
+    assert result.standalone_query is None
+
+
+@pytest.mark.asyncio
+async def test_self_contained_demonstrative_still_uses_history_when_present() -> None:
+    """A named subject must not block normal pronoun resolution on later turns."""
+
+    result = await QueryRewriter().rewrite(
+        "这个泵的维护周期是多少？",
+        _history(("user", "什么是机械密封？"),),
+    )
+
+    assert result.status in {"rewritten", "unchanged"}
+    assert result.standalone_query

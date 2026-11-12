@@ -15,12 +15,34 @@ DOCUMENT_ALIASES = {
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+(?:[-_/.][a-z0-9]+)*|[\u3400-\u9fff]+")
 _CJK_TOKEN_PATTERN = re.compile(r"[\u3400-\u9fff]+")
+# Structural particles only.  Content-forming characters (对/中/能/可/应/要) are
+# deliberately excluded so domain nouns such as 对中, 性能, 可靠, 应用, 要求
+# survive segmentation; splitting inside them would erase the very terms the
+# evidence gate needs to match.
+_CJK_BOUNDARY_PATTERN = re.compile(
+    "[的是了吗呢吧啊着地和与及或并在干从向把被将当其也都还而又再很更最已未这那所]+"
+)
+# Chapter index words are filler in ordinary prose but are exactly the terms an
+# operator searches with ("安装步骤", "拆卸注意").  Treating them as generic
+# filler made installation/disassembly questions unmatchable, so they stay
+# matchable while the remaining instructional fillers remain filtered.
+_CJK_INDEX_TERMS = frozenset({"安装", "拆卸", "检修", "启动", "停机", "型号", "规格"})
+# Answer-shape words describe how an answer should look, not what it is about.
+# Left inside a CJK run they produce junk terms such as 装步 / 安装步, which
+# then never match manual prose and starve the generator of evidence.
+_CJK_SCAFFOLD_PATTERN = re.compile(
+    r"(?:有哪些|有什么|注意事项|注意什么|怎么办|哪些|哪个|排查|步骤|注意|事项|什么|方法|要求|说明|情况|过程|流程|时候|原因)+"
+)
+# Nouns naming the corpus itself rather than the question's subject.
+_CJK_TOPIC_WORDS = frozenset({"泵", "水泵", "泵组", "设备", "机组", "系统", "手册"})
 _SOURCE_HEADER_PATTERN = re.compile(r"\[\[INDUSTRIAL_RAG_SOURCE\b[^\]]*\]\]")
 _PROVENANCE_LINE_PATTERN = re.compile(r"(?m)^\[来源：[^\r\n]*\][ \t]*\r?\n?")
 _MAX_SELECTED = 3
 _CJK_NGRAM_LENGTHS = (2, 3, 4)
 _GENERIC_CJK_PHRASE_PATTERN = re.compile(
-    r"(?:具体操作步骤|设备维护周期|具体操作|操作步骤|请说明|如何进行|请问|如何|怎么|怎么办|进行)+"
+    # Longest alternative first: with 怎么 before 怎么办 the regex consumed only
+    # 怎么 and left a stray 办 behind, which then became its own token.
+    r"(?:具体操作步骤|设备维护周期|具体操作|操作步骤|请说明|如何进行|怎么办|请问|如何|怎么|进行)+"
 )
 _CONDITION_NORMALIZATIONS = {
     "过高": "高",
@@ -90,6 +112,8 @@ _NON_SUBSTANTIVE_CJK_BIGRAMS = frozenset(
         "配置",
     }
 )
+# Chapter index terms stay matchable; see _CJK_INDEX_TERMS.
+_GENERIC_CJK_BIGRAMS = frozenset(_NON_SUBSTANTIVE_CJK_BIGRAMS - _CJK_INDEX_TERMS)
 _STOPWORDS = frozenset(
     {
         "a",
@@ -155,18 +179,38 @@ def select_evidence(question: str, payload: object, *, limit: int = 3, diversify
         if actionable:
             candidates = actionable
     scored = [
-        (_overlap(question, question_tokens, question_conditions, candidate.text), candidate)
+        (
+            _overlap(question, question_tokens, question_conditions, candidate.text),
+            candidate,
+        )
         for candidate in candidates
     ]
-    ranked = sorted(scored, key=lambda item: (-item[0], item[1].rank))
+    # _overlap already encodes the substantive two-character condition rule
+    # (score 2 for a concrete fault term inside a troubleshooting context), so a
+    # score of 2 or more admits without a second subject check.
+    admitted = [
+        (
+            _admits(question, _shared_content_terms(question_tokens, candidate.text))
+            if _conditions_agree(question_conditions, candidate.text)
+            else False
+        )
+        or score >= 2
+        for score, candidate in scored
+    ]
+    triples = [
+        (score, ok, candidate) for (score, candidate), ok in zip(scored, admitted, strict=True)
+    ]
+    ranked = sorted(triples, key=lambda item: (-item[0], item[2].rank))
     if not diversify:
-        selected = tuple(candidate for overlap, candidate in ranked if overlap >= 2)[: min(max(limit, 0), _MAX_SELECTED)]
+        selected = tuple(
+            candidate for _score, admits, candidate in ranked if admits
+        )[: min(max(limit, 0), _MAX_SELECTED)]
     else:
         selected_list: list[EvidenceCandidate] = []
         covered_tokens: set[str] = set()
         cap = min(max(limit, 0), _MAX_SELECTED)
-        for overlap, candidate in ranked:
-            if overlap < 2 or len(selected_list) >= cap:
+        for _score, admits, candidate in ranked:
+            if not admits or len(selected_list) >= cap:
                 continue
             candidate_tokens = set(_tokens(candidate.text))
             # Prefer complementary evidence over duplicate chunks.  Original
@@ -273,35 +317,98 @@ def _candidate_text(content: object) -> str:
 
 
 def _cjk_terms(token: str) -> frozenset[str]:
+    """Return matchable terms for one CJK run, without cross-word fragments.
+
+    A whole unsegmented run such as ``泵的安装步骤是什么`` used to yield every
+    2-4 character window, so ``泵的``/``的安``/``装步``/``骤是`` competed with
+    real words while ``安装`` was filtered out as filler.  None of those
+    fragments ever occurs verbatim in manual prose, so a question about
+    installation could not match installation text at all.  Splitting the run on
+    structural particles and answer-shape scaffolding first keeps the windows
+    inside word-like segments.
+    """
+
     if token in _STOPWORDS:
         return frozenset()
-    meaningful = _GENERIC_CJK_PHRASE_PATTERN.sub("", token)
-    normalized = _CONDITION_PATTERN.sub(
-        lambda match: _CONDITION_NORMALIZATIONS[match.group()], meaningful
-    )
-    if not normalized:
-        return frozenset()
-    if len(normalized) == 1:
-        return frozenset({normalized})
-    if len(normalized) == 2:
-        return frozenset({normalized}) if _is_substantive_cjk_bigram(normalized) else frozenset()
-    terms = {normalized}
-    for length in _CJK_NGRAM_LENGTHS:
-        for index in range(len(normalized) - length + 1):
-            term = normalized[index : index + length]
-            if _is_substantive_cjk_term(term):
-                terms.add(term)
+    terms: set[str] = set()
+    for segment in _cjk_segments(token):
+        terms.update(_segment_terms(segment))
     return frozenset(terms)
 
 
-def _is_substantive_cjk_bigram(term: str) -> bool:
-    return term not in _NON_SUBSTANTIVE_CJK_BIGRAMS
+def _cjk_segments(token: str) -> tuple[str, ...]:
+    """Split one CJK run into word-like segments (see ``_cjk_terms``).
 
+    Corpus-wide topic nouns (泵/设备) are removed first: they name the manual's
+    subject rather than the question's, and leaving them in splits compounds such
+    as 型号规格 into 泵型 + 号规.
+    """
 
-def _is_substantive_cjk_term(term: str) -> bool:
-    return not any(
-        term[index : index + 2] in _NON_SUBSTANTIVE_CJK_BIGRAMS for index in range(len(term) - 1)
+    normalized = _GENERIC_CJK_PHRASE_PATTERN.sub("", token)
+    normalized = _CJK_SCAFFOLD_PATTERN.sub("", normalized)
+    for topic in _CJK_TOPIC_WORDS:
+        normalized = normalized.replace(topic, "")
+    normalized = _CONDITION_PATTERN.sub(
+        lambda match: _CONDITION_NORMALIZATIONS[match.group()], normalized
     )
+    if not normalized:
+        return ()
+    return tuple(part for part in _CJK_BOUNDARY_PATTERN.split(normalized) if part)
+
+
+def _segment_terms(segment: str) -> frozenset[str]:
+    """Return the segment itself plus its substantive 2-4 character windows."""
+
+    candidates: set[str] = {segment}
+    if len(segment) >= 3:
+        for length in _CJK_NGRAM_LENGTHS:
+            for index in range(len(segment) - length + 1):
+                candidates.add(segment[index : index + length])
+    return frozenset(
+        term
+        for term in candidates
+        if term not in _STOPWORDS
+        and not any(
+            term[index : index + 2] in _GENERIC_CJK_BIGRAMS
+            for index in range(len(term) - 1)
+        )
+    )
+
+
+def _subject_segments(question: str) -> frozenset[str]:
+    """Return the question's subject segments, excluding corpus-wide nouns.
+
+    Used to decide whether a single shared term is specific enough: ``泵体``
+    alone must not answer ``泵体泄漏怎么办`` because 泄漏 is the missing half of
+    the subject, while ``安装`` alone may answer ``泵的安装步骤是什么``.
+    """
+
+    segments = [
+        segment
+        for token in _TOKEN_PATTERN.findall(unicodedata.normalize("NFKC", question).casefold())
+        if _CJK_TOKEN_PATTERN.fullmatch(token)
+        for segment in _cjk_segments(token)
+    ]
+    return frozenset(
+        segment
+        for segment in segments
+        if len(segment) >= 2 and segment not in _CJK_TOPIC_WORDS
+    )
+
+
+def _subject_head(question: str) -> str | None:
+    """Return the head noun of the question's subject, if any.
+
+    Chinese noun phrases are head-final: ``泵体泄漏`` heads on ``泄漏``, so a
+    chunk that only says ``泵体`` describes the machine but never the leak the
+    question is about.  ``泵的安装步骤是什么`` reduces to the single segment
+    ``安装``, which is its own head.
+    """
+
+    segments = sorted(_subject_segments(question))
+    if not segments:
+        return None
+    return segments[-1][-2:] if len(segments[-1]) > 2 else segments[-1]
 
 
 def _conditions(value: str) -> frozenset[str]:
@@ -313,18 +420,72 @@ def _conditions(value: str) -> frozenset[str]:
     )
 
 
+def _conditions_agree(
+    question_conditions: frozenset[str], candidate_text: str
+) -> bool:
+    """Return False when the candidate states the opposite condition.
+
+    ``轴承温度高`` must never be answered from ``温度低时检查冷却系统``: the
+    numeric/token overlap is high while the meaning is reversed.
+    """
+
+    candidate_conditions = _conditions(candidate_text)
+    if not question_conditions or not candidate_conditions:
+        return True
+    return not question_conditions.isdisjoint(candidate_conditions)
+
+
+def _document_alias_tokens() -> frozenset[str]:
+    """Alias words route a document and must not count as content overlap."""
+
+    aliases = {document.casefold() for document in DOCUMENT_ALIASES}
+    for values in DOCUMENT_ALIASES.values():
+        aliases.update(alias.casefold() for alias in values)
+    return frozenset(aliases)
+
+
+_DOCUMENT_ALIAS_TOKENS = _document_alias_tokens()
+
+
+def _shared_content_terms(
+    question_tokens: frozenset[str], candidate_text: str
+) -> frozenset[str]:
+    """Shared terms that indicate content, excluding pure routing aliases."""
+
+    return (question_tokens & _tokens(candidate_text)) - _DOCUMENT_ALIAS_TOKENS
+
+
+def _admits(question: str, shared_terms: frozenset[str]) -> bool:
+    """Decide whether the shared content terms justify answering from a chunk.
+
+    Two independent content terms are convincing.  A single term is convincing
+    only when it is the question's whole subject: ``安装`` may answer ``泵的
+    安装步骤是什么``, but ``泵体`` must not answer ``泵体泄漏怎么办`` because the
+    chunk never mentions the leak the question asks about.
+    """
+
+    if len(shared_terms) >= 2:
+        return True
+    if len(shared_terms) != 1:
+        return False
+    shared = next(iter(shared_terms))
+    subject = _subject_segments(question)
+    if len(subject) == 1 and subject == {shared}:
+        return True
+    # A single shared term must be the question's head noun (or inside it).
+    # 泵体泄漏 asks about the leak, so sharing 泄漏 is enough while sharing only
+    # 泵体 is not; 泵体漏油 needs 漏油, not 泵体.
+    head = _subject_head(question)
+    return head is not None and (shared == head or shared in head)
+
+
 def _overlap(
     question: str,
     question_tokens: frozenset[str],
     question_conditions: frozenset[str],
     candidate_text: str,
 ) -> int:
-    candidate_conditions = _conditions(candidate_text)
-    if (
-        question_conditions
-        and candidate_conditions
-        and question_conditions.isdisjoint(candidate_conditions)
-    ):
+    if not _conditions_agree(question_conditions, candidate_text):
         return 0
     shared_terms = question_tokens & _tokens(candidate_text)
     if len(shared_terms) == 1:

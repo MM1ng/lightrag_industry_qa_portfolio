@@ -4,7 +4,7 @@ from pathlib import Path
 from industrial_rag.phase10b_citation_binding import check_citation_binding
 
 
-def test_citation_binding_detects_wrong_chunk():
+def test_citation_binding_keeps_chunk_id_mismatch_diagnostic_only():
     case = {
         "question_id": "q1",
         "golden": {
@@ -16,8 +16,9 @@ def test_citation_binding_detects_wrong_chunk():
         "response": {"citations": [{"chunk_id": "wrong", "document_name": "d", "page": 1}]},
     }
     result = check_citation_binding(case)
-    assert result["wrong_chunk"] is True
-    assert result["all_answer_points_supported"] is False
+    assert result["wrong_chunk"] is False
+    assert result["chunk_id_mismatch"] is True
+    assert result["all_answer_points_supported"] is True
 
 
 def test_citation_binding_artifact_has_no_claim_level_inference():

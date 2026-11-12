@@ -95,3 +95,82 @@ def test_provenance_heading_does_not_create_unsupported_point():
 
     assert len(result.answer_points) == 1
     assert result.answer_points[0].evidence_ids == ("E1",)
+
+
+def test_chinese_procedure_sentence_is_supported_by_its_evidence():
+    """Long Chinese sentences must still bind when they restate the evidence."""
+
+    evidence = "在水泵底板和基础之间使用垫片，确保安装固定时泵脚不受拉力。"
+    result = build_answer_plan(
+        "在水泵底板和基础之间使用垫片，确保安装固定时泵脚不受拉力。",
+        [_candidate("c1", evidence)],
+        [Citation("manual.pdf", 22, "c1")],
+    )
+
+    assert result.status == "success"
+    assert result.answer_points[0].support_status == "supported"
+    assert result.citations == (Citation("manual.pdf", 22, "c1"),)
+
+
+def test_fabricated_material_claim_is_rejected_even_when_topic_words_match():
+    """Topic words alone must not launder an invented specification."""
+
+    result = build_answer_plan(
+        "该泵由钛合金整体铸造并经过真空热等静压处理。",
+        [_candidate("c1", "选择泵的安放位置时，请选择一个易于进行检查和维护的地方。")],
+        [Citation("manual.pdf", 10, "c1")],
+    )
+
+    assert result.status == "insufficient_evidence"
+    assert result.citations == ()
+    assert result.answer == "手册中未检索到充分依据，无法可靠回答该问题。"
+
+
+def test_unrelated_sentence_sharing_only_the_corpus_noun_is_rejected():
+    result = build_answer_plan(
+        "今天天气很好适合去公园散步。",
+        [_candidate("c1", "选择泵的安放位置时，请选择一个易于进行检查和维护的地方。")],
+        [Citation("manual.pdf", 10, "c1")],
+    )
+
+    assert result.status == "insufficient_evidence"
+    assert result.citations == ()
+
+
+def test_ocr_spaced_decimal_matches_model_percentages() -> None:
+    """Regression: the manual prints ". 012 (. 30)"; answering "0.012 (0.30)"
+    was rejected as unsupported while the idiosyncratic spacing passed."""
+
+    from industrial_rag.answer_grounding import _has_numeric_support
+
+    evidence = "最高 300° F (149° C) . 009 (. 23) . 012 (. 30) . 019 (. 48)"
+
+    assert _has_numeric_support("叶轮间隙应设为 0.012 英寸（0.30 毫米）。", evidence) is True
+    assert _has_numeric_support("叶轮间隙应设为 .012 (.30)。", evidence) is True
+
+
+def test_fabricated_number_is_still_rejected_after_normalisation() -> None:
+    from industrial_rag.answer_grounding import _has_numeric_support
+
+    evidence = "最高 300° F (149° C) . 009 (. 23) . 012 (. 30) . 019 (. 48)"
+
+    assert _has_numeric_support("叶轮间隙应设为 0.999 英寸。", evidence) is False
+    assert _has_numeric_support("叶轮间隙应设为 0.777 英寸。", evidence) is False
+
+
+def test_normalisation_does_not_merge_distinct_values() -> None:
+    from industrial_rag.answer_grounding import _has_numeric_support
+
+    evidence = "间隙设置为 .015 (. 38)"
+
+    assert _has_numeric_support("间隙为 0.015 英寸。", evidence) is True
+    assert _has_numeric_support("间隙为 0.019 英寸。", evidence) is False
+
+
+def test_unverified_identifier_accepts_ocr_leading_zero_variant() -> None:
+    from industrial_rag.answer_grounding import _unverified_identifiers
+
+    evidence = "表6 叶轮间隙 . 012 (. 30)"
+
+    assert _unverified_identifiers("应设为 0.012 英寸。", evidence) == set()
+    assert _unverified_identifiers("应设为 0.777 英寸。", evidence) == {"0.777"}

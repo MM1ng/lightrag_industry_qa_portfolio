@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from industrial_rag.auth import AuthenticatedActor, require_admin_actor
 from industrial_rag.db.models import VectorIndexGenerationStatus
 from industrial_rag.db.session import get_session
-from industrial_rag.errors import AppError
+from industrial_rag.errors import AppError, AppErrorCode
 from industrial_rag.repositories.knowledge_base_repository import KnowledgeBaseRepository
 from industrial_rag.repositories.vector_index_generation_repository import (
     VectorIndexGenerationRepository,
@@ -25,7 +27,10 @@ from industrial_rag.routers.schemas import (
     PaginatedResponse,
 )
 from industrial_rag.services.document_service import DocumentService
-from industrial_rag.services.incremental_update_service import IncrementalUpdateService
+from industrial_rag.services.incremental_update_service import (
+    MAX_UPLOAD_SIZE,
+    IncrementalUpdateService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,17 +101,34 @@ async def _require_source_document(
     return doc
 
 
-def _validate_page(doc, page: int) -> JSONResponse | None:
+def _pdf_page_count(path: Path) -> int:
+    """Open a PDF and return its page count (synchronous, runs in a thread)."""
+    import fitz  # type: ignore[import-not-found]
+
+    with fitz.open(path) as pdf:
+        return pdf.page_count
+
+
+def _pdf_page_text(path: Path, page: int) -> str:
+    """Extract normalised text for one page (synchronous, runs in a thread)."""
+    import fitz  # type: ignore[import-not-found]
+
+    with fitz.open(path) as pdf:
+        if page > pdf.page_count:
+            return ""
+        text = pdf.load_page(page - 1).get_text("text").strip()
+        return " ".join(text.split())[:1200]
+
+
+async def _validate_page(doc, page: int) -> JSONResponse | None:
     if page < 1:
         return _source_error("SOURCE_PAGE_INVALID", "页码不存在，请检查引用页码。", 422)
     page_count = doc.page_count
     if page_count is None:
         path = Path(doc.file_path)
         try:
-            import fitz  # type: ignore[import-not-found]
-
-            with fitz.open(path) as pdf:
-                page_count = pdf.page_count
+            # fitz.open blocks for the whole document parse; keep it off the loop.
+            page_count = await asyncio.to_thread(_pdf_page_count, path)
         except Exception:
             return _source_error(
                 "SOURCE_DOCUMENT_UNAVAILABLE", "当前无法读取原文，请稍后重试。", 404
@@ -116,20 +138,71 @@ def _validate_page(doc, page: int) -> JSONResponse | None:
     return None
 
 
-def _page_context(doc, page: int) -> str:
+async def _page_context(doc, page: int) -> str:
     path = Path(doc.file_path)
     if not path.exists():
         return ""
     try:
-        import fitz  # type: ignore[import-not-found]
-
-        with fitz.open(path) as pdf:
-            if page > pdf.page_count:
-                return ""
-            text = pdf.load_page(page - 1).get_text("text").strip()
-            return " ".join(text.split())[:1200]
+        return await asyncio.to_thread(_pdf_page_text, path, page)
     except Exception:
         return ""
+
+
+_UPLOAD_CHUNK_SIZE = 1024 * 1024
+
+
+async def _read_upload_limited(
+    file: UploadFile, *, max_bytes: int = MAX_UPLOAD_SIZE
+) -> bytes:
+    """Read an upload incrementally and abort once it exceeds ``max_bytes``.
+
+    Reading the whole body first and checking the length afterwards lets a
+    single request pull an unbounded amount of data into process memory.
+    """
+
+    declared = getattr(file, "size", None)
+    if declared is not None and declared > max_bytes:
+        raise _too_large(max_bytes)
+
+    chunks: list[bytes] = []
+    total = 0
+    while chunk := await file.read(_UPLOAD_CHUNK_SIZE):
+        total += len(chunk)
+        if total > max_bytes:
+            raise _too_large(max_bytes)
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def _too_large(max_bytes: int) -> AppError:
+    limit = (
+        f"{max_bytes // (1024 * 1024)} MB" if max_bytes >= 1024 * 1024 else f"{max_bytes} bytes"
+    )
+    return AppError(
+        AppErrorCode.file_too_large,
+        f"文件超过 {limit} 上限。",
+        status_code=413,
+    )
+
+
+def _single_page_pdf(file_path: Path, page: int) -> bytes:
+    """Render a one-page PDF containing only the requested physical page."""
+
+    import fitz  # type: ignore[import-not-found]
+
+    with fitz.open(file_path) as source:
+        if page < 1 or page > source.page_count:
+            raise ValueError("page out of range")
+        single = fitz.open()
+        try:
+            single.insert_pdf(source, from_page=page - 1, to_page=page - 1)
+            return single.tobytes()
+        finally:
+            single.close()
+
+
+def _attachment_disposition(filename: str) -> str:
+    return f"attachment; filename*=utf-8''{quote(filename, safe='')}"
 
 
 @router.post("", status_code=202, response_model=DocumentUpdateResponse)
@@ -142,7 +215,7 @@ async def upload_document(
 ) -> DocumentUpdateResponse:
     if file.filename is None:
         raise ValueError("文件名不能为空")
-    content = await file.read()
+    content = await _read_upload_limited(file)
     svc = IncrementalUpdateService(session)
     result = await svc.add_document(
         kb_id,
@@ -166,7 +239,7 @@ async def replace_document(
     actor: AuthenticatedActor = Depends(require_admin_actor),
     session: AsyncSession = Depends(get_session),
 ) -> DocumentUpdateResponse:
-    content = await file.read()
+    content = await _read_upload_limited(file)
     svc = IncrementalUpdateService(session)
     result = await svc.replace_document(
         kb_id,
@@ -237,7 +310,7 @@ async def get_document_source(
     if isinstance(doc_or_error, JSONResponse):
         return doc_or_error
     doc = doc_or_error
-    page_error = _validate_page(doc, page)
+    page_error = await _validate_page(doc, page)
     if page_error is not None:
         return page_error
     file_path = Path(doc.file_path)
@@ -261,7 +334,7 @@ async def get_document_source(
         page=page,
         page_count=doc.page_count,
         excerpt=excerpt,
-        page_context=_page_context(doc, page) if source_available else "",
+        page_context=await _page_context(doc, page) if source_available else "",
         source_available=source_available,
         source_url=source_url,
         unavailable_reason=None if source_available else "当前无法打开原文，已保留引用摘录供核验。",
@@ -275,23 +348,39 @@ async def get_document_source_file(
     page: int = Query(..., ge=1),
     generation_id: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
-) -> FileResponse | JSONResponse:
+) -> Response | JSONResponse:
     doc_or_error = await _require_source_document(
         kb_id, doc_id, session, generation_id=generation_id
     )
     if isinstance(doc_or_error, JSONResponse):
         return doc_or_error
     doc = doc_or_error
-    page_error = _validate_page(doc, page)
+    page_error = await _validate_page(doc, page)
     if page_error is not None:
         return page_error
     file_path = Path(doc.file_path)
     if not file_path.exists() or not file_path.is_file():
         return _source_error("SOURCE_DOCUMENT_UNAVAILABLE", "当前无法打开原文，已保留引用摘录供核验。", 404)
+
+    filename = doc.original_file_name or f"{doc.id}.pdf"
+    if file_path.suffix.lower() == ".pdf":
+        try:
+            content = await asyncio.to_thread(_single_page_pdf, file_path, page)
+        except Exception:
+            logger.warning("source-file page extraction failed", exc_info=True)
+            return _source_error(
+                "SOURCE_DOCUMENT_UNAVAILABLE", "当前无法打开原文，已保留引用摘录供核验。", 404
+            )
+        return Response(
+            content=content,
+            media_type="application/pdf",
+            headers={"Content-Disposition": _attachment_disposition(filename)},
+        )
+
     return FileResponse(
         file_path,
-        media_type=doc.mime_type or "application/pdf",
-        filename=doc.original_file_name,
+        media_type=doc.mime_type or "application/octet-stream",
+        filename=filename,
     )
 
 

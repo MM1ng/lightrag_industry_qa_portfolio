@@ -1,0 +1,10 @@
+# Frozen experiment samples are compared by sha256 across platforms.
+#
+# Several tests assert the exact byte hash of committed .jsonl baselines. Git's
+# end-of-line normalisation rewrites CRLF to LF on checkout, which changes the
+# hash: the same file hashed fc731efc... on Windows and b7201fe7... on Linux,
+# and 23 tests failed only on CI. Marking these paths as binary disables the
+# normalisation so the committed bytes are the checked-out bytes everywhere.
+evaluation/experiments/**/*.jsonl -text
+evaluation/phase*/*.jsonl -text
+data/evaluation/*.jsonl -text

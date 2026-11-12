@@ -44,10 +44,10 @@ class GenerationEvidenceFingerprint:
     app_git_commit: str
     strategy_fingerprint: str
     generation_manifest_hash: str
-    qdrant_content_fingerprint: str
+    qdrant_content_fingerprint: str | None
     document_registry_fingerprint: str
     generation_content_epoch: int
-    qdrant_point_count: int
+    qdrant_point_count: int | None
 
 
 class GenerationContentFingerprintService:
@@ -57,7 +57,25 @@ class GenerationContentFingerprintService:
         self._jobs = UpdateJobRepository(session)
         self._qdrant_client_factory = qdrant_client_factory
 
-    async def calculate(self, kb_id: str, generation: Any) -> GenerationEvidenceFingerprint:
+    async def calculate(
+        self,
+        kb_id: str,
+        generation: Any,
+        *,
+        require_frozen_artifact: bool = True,
+        measure_qdrant: bool = True,
+    ) -> GenerationEvidenceFingerprint:
+        from industrial_rag.services.generation_artifacts import generation_artifact_evidence
+
+        artifact_evidence = (
+            generation_artifact_evidence(
+                Path(generation.workspace_path),
+                expected_generation_id=generation.generation,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
+            if require_frozen_artifact
+            else None
+        )
         manifest_hash = stable_hash(
             {
                 "document": generation.document_manifest_hash,
@@ -65,6 +83,15 @@ class GenerationContentFingerprintService:
                 "embedding": generation.embedding_config_hash,
                 "chunking": generation.chunking_config_hash,
                 "collections": generation.collections or {},
+                "frozen_manifest_bytes": (
+                    artifact_evidence.manifest_bytes_sha256 if artifact_evidence else None
+                ),
+                "frozen_snapshot_bytes": (
+                    artifact_evidence.snapshot_bytes_sha256 if artifact_evidence else None
+                ),
+                "frozen_lexical_index_bytes": (
+                    artifact_evidence.lexical_index_bytes_sha256 if artifact_evidence else None
+                ),
             }
         )
         strategy_hash = stable_hash(
@@ -92,7 +119,10 @@ class GenerationContentFingerprintService:
                 for doc in docs
             ]
         registry_hash = stable_hash(sorted(snapshot, key=lambda item: str(item.get("document_id"))))
-        qdrant_hash, point_count = await self._qdrant_fingerprint(generation.collections or {})
+        qdrant_hash, point_count = (
+            await self._qdrant_fingerprint(generation.collections or {})
+            if measure_qdrant else (None, None)
+        )
         return GenerationEvidenceFingerprint(
             app_git_commit=app_git_commit(),
             strategy_fingerprint=strategy_hash,

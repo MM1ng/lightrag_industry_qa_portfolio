@@ -12,6 +12,7 @@ const router = createRouter({
     { path: '/admin/documents', component: () => import('../views/admin/DocumentsView.vue'), meta: { requiresAdmin: true } },
     { path: '/admin/jobs', component: () => import('../views/admin/JobsView.vue'), meta: { requiresAdmin: true } },
     { path: '/admin/generations', component: () => import('../views/admin/GenerationsView.vue'), meta: { requiresAdmin: true } },
+    { path: '/admin/evaluation', component: () => import('../views/admin/EvaluationView.vue'), meta: { requiresAdmin: true } },
   ],
 })
 

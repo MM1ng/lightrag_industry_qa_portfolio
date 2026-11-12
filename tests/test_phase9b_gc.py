@@ -14,6 +14,8 @@ from industrial_rag.db.models import (
     VectorIndexGeneration,
     VectorIndexGenerationStatus,
 )
+from industrial_rag.parser_models import ChildChunk
+from industrial_rag.services.generation_artifacts import freeze_generation_child_chunks
 from industrial_rag.services.generation_gc_service import GenerationGCService
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -64,12 +66,38 @@ async def gc_state(tmp_path, monkeypatch):
     )}
     now = datetime.now(UTC)
     workspaces = {}
+    manifest_hashes = {}
+    for name, generation_id in ids.items():
+        workspace = data_root / kb_id / "qdrant" / "generations" / name / "workspace"
+        workspace.mkdir(parents=True)
+        (workspace / "evidence.json").write_text(name, encoding="utf-8")
+        workspaces[name] = workspace
+        document = SimpleNamespace(
+            id=f"{name}-document",
+            version=1,
+            file_hash=f"{name}-hash",
+            original_file_name=f"{name}.pdf",
+        )
+        manifest = freeze_generation_child_chunks(
+            workspace,
+            generation_id=f"g{name}00000000",
+            document_children=[
+                (
+                    document,
+                    ChildChunk(
+                        chunk_id=f"{name}-chunk",
+                        parent_chunk_id=f"{name}-parent",
+                        document_id=document.id,
+                        document_name=document.original_file_name,
+                        page_start=1,
+                        page_end=1,
+                        content=name,
+                    ),
+                )
+            ],
+        )
+        manifest_hashes[name] = manifest.child_manifest_hash
     async with factory() as session:
-        for name in ids:
-            workspace = data_root / kb_id / "qdrant" / "generations" / name / "workspace"
-            workspace.mkdir(parents=True)
-            (workspace / "evidence.json").write_text(name, encoding="utf-8")
-            workspaces[name] = workspace
         session.add(
             KnowledgeBase(
                 id=kb_id,
@@ -101,7 +129,7 @@ async def gc_state(tmp_path, monkeypatch):
                     workspace_path=str(workspaces[name]),
                     collections={"chunks": f"exact_{name}_chunks"},
                     document_manifest_hash="1" * 64,
-                    child_chunks_manifest_hash="2" * 64,
+                    child_chunks_manifest_hash=manifest_hashes[name],
                     embedding_config_hash="3" * 64,
                     chunking_config_hash="4" * 64,
                     audit_frozen=name == "audit",

@@ -5,13 +5,13 @@
   "metric_definition": {
     "definition_version": "phase10b3d-metric-policy-v1",
     "source_path": "evaluation/phase10b3d/metric_policy.json",
-    "source_sha256": "8850674f37430afece9088b53e9f1eaa874b831d341db04bc42e648b55bcd03d"
+    "source_sha256": "f25732664b636a26e66b5d641d4a824e9a3bf86e110fa4cbe7967725f55767b1"
   },
   "input_evidence": {
     "j0_results_path": "evaluation/phase10b3j_r1/j0_development_results.jsonl",
-    "j0_results_sha256": "9de46793cf441eb3c02306e16a50758e0acb763065b678c80f208fbc8ecddb32",
+    "j0_results_sha256": "577c22aac364577a7b1b69aed38078ed58f8b9c331f31d247728ba6df26b67e2",
     "r2_reference_path": "evaluation/phase10b3i_r2/i0_development_metrics.json",
-    "r2_reference_sha256": "01dea62ec1a9bc40bc940993359bdfa37d193dcbbe661cfe42bb77b950e35d7e",
+    "r2_reference_sha256": "0ec28280dcd5a1f10e27058806bab8431bf536ad33dba5fffdaf0c5bdc20f208",
     "golden_set_read": false,
     "development_golden_sidecar_read": true,
     "j0_embedded_development_expectations_read": true,
@@ -28,7 +28,7 @@
   "quality_metrics": {
     "method": "J0 captured claims/citations/grounding audit plus immutable development evidence sidecar",
     "sidecar_path": "evaluation/phase10b3c/golden_evidence_mapping_g10b3c20260803.json",
-    "sidecar_sha256": "8a20cb57b1ca16e121d7f7cc99b7e98820fb06bfda23c4389ee2ae5df83b5427",
+    "sidecar_sha256": "da8505fba2697346e42474da2d4ccf5296cb296b2bafa6788779020a7e036da4",
     "sidecar_development_record_count": 39,
     "j0_matrix_inputs": {
       "grounding_removal_matrix_record_count": 36,

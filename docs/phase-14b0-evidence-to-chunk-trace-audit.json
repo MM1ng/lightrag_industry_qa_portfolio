@@ -1,0 +1,909 @@
+{
+  "phase": "14B-0",
+  "status": "TRACE_INCOMPLETE",
+  "final_decision": "TRACE_INCOMPLETE",
+  "read_only": true,
+  "models_called": 0,
+  "retrieval_rerun": false,
+  "rerank_rerun": false,
+  "embedding_rerun": false,
+  "experiment_identity": {
+    "audit_commit": "d8f5ca59bf6b2ff5c503508b798285f3a829b227",
+    "generation_id": "dev-v2-20260902",
+    "dataset_fingerprint": "deac5832de37a95f933267aba10e40215582f1136cd6a60dfabf2d9784385060",
+    "chunk_fingerprint": "b1a6334f6e725591e5d796f318e76d3eb77c46fa8c8cc3f6342dc850ad77d1e0",
+    "parent_chunk_fingerprint": "4a576db34d65ae270efdc5ca3694c8a32f5a7f1bb5e3416f1ee27d93ab9b5bb1",
+    "pdf_fingerprint": "ed7bf1da6aab63a7afcf88c21480c6e987d231b9de65de2dd0977ce4b4e60e68",
+    "parsed_document_fingerprint": "7139ac3f67f5c1d502a47c247866fd449cf8d782a593f791f21f9cc59284fc2d",
+    "embedding_snapshot_fingerprint": "744553a7f8c9ae7cf74ba7576b3839d2a73bd5871a4607f9a5f178c1e697b670",
+    "bm25_fingerprint": "6a1fd370918362422d7539f60265cf3992e06f1f9ddd5c69d9e8545c3d7f1c13",
+    "qdrant_collection_identity": "not_applicable:nano_local_vdb_chunks",
+    "drift": {}
+  },
+  "historical_missing_evidence_total": 21,
+  "historical_missing_question_ids": [
+    "S014",
+    "S015",
+    "S006",
+    "S003",
+    "S016",
+    "S011"
+  ],
+  "evidence_funnel": {
+    "parsed": {
+      "known_hit": 21,
+      "unavailable": 0
+    },
+    "chunk": {
+      "known_hit": 21,
+      "unavailable": 0
+    },
+    "embedding": {
+      "known_hit": 21,
+      "unavailable": 0
+    },
+    "bm25": {
+      "known_hit": 21,
+      "unavailable": 0
+    },
+    "retrieval": {
+      "known_hit": 0,
+      "unavailable": 21
+    },
+    "fusion": {
+      "known_hit": 0,
+      "unavailable": 21
+    },
+    "rerank": {
+      "known_hit": 0,
+      "unavailable": 21
+    },
+    "final_top10": {
+      "known_hit": 0,
+      "unavailable": 0
+    },
+    "final_top5": {
+      "known_hit": 0,
+      "unavailable": 0
+    }
+  },
+  "root_cause_distribution": {
+    "UNRESOLVED": 21,
+    "PARSING_LOSS": 0,
+    "CHUNK_GENERATION_LOSS": 0,
+    "INDEX_MISSING": 0,
+    "CANDIDATE_RECALL_FAILURE": 0,
+    "FUSION_LOSS": 0,
+    "RERANKER_LOSS": 0,
+    "TOPK_SELECTION_LOSS": 0
+  },
+  "question_analysis": {
+    "S014": {
+      "gold_count": 1,
+      "parsed_hits": 1,
+      "chunk_hits": 1,
+      "embedding_hits": 1,
+      "bm25_hits": 1,
+      "final_top10_hits": 0,
+      "final_top5_hits": 0,
+      "first_failure_point": "canonical_a2_retrieval_trace_unavailable",
+      "primary_root_cause": "UNRESOLVED",
+      "secondary_causes": [],
+      "evidence_ids": [
+        "cchunk-pymupdf-v1-93807a18f7b7345f-000"
+      ]
+    },
+    "S015": {
+      "gold_count": 3,
+      "parsed_hits": 3,
+      "chunk_hits": 3,
+      "embedding_hits": 3,
+      "bm25_hits": 3,
+      "final_top10_hits": 0,
+      "final_top5_hits": 0,
+      "first_failure_point": "canonical_a2_retrieval_trace_unavailable",
+      "primary_root_cause": "UNRESOLVED",
+      "secondary_causes": [],
+      "evidence_ids": [
+        "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+        "cchunk-pymupdf-v1-5989850607a8046c-000",
+        "cchunk-pymupdf-v1-78a156ed97cebd53-000"
+      ]
+    },
+    "S006": {
+      "gold_count": 3,
+      "parsed_hits": 3,
+      "chunk_hits": 3,
+      "embedding_hits": 3,
+      "bm25_hits": 3,
+      "final_top10_hits": 0,
+      "final_top5_hits": 0,
+      "first_failure_point": "canonical_a2_retrieval_trace_unavailable",
+      "primary_root_cause": "UNRESOLVED",
+      "secondary_causes": [],
+      "evidence_ids": [
+        "cchunk-pymupdf-v1-5388c52812f37351-000",
+        "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+        "cchunk-pymupdf-v1-d8638f275d20c6d6-000"
+      ]
+    },
+    "S003": {
+      "gold_count": 4,
+      "parsed_hits": 4,
+      "chunk_hits": 4,
+      "embedding_hits": 4,
+      "bm25_hits": 4,
+      "final_top10_hits": 0,
+      "final_top5_hits": 0,
+      "first_failure_point": "canonical_a2_retrieval_trace_unavailable",
+      "primary_root_cause": "UNRESOLVED",
+      "secondary_causes": [],
+      "evidence_ids": [
+        "cchunk-pymupdf-v1-6590f00e21e280d0-000",
+        "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+        "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+        "cchunk-pymupdf-v1-663e640852497df6-000"
+      ]
+    },
+    "S016": {
+      "gold_count": 4,
+      "parsed_hits": 4,
+      "chunk_hits": 4,
+      "embedding_hits": 4,
+      "bm25_hits": 4,
+      "final_top10_hits": 0,
+      "final_top5_hits": 0,
+      "first_failure_point": "canonical_a2_retrieval_trace_unavailable",
+      "primary_root_cause": "UNRESOLVED",
+      "secondary_causes": [],
+      "evidence_ids": [
+        "cchunk-pymupdf-v1-99121c418e138c64-000",
+        "cchunk-pymupdf-v1-317e33cc54ca5b18-000",
+        "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+        "cchunk-pymupdf-v1-16686d3e3ddcc21b-000"
+      ]
+    },
+    "S011": {
+      "gold_count": 6,
+      "parsed_hits": 6,
+      "chunk_hits": 6,
+      "embedding_hits": 6,
+      "bm25_hits": 6,
+      "final_top10_hits": 0,
+      "final_top5_hits": 0,
+      "first_failure_point": "canonical_a2_retrieval_trace_unavailable",
+      "primary_root_cause": "UNRESOLVED",
+      "secondary_causes": [],
+      "evidence_ids": [
+        "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+        "cchunk-pymupdf-v1-bf2be6315d2f187b-000",
+        "cchunk-pymupdf-v1-ac2c48838803419d-000",
+        "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+        "cchunk-pymupdf-v1-91e5666cf6078fb9-000",
+        "cchunk-pymupdf-v1-93807a18f7b7345f-000"
+      ]
+    }
+  },
+  "evidence_lineage": [
+    {
+      "question_id": "S014",
+      "gold_evidence_id": "cchunk-pymupdf-v1-93807a18f7b7345f-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 54,
+      "gold_text_hash": "5b27139002dd7346966a6633c593bd3d66f46cc31ce44f28270fcaa656e777fe",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p54-c1-3001930c0d-p0"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p54-54-g279-安装、操作及维护手册-5b27139002dd"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-93807a18f7b7345f-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S015",
+      "gold_evidence_id": "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 23,
+      "gold_text_hash": "0f44c075b8e8cf03c610a173ad720ea162c975fa772bb3d788c0a6215b6a01d0",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p23-c1-ab3dea34f3-p1"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p23-23-g93-安装、操作及维护手册-0f44c075b8e8"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-34cc49bd2766d02e-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S015",
+      "gold_evidence_id": "cchunk-pymupdf-v1-5989850607a8046c-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 23,
+      "gold_text_hash": "e5d98dd4ce05db2b55719fa2c9e0deffa7ce662112ab5900e50ec933324f7c11",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p23-c1-ab3dea34f3-p2"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p23-23-g94-安装、操作及维护手册-e5d98dd4ce05"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-5989850607a8046c-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S015",
+      "gold_evidence_id": "cchunk-pymupdf-v1-78a156ed97cebd53-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 23,
+      "gold_text_hash": "214f91586a2baa826e1a6ef83c8dcf2a4080a8780d9563ff35f1007c62673113",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p23-c1-ab3dea34f3-p10"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p23-23-g97-安装、操作及维护手册-214f91586a2b"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-78a156ed97cebd53-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S006",
+      "gold_evidence_id": "cchunk-pymupdf-v1-5388c52812f37351-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 14,
+      "gold_text_hash": "792db877da024a0d3ad0e7fd52f4585970cc86113222ba3aa474160a2ba5bbb2",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p14-c1-44bb480c09-p1"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p14-14-g51-安装、操作及维护手册-792db877da02"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-5388c52812f37351-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S006",
+      "gold_evidence_id": "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 14,
+      "gold_text_hash": "4ac52828a19571d64cb863e4dbf7c66a9979b2266be0618b15d51f7d2f66cbaa",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p14-c1-44bb480c09-p13"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p14-14-g54-安装、操作及维护手册-5e8b5807c2d6"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-a03be0b31badfb6b-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S006",
+      "gold_evidence_id": "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 14,
+      "gold_text_hash": "124a110c8a4bcc37521a43f7bf15fe6c9b9d26ea14c6038ccd98b12e964a9d60",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p14-c1-44bb480c09-p4"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p14-14-g52-安装、操作及维护手册-f94cf5859772"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-d8638f275d20c6d6-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S003",
+      "gold_evidence_id": "cchunk-pymupdf-v1-6590f00e21e280d0-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 10,
+      "gold_text_hash": "b2dbcf02206bc48248d58e38ab14b9ed472b910a1d7555edae647fe760c223b4",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p10-c1-83a4f22b28-p1"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p10-10-g29-安装、操作及维护手册-b2dbcf02206b"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-6590f00e21e280d0-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S003",
+      "gold_evidence_id": "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 10,
+      "gold_text_hash": "593d521a5b21666844f7438c3e9e366c94c770986244711221dc1d4d38f6042b",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p10-c1-83a4f22b28-p3"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p10-10-g30-安装、操作及维护手册-60f631632134"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S003",
+      "gold_evidence_id": "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 10,
+      "gold_text_hash": "29d18d16f6d5bdc93e82e30b1c26a68a849f986b43dff3066c548d1f8f77c945",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p10-c1-83a4f22b28-p5"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p10-10-g31-安装、操作及维护手册-2d890597ad4d"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-87557f88f4709fcc-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S003",
+      "gold_evidence_id": "cchunk-pymupdf-v1-663e640852497df6-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 10,
+      "gold_text_hash": "97133bcb326185eda0e062ec9bb45e953d4d913003259c7bc4a0154da1b05683",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p10-c1-83a4f22b28-p9"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p10-10-g32-安装、操作及维护手册-47226b1f749b"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-663e640852497df6-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S016",
+      "gold_evidence_id": "cchunk-pymupdf-v1-99121c418e138c64-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 24,
+      "gold_text_hash": "2042828e240df955869841a22dab39df8080845885d140e16fbc4f196bd8e143",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p24-c1-0e01b780ef-p9"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p24-24-g102-安装、操作及维护手册-ce631c176fb5"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-99121c418e138c64-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S016",
+      "gold_evidence_id": "cchunk-pymupdf-v1-317e33cc54ca5b18-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 24,
+      "gold_text_hash": "ae87a0057a631f7261f4f406f1a693cad1bdcfece3fc4fc2c611fcedef5c4523",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p24-c1-0e01b780ef-p10"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p24-24-g103-安装、操作及维护手册-ae87a0057a63"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-317e33cc54ca5b18-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S016",
+      "gold_evidence_id": "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 24,
+      "gold_text_hash": "67b6e4b74633e72b059c5673ea39f407805b7249618909b5bceadbb3ce3d17c3",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p24-c1-0e01b780ef-p3"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p24-24-g101-安装、操作及维护手册-67b6e4b74633"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-f997c995a333b4ae-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S016",
+      "gold_evidence_id": "cchunk-pymupdf-v1-16686d3e3ddcc21b-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 24,
+      "gold_text_hash": "e05e769c5e5d48bedb4a96586dfe3b498a10c3aa97f874ca81b69a6729b994d4",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p24-c1-0e01b780ef-p2"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p24-24-g100-安装、操作及维护手册-e05e769c5e5d"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-16686d3e3ddcc21b-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 17,
+      "gold_text_hash": "caa51173922ee20278c86d75402608c8a7fd443b7189bfd37fb385ae13e3b50f",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p17-c1-ccbbfadbcf-p6"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p17-17-g75-安装、操作及维护手册-9776f1f8dc59"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-bf2be6315d2f187b-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 17,
+      "gold_text_hash": "f237dc8516fe98160a02d5815a7e7550a9b7e970baa96437f9838ede42fe59b8",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p17-c1-ccbbfadbcf-p20"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p17-17-g78-安装、操作及维护手册-f237dc8516fe"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-bf2be6315d2f187b-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-ac2c48838803419d-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 17,
+      "gold_text_hash": "190818c16588665694b152a9690c5d05022a3ec6fa3f965e18621ffd58f7d94d",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p17-c1-ccbbfadbcf-p16"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p17-17-g77-安装、操作及维护手册-dd11989cbb07"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-ac2c48838803419d-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 17,
+      "gold_text_hash": "e0adf13058034bf1909cf8c8f15c977f737f2aca376f246435c25bdb89a37874",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p17-c1-ccbbfadbcf-p10"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p17-17-g76-安装、操作及维护手册-e0adf1305803"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-91e5666cf6078fb9-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 18,
+      "gold_text_hash": "71ac1be2d43e335189e4d3bb64ab8cfc295efc941118b08c7f8541adcf270948",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p18-c1-767a46d97c-p3"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p18-18-g81-安装、操作及维护手册-c667c6669da3"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-91e5666cf6078fb9-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-93807a18f7b7345f-000",
+      "document_id": "doc-4ffb6df91a9a",
+      "page": 54,
+      "gold_text_hash": "5b27139002dd7346966a6633c593bd3d66f46cc31ce44f28270fcaa656e777fe",
+      "parsed_block_ids": [
+        "2196-ansi-manual-chinese-p54-c1-3001930c0d-p0"
+      ],
+      "parsed_match": "FULL",
+      "parent_chunk_ids": [
+        "pchunk-pymupdf-v1-doc-4ffb6df9-p54-54-g279-安装、操作及维护手册-5b27139002dd"
+      ],
+      "child_chunk_ids": [
+        "cchunk-pymupdf-v1-93807a18f7b7345f-000"
+      ],
+      "chunk_match": "FULL",
+      "embedding_exists": true,
+      "bm25_exists": true,
+      "retrieval_hit": "unavailable",
+      "retrieval_rank": null,
+      "fusion_hit": "unavailable",
+      "fusion_rank": null,
+      "rerank_hit": "unavailable",
+      "rerank_rank": null,
+      "final_top10": false,
+      "final_top5": false,
+      "trace_availability": {
+        "canonical_a2_raw_retrieval": "unavailable",
+        "canonical_a2_fusion_top20": "unavailable",
+        "canonical_a2_rerank_output": "final_top10_only"
+      },
+      "primary_root_cause": "UNRESOLVED"
+    }
+  ],
+  "trace_sources": {
+    "historical_missing_denominator": "phase13b_multi_query_ablation_2026-09-03.json:phase13a_six_miss_recovery",
+    "canonical_final_a2": "formal_development_effectiveness_2026-09-03.json",
+    "parser_lineage": "docs/phase-14a-pymupdf-vs-mineru-parser-ab.json",
+    "frozen_generation": "dev_generation_v2"
+  }
+}

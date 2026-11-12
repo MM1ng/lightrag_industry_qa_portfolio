@@ -120,6 +120,7 @@ class RetrievalTraceResponse(BaseModel):
     grounding_removed_answer_points: list[str] = Field(default_factory=list)
     grounding_removal_reasons: list[dict[str, Any]] = Field(default_factory=list)
     grounding_false_negative_diagnostics: list[dict[str, Any]] = Field(default_factory=list)
+    unsupported_assertion_audit: list[dict[str, Any]] = Field(default_factory=list)
     generated_answer_points: list[str] = Field(default_factory=list)
     rejected_answer_points: list[str] = Field(default_factory=list)
     support_validation_reason_codes: list[str] = Field(default_factory=list)

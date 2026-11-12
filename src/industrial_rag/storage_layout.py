@@ -57,6 +57,38 @@ def kb_qdrant_generation_workspace(kb_id: str, generation: str) -> Path:
     return kb_qdrant_generations_dir(kb_id) / generation / "workspace"
 
 
+def is_valid_generation_workspace(path: Path | str) -> bool:
+    """Return whether a directory is a real, usable generation workspace.
+
+    A bare ``is_dir()`` check is not enough: on Linux a Windows path such as
+    ``D:\\ira_demo_data\\...`` is a *single legal directory name*, and LightRAG
+    will happily create that stray directory under /app on first use. Requiring
+    the frozen retrieval manifest prevents such a placeholder from being taken
+    for the real workspace after the data has been moved or mounted elsewhere.
+    """
+
+    candidate = Path(path)
+    return (candidate / "retrieval" / "chunk_manifest.json").is_file()
+
+
+def resolve_generation_workspace(stored: Path | str, *, kb_id: str, generation: str) -> Path:
+    """Return the generation workspace that exists on *this* host.
+
+    ``vector_index_generations.workspace_path`` records an absolute path captured
+    when the generation was built. Moving the data (or running inside a container
+    where the host path is not mounted) leaves that path dangling, and the query
+    path then fails with ``generation_invalid_state``. When the stored path is
+    not a *valid* workspace (see ``is_valid_generation_workspace``), rebuild it
+    from ``KB_DATA_ROOT`` + kb_id + generation.
+    """
+
+    candidate = Path(stored)
+    if is_valid_generation_workspace(candidate):
+        return candidate
+    derived = kb_qdrant_generation_workspace(kb_id, generation)
+    return derived if is_valid_generation_workspace(derived) else candidate
+
+
 def kb_uploads_dir(kb_id: str) -> Path:
     return kb_base_dir(kb_id) / "uploads"
 
@@ -67,6 +99,24 @@ def kb_parsed_dir(kb_id: str) -> Path:
 
 def kb_parsed_documents_dir(kb_id: str) -> Path:
     return kb_parsed_dir(kb_id) / "documents"
+
+
+def kb_parsed_attempt_staging_dir(
+    kb_id: str, job_id: str, attempt: int, document_id: str
+) -> Path:
+    """Return the immutable writer directory for one claimed parse attempt.
+
+    ``current`` remains a legacy parser compatibility location.  Runtime-owned
+    candidate builds must use this path and record it in their checkpoint.
+    """
+    _validate_kb_id(kb_id)
+    if not re.fullmatch(r"[a-f0-9]{8,64}", job_id):
+        raise ValueError(f"Invalid update job id: {job_id!r}")
+    if attempt < 1:
+        raise ValueError("attempt must be positive")
+    if not re.fullmatch(r"[a-f0-9]{8,64}", document_id):
+        raise ValueError(f"Invalid document id: {document_id!r}")
+    return kb_parsed_dir(kb_id) / "attempts" / job_id / str(attempt) / document_id / "staging"
 
 
 def kb_parent_chunks_dir(kb_id: str) -> Path:

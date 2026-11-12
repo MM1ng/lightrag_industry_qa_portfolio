@@ -9,7 +9,9 @@ import type {
   KnowledgeBase,
   KnowledgeBaseDetail,
   QueryResult,
+  TranscriptionResult,
   UpdateJob,
+  EvaluationDashboard,
 } from '../types/api'
 
 export class ApiClientError extends Error {
@@ -27,6 +29,17 @@ export class ApiClientError extends Error {
 }
 
 type TokenProvider = () => string | null
+
+export type QueryStreamHandlers = {
+  onStage?: (stage: string) => void
+  onDelta?: (text: string) => void
+}
+
+type QueryStreamEvent =
+  | { type: 'stage'; stage: string }
+  | { type: 'delta'; text: string }
+  | { type: 'final'; payload: unknown }
+  | { type: 'error'; code: string; message: string }
 
 export class ApiClient {
   constructor(
@@ -51,8 +64,154 @@ export class ApiClient {
     return projectPublicQueryResult(result)
   }
 
+  /**
+   * Same query as `queryKnowledgeBase`, delivered as server-sent events.
+   *
+   * `onDelta` receives an unvalidated preview of the answer. The returned
+   * result is the validated payload from the terminal `final` event and must
+   * replace whatever the preview showed.
+   */
+  async queryKnowledgeBaseStream(
+    kbId: string,
+    question: string,
+    history: ChatHistoryItem[],
+    handlers: QueryStreamHandlers = {},
+  ): Promise<QueryResult> {
+    const headers = new Headers({ Accept: 'text/event-stream', 'Content-Type': 'application/json' })
+    const token = this.tokenProvider()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+
+    let response: Response
+    try {
+      response = await fetch(`${this.baseUrl}/v1/knowledge-bases/${encodeURIComponent(kbId)}/query/stream`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ query: question, history }),
+      })
+    } catch {
+      throw new ApiClientError({ code: 'network_error', message: '服务暂时不可达，请检查服务状态后重试。', retryable: true }, 0)
+    }
+
+    if (!response.ok || !response.body) {
+      throw await this.streamError(response)
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let finalPayload: unknown
+
+    try {
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let boundary = buffer.indexOf('\n\n')
+        while (boundary >= 0) {
+          const frame = buffer.slice(0, boundary)
+          buffer = buffer.slice(boundary + 2)
+          const dataLine = frame.split('\n').find((line) => line.startsWith('data: '))
+          if (dataLine) {
+            const event = JSON.parse(dataLine.slice(6)) as QueryStreamEvent
+            if (event.type === 'delta') handlers.onDelta?.(event.text)
+            else if (event.type === 'stage') handlers.onStage?.(event.stage)
+            else if (event.type === 'final') finalPayload = event.payload
+            else if (event.type === 'error') {
+              throw new ApiClientError({ code: event.code, message: event.message, retryable: true }, response.status)
+            }
+          }
+          boundary = buffer.indexOf('\n\n')
+        }
+      }
+    } finally {
+      reader.cancel().catch(() => undefined)
+    }
+
+    if (finalPayload === undefined) {
+      throw new ApiClientError({ code: 'stream_incomplete', message: '回答没有完成，请重试。', retryable: true }, 0)
+    }
+    const failure = (finalPayload as { error?: ApiErrorShape }).error
+    if (failure) throw new ApiClientError(failure, 200)
+    return projectPublicQueryResult(finalPayload as QueryResult)
+  }
+
+  private async streamError(response: Response): Promise<ApiClientError> {
+    let error: Partial<ApiErrorShape> = {}
+    try {
+      const body = await response.json() as { code?: string; message?: string; detail?: { code?: string; message?: string } }
+      error = body.detail ?? body
+    } catch {
+      // Never surface raw backend text in the UI.
+    }
+    return new ApiClientError({
+      code: error.code || `http_${response.status}`,
+      message: error.message || (response.status >= 500 ? '服务暂时不可用，请稍后重试。' : '请求未获授权或无法完成。'),
+      retryable: response.status === 408 || response.status === 429 || response.status >= 500,
+    }, response.status)
+  }
+
   async submitFeedback(input: FeedbackInput): Promise<void> {
     await this.request('/v1/feedback', { method: 'POST', body: JSON.stringify(input) })
+  }
+
+  /**
+   * Send one recorded clip for transcription.
+   *
+   * The returned text is meant to be placed in the input box for the user to
+   * review, not submitted automatically: misheard industrial terms are costly.
+   */
+  async transcribeAudio(audio: Blob, durationMs: number): Promise<TranscriptionResult> {
+    const form = new FormData()
+    const ext = audio.type.includes('webm') ? 'webm' : 'wav'
+    form.append('file', audio, `recording.${ext}`)
+    form.append('duration_ms', String(Math.round(durationMs)))
+
+    const headers = new Headers()
+    const token = this.tokenProvider()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+
+    const response = await fetch(`${this.baseUrl}/v1/voice/transcribe`, {
+      method: 'POST',
+      headers,
+      body: form,
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as { code?: string; message?: string }
+      throw new ApiClientError(
+        {
+          code: body.code ?? 'voice_failed',
+          message: body.message ?? '语音识别失败，请重试。',
+          retryable: response.status >= 500 || response.status === 429,
+        },
+        response.status,
+      )
+    }
+    return (await response.json()) as TranscriptionResult
+  }
+
+  /** Synthesize spoken audio for one answer and return the audio blob. */
+  async synthesizeSpeech(text: string): Promise<Blob> {
+    const headers = new Headers({ 'Content-Type': 'application/json' })
+    const token = this.tokenProvider()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+
+    const response = await fetch(`${this.baseUrl}/v1/voice/speak`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ text }),
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as { code?: string; message?: string }
+      throw new ApiClientError(
+        {
+          code: body.code ?? 'speech_failed',
+          message: body.message ?? '语音合成失败，请稍后重试。',
+          retryable: response.status >= 500 || response.status === 429,
+        },
+        response.status,
+      )
+    }
+    return await response.blob()
   }
 
   async verifyAdminAccess(): Promise<void> {
@@ -115,12 +274,20 @@ export class ApiClient {
   async rollbackGeneration(kbId: string, generationId: string): Promise<unknown> { return this.request(`/v1/knowledge-bases/${encodeURIComponent(kbId)}/generations/${encodeURIComponent(generationId)}/rollback`, { method: 'POST' }) }
   async diffGeneration(kbId: string, generationId: string): Promise<unknown> { return this.request(`/v1/knowledge-bases/${encodeURIComponent(kbId)}/generations/${encodeURIComponent(generationId)}/diff`) }
 
-  async getGraphOverview(limit = 50): Promise<GraphPayload> {
-    return this.request<GraphPayload>(`/v1/graph/overview?limit=${limit}`)
+  async getEvaluationDashboard(kbId: string, generationId?: string, compareGenerationId?: string): Promise<EvaluationDashboard> {
+    const params = new URLSearchParams()
+    if (generationId) params.set('generation_id', generationId)
+    if (compareGenerationId) params.set('compare_generation_id', compareGenerationId)
+    const suffix = params.toString() ? `?${params.toString()}` : ''
+    return this.request<EvaluationDashboard>(`/v1/admin/evaluation/knowledge-bases/${encodeURIComponent(kbId)}${suffix}`)
   }
 
-  async getGraphNeighborhood(query: string, hops: 1 | 2): Promise<GraphPayload> {
-    return this.request<GraphPayload>(`/v1/graph/neighborhood?query=${encodeURIComponent(query)}&hops=${hops}`)
+  async getGraphOverview(kbId: string, limit = 50): Promise<GraphPayload> {
+    return this.request<GraphPayload>(`/v1/knowledge-bases/${encodeURIComponent(kbId)}/graph/overview?limit=${limit}`)
+  }
+
+  async getGraphNeighborhood(kbId: string, query: string, hops: 1 | 2): Promise<GraphPayload> {
+    return this.request<GraphPayload>(`/v1/knowledge-bases/${encodeURIComponent(kbId)}/graph/neighborhood?query=${encodeURIComponent(query)}&hops=${hops}`)
   }
 
   async request<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {

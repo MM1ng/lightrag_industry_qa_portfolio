@@ -23,6 +23,19 @@ _NUMBER = re.compile(r"(?<![A-Za-z])[-+]?\d+(?:\.\d+)?(?:\s*(?:%|°C|℃|°F|°|
 _UNIT = re.compile(r"(?<![A-Za-z])(?:°C|℃|°F|mm|cm|m|kPa|MPa|bar|rpm|Hz|秒|分钟|小时|天|周|月|年|%)(?![A-Za-z])", re.I)
 _PROVENANCE = re.compile(r"[（(][^）)]*(?:依据|证据)来源：[^）)]*[）)]")
 _GENERIC = frozenset(["根据", "手册", "内容", "如下", "需要", "应当", "可以", "进行", "相关", "要求", "说明", "建议"])
+# Connective phrasing carries no verifiable fact.  A sentence such as
+# "2196 系列泵包括以下型号：STO、MTO、LTO、XLO 和 XLO-17" is fully supported by
+# a chunk listing those model names, but the 4-gram windows of "包括以下型号"
+# (列包/括以/包括以下型 …) dominate the token count and drag coverage to 0.28.
+# Dropping these fragments lets the gate weigh the factual terms instead.
+_CONNECTIVE_FRAGMENTS = frozenset(
+    [
+        "以下", "如下", "包括", "包含", "系列", "型号", "列包", "列包括",
+        "括以", "括以下", "括以下型", "下型", "下型号", "以下型", "以下型号",
+        "列包括以", "包括以", "包括以下", "包括以下型", "系列包", "系列包括",
+        "系包括", "包包括", "括起来", "其中", "以及", "还有", "等型",
+    ]
+)
 _MIN_CLAIM_TOKEN_COVERAGE = 0.8
 _REFUSAL_PREFIX = "手册中未检索到充分依据"
 _AUDIT_MAX_ANSWER_CHARS = 16_000
@@ -166,19 +179,79 @@ def classify_question_type(question: str) -> str:
 
 def _claim_tokens(text: str) -> set[str]:
     normalized, _ = _replace_aliases(text)
-    return {token for token in _tokens(_PROVENANCE.sub("", normalized)) if token not in _GENERIC}
+    return {
+        token
+        for token in _tokens(_PROVENANCE.sub("", normalized))
+        if token not in _GENERIC and token not in _CONNECTIVE_FRAGMENTS
+    }
+
+
+_NUMERIC_SPACING = re.compile(r"\s*([.,])\s*")
+# OCR drops the leading zero in values below one: the manual prints ". 012".
+_LEADING_ZERO = re.compile(r"(?<![\d])\.(\d)")
+
+
+def _normalize_numeric_spacing(text: str) -> str:
+    """Normalise OCR numeric artefacts so equivalent values compare equal.
+
+    The manuals are OCR-derived and print values as ``. 012 (. 30)`` — decimal
+    point separated from its digits, and no leading zero. A model correctly
+    answering "0.012 (0.30)" was rejected by the numeric gate while the
+    idiosyncratic ".012 (.30)" form passed. Normalising both sides removes the
+    artefact instead of rewarding it.
+    """
+
+    collapsed = _NUMERIC_SPACING.sub(r"\1", text.casefold()).replace(" ", "")
+    return _LEADING_ZERO.sub(r"0.\1", collapsed)
 
 
 def _has_numeric_support(claim: str, evidence: str) -> bool:
     numbers = _NUMBER.findall(_PROVENANCE.sub("", claim))
     if not numbers:
         return True
-    evidence_folded = evidence.casefold().replace(" ", "")
+    evidence_folded = _normalize_numeric_spacing(evidence)
     for number in numbers:
-        if number.casefold().replace(" ", "") not in evidence_folded:
+        if _normalize_numeric_spacing(number) not in evidence_folded:
             return False
     claim_has_unit = bool(_UNIT.search(claim))
     return not claim_has_unit or bool(_UNIT.search(evidence))
+
+
+# Identifiers that carry a specific, checkable claim: model/variant names, standard
+# numbers and any alphanumeric designator.  A high token-coverage score cannot see
+# these because they are short and rare, so they are verified separately.
+_IDENTIFIER = re.compile(r"[a-z0-9]+(?:[-_/.][a-z0-9]+)*")
+# Fragments produced by CJK n-gram slicing are not identifiers and must not be
+# treated as unverified claims.
+_IDENTIFIER_MIN_LEN = 2
+
+
+def _unverified_identifiers(claim: str, evidence: str) -> set[str]:
+    """Return identifiers asserted by the claim but absent from the evidence.
+
+    A claim such as ``对于直连结构（DNS标准结构），轴承温度不得超过电机允许值``
+    scores 0.90 token coverage against the evidence "对于直连结构轴承温度不得
+    超过电机允许值", so the coverage gate accepts it even though ``DNS`` is not in
+    the manual.  Binding an answer to a variant the source never mentions is a
+    fabricated qualifier, not a paraphrase, so those must be refused.
+    """
+
+    claim_text = _PROVENANCE.sub("", claim).casefold()
+    evidence_text = _PROVENANCE.sub("", evidence).casefold()
+    asserted = {
+        token
+        for token in _IDENTIFIER.findall(claim_text)
+        if len(token) >= _IDENTIFIER_MIN_LEN
+    }
+    if not asserted:
+        return set()
+    # Same OCR normalisation as the numeric gate: ". 012" must match "0.012".
+    evidence_folded = _normalize_numeric_spacing(evidence_text)
+    return {
+        token
+        for token in asserted
+        if _normalize_numeric_spacing(token) not in evidence_folded
+    }
 
 
 def _supports(claim: str, evidence: str) -> bool:
@@ -188,6 +261,8 @@ def _supports(claim: str, evidence: str) -> bool:
         return False
     token_coverage = len(claim_tokens & evidence_tokens) / len(claim_tokens)
     if token_coverage < _MIN_CLAIM_TOKEN_COVERAGE:
+        return False
+    if _unverified_identifiers(claim, evidence):
         return False
     return _has_numeric_support(claim, evidence)
 

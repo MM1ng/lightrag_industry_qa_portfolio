@@ -1,0 +1,66 @@
+{
+  "report_type": "ragas_development_summary",
+  "source_artifacts": [
+    "evaluation\\phase10\\conversation_e2e_semantic_scores_development.jsonl",
+    "evaluation\\phase10\\ragas_migration_development_report.json",
+    "evaluation\\phase10\\conversation_e2e_ragas_development_report.json"
+  ],
+  "ragas_version": "0.3.9",
+  "judge_model": "qwen-plus-2025-07-28",
+  "judge_metrics": [
+    "Faithfulness",
+    "ResponseRelevancy"
+  ],
+  "case_count": 18,
+  "all_cases_available": true,
+  "semantic_metrics": {
+    "baseline": {
+      "faithfulness": {
+        "n": 18,
+        "mean": 0.9402,
+        "min": 0.5,
+        "max": 1.0
+      },
+      "response_relevancy": {
+        "n": 18,
+        "mean": 0.5676,
+        "min": 0.0,
+        "max": 0.8248
+      }
+    },
+    "candidate": {
+      "faithfulness": {
+        "n": 18,
+        "mean": 0.9215,
+        "min": 0.6,
+        "max": 1.0
+      },
+      "response_relevancy": {
+        "n": 18,
+        "mean": 0.7322,
+        "min": 0.0,
+        "max": 0.9923
+      }
+    }
+  },
+  "retrieval_metrics_after": {
+    "hit_recall_at_5": 0.9444444444444444,
+    "evidence_recall_at_5": 0.9444444444444444,
+    "mrr_at_5": 0.7592592592592593,
+    "hit_recall_at_10": 1.0,
+    "evidence_recall_at_10": 1.0,
+    "mrr_at_10": 0.7662037037037037
+  },
+  "migration_status": "MIGRATION_PASS",
+  "migration_parity_passed": true,
+  "e2e_gate_status": "R3_MIXED",
+  "e2e_gate_reasons": [
+    "supporting_recall_unavailable",
+    "question_level_citation_accuracy_unavailable",
+    "expected_answer_coverage_unavailable",
+    "faithfulness_regressed"
+  ],
+  "no_llm_semantic_metrics": true,
+  "validation_holdout_accessed": false,
+  "note": "Aggregates are recomputed from persisted per-case rows; the LLM judge was NOT re-run because its model (qwen-plus-2025-07-28) is outside the current provider quota. This is a verification of existing development artifacts, not a fresh evaluation."
+}

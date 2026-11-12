@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+from collections import OrderedDict
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ import networkx as nx
 
 from industrial_rag.graph_display_mapping import (
     bilingual_entity_label,
+    is_inferred_type,
     map_entity_zh,
     map_type_zh,
 )
@@ -64,6 +66,52 @@ def load_graph(graphml_path: Path | str) -> nx.Graph:
     if not path.is_file():
         raise FileNotFoundError(f"GraphML 文件不存在: {path}")
     return nx.read_graphml(path)
+
+
+# Parsing the production GraphML (thousands of nodes) costs hundreds of
+# milliseconds, so the parsed graph is memoised per file fingerprint.  The
+# cache is bounded: only the newest ``_GRAPH_CACHE_MAX_ENTRIES`` generations are
+# kept, which is enough for the active generation plus a couple of switches.
+_GRAPH_CACHE_MAX_ENTRIES = 4
+_graph_cache: OrderedDict[str, nx.Graph] = OrderedDict()
+
+
+def graph_file_fingerprint(graphml_path: Path | str) -> str:
+    """Return a cheap identity token for a GraphML file.
+
+    The token changes whenever the file is rewritten (mtime or size), so a
+    rebuilt graph is never served from a stale cache entry.
+    """
+    path = Path(graphml_path)
+    stat = path.stat()
+    return f"{path.resolve()}|{stat.st_mtime_ns}|{stat.st_size}"
+
+
+def load_graph_cached(graphml_path: Path | str) -> nx.Graph:
+    """Parse a GraphML file at most once per ``(path, mtime, size)`` identity."""
+    path = Path(graphml_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"GraphML 文件不存在: {path}")
+    try:
+        key = graph_file_fingerprint(path)
+    except OSError as error:  # pragma: no cover - stat raced with a removal
+        raise FileNotFoundError(f"GraphML 文件不存在: {path}") from error
+
+    cached = _graph_cache.get(key)
+    if cached is not None:
+        _graph_cache.move_to_end(key)
+        return cached
+
+    graph = nx.read_graphml(path)
+    _graph_cache[key] = graph
+    while len(_graph_cache) > _GRAPH_CACHE_MAX_ENTRIES:
+        _graph_cache.popitem(last=False)
+    return graph
+
+
+def clear_graph_cache() -> None:
+    """Drop every memoised graph (used by tests and by generation switches)."""
+    _graph_cache.clear()
 
 
 def get_graph_statistics(graph: nx.Graph) -> dict[str, Any]:
@@ -231,8 +279,7 @@ def build_node_tooltip(node_id: str, attrs: Mapping[str, Any] | None = None) -> 
     name = get_node_display_name(node_id, data)
     bilingual = bilingual_entity_label(name)
     entity_type = get_node_type(data)
-    type_label = map_type_zh(entity_type)
-    type_display = f"{type_label} ({entity_type})" if type_label != entity_type else entity_type
+    type_display = _type_tooltip_value(entity_type)
     description = get_node_description(data)
 
     rows = [
@@ -244,6 +291,22 @@ def build_node_tooltip(node_id: str, attrs: Mapping[str, Any] | None = None) -> 
         rows.append(_tooltip_row("描述", description))
     rows.extend(format_provenance_lines(data))
     return "\n".join(rows)
+
+
+def _type_tooltip_value(entity_type: str) -> str:
+    """Human-readable type for tooltips.
+
+    Inferred display categories are marked as such and their internal
+    ``inferred:`` prefix is never shown; "UNKNOWN" is spelled out because no
+    extraction type is stored for it.
+    """
+
+    if is_inferred_type(entity_type):
+        return f"{map_type_zh(entity_type)}（展示层推断，非抽取结果）"
+    if (entity_type or "").strip().upper() == "UNKNOWN" or not (entity_type or "").strip():
+        return "未标注类型"
+    label = map_type_zh(entity_type)
+    return f"{label} ({entity_type})" if label != entity_type else entity_type
 
 
 def build_edge_tooltip(attrs: Mapping[str, Any] | None = None) -> str:
@@ -572,6 +635,100 @@ _NEIGHBOR_HIGHLIGHT_SCRIPT = """
         edges.update(edgeUpdates);
       }
       highlightActive = true;
+      if (typeof renderDetailPanel === "function") {
+        renderDetailPanel(selectedId);
+      }
+    });
+  })();
+</script>
+"""
+
+_DETAIL_PANEL_CSS = """
+<style type="text/css">
+  /* industrial-rag:detail-panel */
+  #ira-detail {
+    position: absolute; top: 12px; right: 12px; z-index: 5;
+    width: min(340px, 46vw); max-height: 62%; overflow: auto;
+    padding: 12px 14px; border: 1px solid #d5dbe6; border-radius: 10px;
+    background: rgba(255,255,255,.97); box-shadow: 0 6px 20px rgba(15,23,42,.12);
+    font: 12px/1.65 "Segoe UI", "Microsoft YaHei", sans-serif; color: #111827;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  #ira-detail[hidden] { display: none; }
+  #ira-detail .ira-detail-head {
+    display: flex; align-items: start; justify-content: space-between; gap: 8px;
+    margin-bottom: 6px; font-size: 13px; font-weight: 700;
+  }
+  #ira-detail .ira-detail-close {
+    flex: none; min-width: 22px; height: 22px; padding: 0 6px; cursor: pointer;
+    border: 1px solid #d5dbe6; border-radius: 6px; background: #fff;
+    color: #475569; font: 12px/1 "Segoe UI", sans-serif;
+  }
+</style>
+"""
+
+_DETAIL_PANEL_HTML = """
+<div id="ira-detail" hidden role="region" aria-live="polite" aria-label="节点描述"></div>
+"""
+
+_DETAIL_PANEL_SCRIPT = """
+<script type="text/javascript">
+  /* industrial-rag:detail-panel */
+  (function () {
+    if (typeof network === "undefined" || typeof nodes === "undefined") {
+      return;
+    }
+    var panel = document.getElementById("ira-detail");
+    if (!panel) {
+      return;
+    }
+    panel.hidden = true;
+
+    function closePanel() {
+      panel.hidden = true;
+    }
+
+    panel.addEventListener("click", function (event) {
+      if (event.target && event.target.className === "ira-detail-close") {
+        closePanel();
+      }
+    });
+
+    // The tooltip text already carries "名称/类型/描述/文件/页码/章节" rows.
+    function renderDetailPanel(nodeId) {
+      var node = null;
+      try {
+        node = nodes.get(nodeId);
+      } catch (e) {
+        node = null;
+      }
+      var raw = node && node.title ? String(node.title) : "";
+      panel.textContent = "";
+      var head = document.createElement("div");
+      head.className = "ira-detail-head";
+      var title = document.createElement("span");
+      title.textContent = node && node.label ? String(node.label).replace(/\\n/g, " ") : String(nodeId);
+      var close = document.createElement("button");
+      close.type = "button";
+      close.className = "ira-detail-close";
+      close.textContent = "关闭";
+      close.setAttribute("aria-label", "关闭节点描述");
+      head.appendChild(title);
+      head.appendChild(close);
+      panel.appendChild(head);
+
+      var body = document.createElement("div");
+      // textContent keeps this injection-safe: descriptions are model output.
+      body.textContent = raw || "该节点没有可展示的描述。";
+      panel.appendChild(body);
+      panel.hidden = false;
+    }
+
+    window.renderDetailPanel = renderDetailPanel;
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        closePanel();
+      }
     });
   })();
 </script>
@@ -724,15 +881,17 @@ def render_pyvis_html(
     if not isinstance(content, str) or not content.strip():
         raise RuntimeError("PyVis 生成了空 HTML")
 
-    body_scripts = _STABILIZE_SCRIPT + _NEIGHBOR_HIGHLIGHT_SCRIPT
+    body_scripts = (
+        _DETAIL_PANEL_HTML + _STABILIZE_SCRIPT + _NEIGHBOR_HIGHLIGHT_SCRIPT + _DETAIL_PANEL_SCRIPT
+    )
     if "</head>" in content:
-        content = content.replace("</head>", _TOOLTIP_CSS + "</head>")
+        content = content.replace("</head>", _TOOLTIP_CSS + _DETAIL_PANEL_CSS + "</head>")
         if "</body>" in content:
             content = content.replace("</body>", body_scripts + "</body>")
         else:
             content += body_scripts
     elif "</body>" in content:
-        content = content.replace("</body>", _TOOLTIP_CSS + body_scripts + "</body>")
+        content = content.replace("</body>", _TOOLTIP_CSS + _DETAIL_PANEL_CSS + body_scripts + "</body>")
     else:
-        content = _TOOLTIP_CSS + body_scripts + content
+        content = _TOOLTIP_CSS + _DETAIL_PANEL_CSS + body_scripts + content
     return content

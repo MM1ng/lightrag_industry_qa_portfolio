@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal, Protocol
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, StringConstraints
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
@@ -31,14 +33,24 @@ from industrial_rag.citation_formatter import (
 )
 from industrial_rag.citation_selection import select_runtime_citations
 from industrial_rag.claim_citation_pruning import prune_claim_citations
-from industrial_rag.config import Settings
+from industrial_rag.config import (
+    DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE,
+    DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE,
+    Settings,
+)
 from industrial_rag.db.session import close_db, get_session, init_db
 from industrial_rag.errors import AppError
 from industrial_rag.lightrag_service import INSUFFICIENT_EVIDENCE_MESSAGE, QueryResult
 from industrial_rag.operational_metrics import operational_metrics
+from industrial_rag.rate_limit import (
+    BUCKET_DEFAULT,
+    BUCKET_FEEDBACK,
+    AnonymousRateLimiter,
+)
 from industrial_rag.routers import (
     admin_diagnostics,
     documents,
+    evaluation,
     feedback,
     generation_gc,
     generations,
@@ -46,6 +58,7 @@ from industrial_rag.routers import (
     knowledge_bases,
     tasks,
     update_jobs,
+    voice,
 )
 from industrial_rag.runtime import LightRAGRuntime
 from industrial_rag.services.answer_feedback_service import (
@@ -160,6 +173,7 @@ _ERRORS: dict[str, tuple[int, str, bool]] = {
     "QUERY_REWRITE_AMBIGUOUS": (422, "当前问题存在多个可能的指代对象，请明确设备或对象后重试。", False),
     "QUERY_REWRITE_FAILED": (422, "当前问题依赖会话上下文，但无法安全改写，请补充明确的设备或对象。", False),
     "CITATION_AUDIT_WARNING": (200, "引用审计发现警告，请人工复核。", False),
+    "RATE_LIMITED": (429, "请求过于频繁，请稍后重试。", True),
     "INTERNAL_ERROR": (500, "系统内部错误，请稍后重试。", False),
 }
 
@@ -526,32 +540,408 @@ def _query_schema(history: list[dict[str, str]]) -> dict[str, object]:
     }
 
 
+_PUBLIC_EXACT_ROUTES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("GET", "/v1/knowledge-bases"),
+        ("POST", "/v1/feedback"),
+        # Speech endpoints are reachable anonymously like POST /query: the
+        # workbench carries no browser token. Abuse is bounded by BUCKET_VOICE
+        # rather than by credentials.
+        ("POST", "/v1/voice/transcribe"),
+        ("POST", "/v1/voice/speak"),
+    }
+)
+
+_PUBLIC_DOCUMENT_SOURCE_SUFFIXES: tuple[str, ...] = ("/source", "/source-file")
+
+_KB_ROUTE_PREFIX = "/v1/knowledge-bases/"
+# Graph reads are knowledge-base scoped: /v1/knowledge-bases/{kb_id}/graph/{leaf}
+_PUBLIC_GRAPH_LEAVES = frozenset({"overview", "neighborhood", "native"})
+
+# Reachable without credentials even when no API keys are configured, so that
+# container/platform health probes keep working in a fail-closed deployment.
+_HEALTH_PATHS: frozenset[str] = frozenset(
+    {"/readyz", "/healthz", "/ready", "/health", "/version"}
+)
+
+_INSECURE_LOCAL_DEV_FLAG = "IRA_DEV_INSECURE"
+_INSECURE_LOCAL_DEV_TRUE = frozenset({"1", "true", "yes", "on"})
+
+# Feedback writes get their own tighter budget on the anonymous surface.
+_FEEDBACK_PATH = "/v1/feedback"
+
+
+_PUBLIC_QUERY_LEAVES = frozenset({"query", "stream"})
+
+
+def _is_public_kb_query_path(path: str) -> bool:
+    """Match ``/v1/knowledge-bases/{kb_id}/query`` and its streaming sibling.
+
+    ``/query/stream`` is the SSE variant of the same read; both must stay on the
+    anonymous allowlist or the browser workbench cannot ask a question at all.
+    """
+
+    if not path.startswith(_KB_ROUTE_PREFIX):
+        return False
+    segments = [segment for segment in path[len(_KB_ROUTE_PREFIX) :].split("/") if segment]
+    if len(segments) == 2:
+        return segments[1] == "query"
+    return len(segments) == 3 and segments[1] == "query" and segments[2] in _PUBLIC_QUERY_LEAVES
+
+
+def _is_public_kb_graph_path(path: str) -> bool:
+    """Match exactly ``/v1/knowledge-bases/{kb_id}/graph/{leaf}``.
+
+    Graph reads used to live at ``/v1/graph/*`` and resolved their workspace from
+    process settings, so an anonymous visitor saw whichever graph the deployment
+    happened to be configured with. Scoping the path to a knowledge base keeps
+    the read anonymous while making the target explicit.
+    """
+
+    if not path.startswith(_KB_ROUTE_PREFIX):
+        return False
+    segments = [segment for segment in path[len(_KB_ROUTE_PREFIX) :].split("/") if segment]
+    return (
+        len(segments) == 3
+        and segments[1] == "graph"
+        and segments[2] in _PUBLIC_GRAPH_LEAVES
+    )
+
+
 def _is_public_browser_request(request: Request) -> bool:
     """Allow the browser's ordinary-user surface without exposing service keys.
 
     The legacy ``/v1/query`` endpoint remains service-authenticated. The Vue
     workbench uses only the explicitly public, read-only/query paths below;
     every management mutation and admin diagnostic stays behind Bearer auth.
+
+    The anonymous surface is an explicit allowlist rather than a pattern
+    inferred from path shape, so a new route cannot become public by accident.
+    See ``tests/test_public_route_contract.py`` for the pinned boundary.
     """
+
+    method = request.method
     path = request.url.path
-    if request.method == "GET" and path == "/v1/knowledge-bases":
+    if (method, path) in _PUBLIC_EXACT_ROUTES:
+        return True
+    if method == "GET" and _is_public_kb_graph_path(path):
         return True
     if (
-        request.method == "GET"
-        and path.startswith("/v1/knowledge-bases/")
-        and (path.endswith("/source") or path.endswith("/source-file"))
+        method == "GET"
+        and path.startswith(_KB_ROUTE_PREFIX)
+        and path.endswith(_PUBLIC_DOCUMENT_SOURCE_SUFFIXES)
     ):
         return True
-    if path.startswith("/v1/graph/") and request.method == "GET":
-        return True
-    if path == "/v1/feedback" and request.method == "POST":
-        return True
-    return (
-        request.method == "POST"
-        and len(path.strip("/").split("/")) == 4
-        and path.startswith("/v1/knowledge-bases/")
-        and path.endswith("/query")
+    return method == "POST" and _is_public_kb_query_path(path)
+
+
+def _dashscope_native_base_url(settings: Settings) -> str:
+    """Return the DashScope native API base for the speech endpoints.
+
+    ``llm_base_url`` points at the OpenAI-compatible surface
+    (``.../compatible-mode/v1``), which has no multimodal-generation route. The
+    speech API lives under ``.../api/v1`` on the same host, so the host is kept
+    and the path replaced. A custom base that already ends in ``/api/v1`` is
+    passed through unchanged.
+    """
+
+    configured = (settings.llm_base_url or "").strip()
+    if not configured:
+        return "https://dashscope.aliyuncs.com/api/v1"
+    trimmed = configured.rstrip("/")
+    if trimmed.endswith("/api/v1"):
+        return trimmed
+    marker = "/compatible-mode"
+    if marker in trimmed:
+        return trimmed.split(marker, 1)[0] + "/api/v1"
+    return trimmed + "/api/v1"
+
+
+def _insecure_local_dev_enabled(settings: Settings | None) -> bool:
+    """Uncredentialed admin access requires an explicit local-only opt-in.
+
+    A missing credential fails closed by default: management endpoints stay
+    unreachable instead of silently granting administrator rights. Both
+    ``local_dev`` and a truthy ``IRA_DEV_INSECURE`` are required.
+    """
+
+    environment = (
+        settings.deployment_environment
+        if settings is not None
+        else (os.environ.get("IRA_DEPLOYMENT_ENVIRONMENT") or "local_dev")
     )
+    if str(environment).strip().lower() != "local_dev":
+        return False
+    flag = (os.environ.get(_INSECURE_LOCAL_DEV_FLAG) or "").strip().lower()
+    return flag in _INSECURE_LOCAL_DEV_TRUE
+
+
+_READY_PROBE_TIMEOUT_SECONDS = 2.0
+_READY_CACHE_TTL_SECONDS = 5.0
+_READY_PROBE_CACHE_ATTR = "ready_probe_cache"
+
+
+def _build_anonymous_rate_limiter(settings: Settings | None) -> AnonymousRateLimiter:
+    """Create the per-app limiter for the unauthenticated browser surface."""
+    return AnonymousRateLimiter(
+        default_limit=(
+            settings.public_rate_limit_per_minute
+            if settings is not None
+            else DEFAULT_PUBLIC_RATE_LIMIT_PER_MINUTE
+        ),
+        feedback_limit=(
+            settings.feedback_rate_limit_per_minute
+            if settings is not None
+            else DEFAULT_FEEDBACK_RATE_LIMIT_PER_MINUTE
+        ),
+        window_seconds=60.0,
+    )
+
+
+def _anonymous_rate_limit_bucket(request: Request) -> str:
+    """Return the bucket an anonymous request draws from."""
+    if request.method == "POST" and request.url.path == _FEEDBACK_PATH:
+        return BUCKET_FEEDBACK
+    return BUCKET_DEFAULT
+
+
+def _anonymous_client_key(request: Request, *, trust_proxy_headers: bool) -> str:
+    """Identify the anonymous caller.
+
+    ``X-Forwarded-For`` is only honoured when the deployment explicitly declares
+    a sanitising proxy in front of the API (``IRA_TRUST_PROXY_HEADERS``);
+    otherwise any client could forge its own budget by setting the header.
+    """
+    if trust_proxy_headers:
+        forwarded = request.headers.get("x-forwarded-for") or ""
+        first_hop = forwarded.split(",")[0].strip()
+        if first_hop:
+            return first_hop
+    client = request.client
+    host = getattr(client, "host", None)
+    # ASGI servers normally always report a peer address. When they do not, all
+    # such requests share one bucket: over-restrictive rather than fail-open,
+    # which is the right direction for an abuse brake.
+    return host or "unknown"
+
+
+def _rate_limited_response(
+    *,
+    limiter: AnonymousRateLimiter,
+    client_key: str,
+    bucket: str,
+    request_id: str,
+    trace_id: str,
+) -> JSONResponse:
+    retry_after = max(1, limiter.retry_after(client_key, bucket=bucket))
+    operational_metrics.increment("rate_limited_total")
+    _record_response_status(429)
+    _log_result(request_id=request_id, status="RATE_LIMITED", latency_ms=0)
+    return _error_response(
+        "RATE_LIMITED",
+        request_id=request_id,
+        trace_id=trace_id,
+        headers={"Retry-After": str(retry_after)},
+    )
+
+async def _db_reachable() -> bool:
+    """Return whether a database session can be acquired within the timeout.
+
+    Shared by ``/healthz`` and ``/ready`` so both report the same thing.  The
+    ``asyncio.timeout`` guard is mandatory: these probes now run on the event
+    loop instead of a worker thread, so an unresponsive database must not be
+    able to block the loop.
+    """
+    try:
+        async with asyncio.timeout(_READY_PROBE_TIMEOUT_SECONDS):
+            async for _ in get_session():
+                break
+        return True
+    except Exception:
+        return False
+
+
+async def _qdrant_reachable(settings: Settings) -> bool:
+    """Return whether the configured Qdrant answers a collection listing."""
+    try:
+        from qdrant_client import AsyncQdrantClient
+    except Exception:
+        return False
+    client = AsyncQdrantClient(
+        url=settings.qdrant_url, timeout=_READY_PROBE_TIMEOUT_SECONDS
+    )
+    try:
+        async with asyncio.timeout(_READY_PROBE_TIMEOUT_SECONDS):
+            await client.get_collections()
+        return True
+    except Exception:
+        return False
+    finally:
+        try:
+            await client.close()
+        except Exception:  # pragma: no cover - close must never mask the probe
+            pass
+
+
+def _ready_probe_cache(application: FastAPI) -> dict[str, tuple[float, bool]]:
+    """Per-app readiness cache so parallel probes do not stampede."""
+    cache = getattr(application.state, _READY_PROBE_CACHE_ATTR, None)
+    if cache is None:
+        cache = {}
+        application.state.ready_probe_cache = cache
+    return cache
+
+
+async def _cached_probe(
+    cache: dict[str, tuple[float, bool]],
+    key: str,
+    probe: Callable[[], Awaitable[bool]],
+    *,
+    timeout: float = _READY_PROBE_TIMEOUT_SECONDS,
+) -> bool:
+    """Run ``probe`` at most once per TTL per ``key``, bounded by ``timeout``.
+
+    The bound is enforced here as well as inside the individual probes: the
+    readiness probes execute on the event loop, so *no* probe implementation
+    (including a replaced or hung one) may be allowed to stall the loop.
+    """
+    loop = asyncio.get_running_loop()
+    entry = cache.get(key)
+    if entry is not None and entry[0] > loop.time():
+        return entry[1]
+    try:
+        async with asyncio.timeout(timeout):
+            value = await probe()
+    except Exception:
+        value = False
+    cache[key] = (loop.time() + _READY_CACHE_TTL_SECONDS, value)
+    return value
+
+
+def _log_auth_mode(settings: Settings, *, insecure_local_dev: bool) -> None:
+    """Record the effective authentication mode so it is visible in startup logs."""
+
+    if insecure_local_dev:
+        logger.warning(
+            "authentication mode=INSECURE_LOCAL_DEV: requests without credentials are treated as admin"
+        )
+    elif settings.service_api_key is None and settings.admin_api_key is None:
+        logger.error(
+            "authentication mode=FAIL_CLOSED: no API keys configured; "
+            "every non-health endpoint returns 401"
+        )
+    else:
+        logger.info(
+            "authentication mode=bearer environment=%s",
+            settings.deployment_environment,
+        )
+
+
+def _log_proxy_header_mode(settings: Settings) -> None:
+    """Record whether client addresses may come from ``X-Forwarded-For``.
+
+    The application layer can only choose whether *it* parses the header.  When
+    the ASGI server rewrites ``request.client`` from ``X-Forwarded-For`` (uvicorn
+    does this by default for peers listed in ``--forwarded-allow-ips``, which
+    defaults to ``127.0.0.1``), a client can hand itself a fresh rate-limit
+    bucket.  That rewrite happens before the app runs, so the only reliable
+    control is the server launch flag; log the expectation so a mismatched
+    deployment is visible at startup instead of only under abuse.
+    """
+
+    if settings.trust_proxy_headers:
+        logger.warning(
+            "proxy headers mode=TRUSTED: anonymous rate limiting keys on X-Forwarded-For; "
+            "only safe when a proxy overwrites that header with the real peer address"
+        )
+    else:
+        logger.info(
+            "proxy headers mode=IGNORED: anonymous rate limiting keys on the socket peer; "
+            "start uvicorn with --no-proxy-headers (or set --forwarded-allow-ips "
+            "explicitly) so the server does not rewrite client addresses"
+        )
+
+
+def _record_response_status(status_code: int) -> None:
+    """Count a request that short-circuits before the metrics middleware runs.
+
+    Responses produced inside the authentication middleware never reach
+    ``collect_operational_metrics``, so their status codes must be recorded
+    here or ``http_status_401_total`` / ``http_status_429_total`` stay at zero.
+    """
+
+    operational_metrics.increment("http_request_total")
+    operational_metrics.increment(f"http_status_{status_code}_total")
+
+
+# ---------------------------------------------------------------------------
+# Server-sent events for the streaming query
+# ---------------------------------------------------------------------------
+
+_SSE_POLL_SECONDS = 0.1
+_SSE_KEEPALIVE_SECONDS = 15.0
+
+
+def _sse_event(payload: Mapping[str, Any]) -> bytes:
+    """Encode one server-sent event frame."""
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n".encode()
+
+
+async def _query_event_stream(
+    runner: Callable[[Callable[[str], None]], Awaitable[dict[str, Any]]],
+) -> AsyncIterator[bytes]:
+    """Relay a query as SSE: stage, then deltas, then the validated payload.
+
+    The deltas are a *preview*.  Citation grounding needs the complete answer, so
+    the only authoritative result is the ``final`` event — it carries exactly the
+    payload the non-streaming endpoint returns, including an
+    ``insufficient_evidence`` verdict when the answer cannot be grounded.  The
+    client is expected to replace the preview with it.
+    """
+
+    events: asyncio.Queue[str] = asyncio.Queue()
+
+    def _on_delta(text: str) -> None:
+        if text:
+            events.put_nowait(text)
+
+    task = asyncio.create_task(runner(_on_delta))
+    yield _sse_event({"type": "stage", "stage": "retrieving"})
+    generating = False
+    last_keepalive = time.monotonic()
+    while True:
+        if task.done() and events.empty():
+            break
+        try:
+            text = await asyncio.wait_for(events.get(), timeout=_SSE_POLL_SECONDS)
+        except TimeoutError:
+            if time.monotonic() - last_keepalive >= _SSE_KEEPALIVE_SECONDS:
+                last_keepalive = time.monotonic()
+                yield b": keep-alive\n\n"
+            continue
+        if not generating:
+            generating = True
+            yield _sse_event({"type": "stage", "stage": "generating"})
+        yield _sse_event({"type": "delta", "text": text})
+    try:
+        payload = await task
+    except AppError as error:
+        code = getattr(error.code, "value", str(error.code))
+        yield _sse_event(
+            {"type": "error", "code": code, "message": error.message}
+        )
+        return
+    except Exception:
+        logger.exception("streaming query failed")
+        yield _sse_event(
+            {
+                "type": "error",
+                "code": "INTERNAL_ERROR",
+                "message": "查询没有完成，请稍后重试。",
+            }
+        )
+        return
+    yield _sse_event({"type": "final", "payload": payload})
 
 
 # ---------------------------------------------------------------------------
@@ -563,6 +953,7 @@ def create_app(
     *,
     settings: Settings | None = None,
     runtime_factory: Callable[[Settings], QueryRuntime] = LightRAGRuntime,
+    voice_provider: object | None = None,
 ) -> FastAPI:
     """Create an API whose settings and runtime are resolved during lifespan startup."""
 
@@ -588,6 +979,17 @@ def create_app(
             application.state.resolved_settings = resolved_settings
             application.state.service_api_key = resolved_settings.service_api_key
             application.state.admin_api_key = resolved_settings.admin_api_key
+            application.state.allow_insecure_local_dev = _insecure_local_dev_enabled(
+                resolved_settings
+            )
+            application.state.anonymous_rate_limiter = _build_anonymous_rate_limiter(
+                resolved_settings
+            )
+            _log_auth_mode(
+                resolved_settings,
+                insecure_local_dev=application.state.allow_insecure_local_dev,
+            )
+            _log_proxy_header_mode(resolved_settings)
             if (
                 resolved_settings.deployment_environment
                 in {"local_staging", "staging", "production"}
@@ -612,6 +1014,29 @@ def create_app(
             )
             _runtime_manager = KnowledgeBaseRuntimeManager()
             application.state.runtime_manager = _runtime_manager
+
+            # Speech endpoints stay dormant unless explicitly enabled: ASR and
+            # TTS are billed per call. An injected provider wins so tests never
+            # touch the network.
+            if voice_provider is not None:
+                application.state.voice_provider = voice_provider
+            elif resolved_settings.voice_enabled:
+                from industrial_rag.voice_provider import DashScopeVoiceProvider
+
+                application.state.voice_provider = DashScopeVoiceProvider(
+                    api_key=resolved_settings.api_key or "",
+                    # The voice API lives on the DashScope native endpoint, not
+                    # the OpenAI-compatible one used for chat completions. Derive
+                    # it from the configured host instead of reusing llm_base_url,
+                    # which ends in /compatible-mode/v1 and would 404 here.
+                    base_url=_dashscope_native_base_url(resolved_settings),
+                    model=resolved_settings.voice_asr_model,
+                    tts_model=resolved_settings.voice_tts_model,
+                    voice=resolved_settings.voice_tts_voice,
+                )
+            else:
+                application.state.voice_provider = None
+
 
             # Start lifecycle task executor
             # Import handler impls so they self-register
@@ -704,6 +1129,10 @@ def create_app(
             application.state.resolved_settings = None
 
     application = FastAPI(lifespan=lifespan)
+    # Computed eagerly so tests and non-lifespan clients observe the same
+    # fail-closed default; lifespan recomputes it from resolved settings.
+    application.state.allow_insecure_local_dev = _insecure_local_dev_enabled(settings)
+    application.state.anonymous_rate_limiter = _build_anonymous_rate_limiter(settings)
 
     @application.middleware("http")
     async def collect_operational_metrics(
@@ -711,8 +1140,7 @@ def create_app(
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         response = await call_next(request)
-        operational_metrics.increment("http_request_total")
-        operational_metrics.increment(f"http_status_{response.status_code}_total")
+        _record_response_status(response.status_code)
         return response
 
     # ------------------------------------------------------------------
@@ -730,16 +1158,47 @@ def create_app(
             request.app.state, "service_api_key", None
         )
         admin_api_key: str | None = getattr(request.app.state, "admin_api_key", None)
-        if service_api_key is None and admin_api_key is None:
-            request.state.authenticated_actor = local_development_actor()
-            return await call_next(request)
         path = request.url.path
-        if path in {"/readyz", "/healthz", "/ready", "/health", "/version"}:
+        if path in _HEALTH_PATHS:
+            return await call_next(request)
+        if service_api_key is None and admin_api_key is None:
+            # Fail closed: an unconfigured deployment must not silently grant
+            # administrator rights. Local development opts in explicitly.
+            if not getattr(request.app.state, "allow_insecure_local_dev", False):
+                _log_result(request_id=request_id, status="UNAUTHORIZED", latency_ms=0)
+                _record_response_status(401)
+                return _error_response(
+                    "UNAUTHORIZED", request_id=request_id, trace_id=trace_id
+                )
+            request.state.authenticated_actor = local_development_actor()
             return await call_next(request)
         if _is_public_browser_request(request):
             request.state.authenticated_actor = AuthenticatedActor(
                 role="service", actor="public-browser", credential_type="anonymous"
             )
+            # Rate limiting belongs *inside* the anonymous branch, after the
+            # credential_type is set and before the route runs.  Bearer and
+            # local_dev actors return earlier and are never limited.
+            limiter: AnonymousRateLimiter | None = getattr(
+                request.app.state, "anonymous_rate_limiter", None
+            )
+            if limiter is not None and limiter.enabled:
+                resolved = getattr(request.app.state, "resolved_settings", None)
+                client_key = _anonymous_client_key(
+                    request,
+                    trust_proxy_headers=bool(
+                        resolved is not None and resolved.trust_proxy_headers
+                    ),
+                )
+                bucket = _anonymous_rate_limit_bucket(request)
+                if not limiter.allow(client_key, bucket=bucket):
+                    return _rate_limited_response(
+                        limiter=limiter,
+                        client_key=client_key,
+                        bucket=bucket,
+                        request_id=request_id,
+                        trace_id=trace_id,
+                    )
             return await call_next(request)
         actor = authenticate_bearer(
             request.headers.get("Authorization"),
@@ -817,10 +1276,15 @@ def create_app(
 
     @application.get("/healthz")
     async def healthz(request: Request) -> dict[str, str]:
+        # The probe already carries its own 2 s guard; this outer one keeps the
+        # endpoint bounded even if the probe is replaced by a slower
+        # implementation, mirroring /ready.
         try:
-            async for _ in get_session():
-                break  # DB available
-        except Exception:
+            async with asyncio.timeout(_READY_PROBE_TIMEOUT_SECONDS):
+                reachable = await _db_reachable()
+        except TimeoutError:
+            reachable = False
+        if not reachable:
             return {"status": "degraded", "db": "unavailable"}
         return {"status": "ok", "db": "available"}
 
@@ -868,13 +1332,19 @@ def create_app(
         return operational_metrics.snapshot()
 
     @application.get("/ready", response_model=None)
-    def ready(request: Request) -> dict[str, object] | JSONResponse:
-        """Readiness: config legal, DB reachable, Qdrant reachable (when used)."""
+    async def ready(request: Request) -> dict[str, object] | JSONResponse:
+        """Readiness: config legal, DB reachable, Qdrant reachable (when used).
+
+        This handler runs on the event loop, so every probe is bounded by
+        ``_READY_PROBE_TIMEOUT_SECONDS`` and memoised for
+        ``_READY_CACHE_TTL_SECONDS`` on the app state.  Without both, a hung
+        dependency would stall the loop and repeated probes would keep building
+        ``AsyncQdrantClient`` instances.
+        """
         components: dict[str, str] = {"config": "unknown", "db": "unknown", "qdrant": "n/a"}
         resolved = getattr(request.app.state, "resolved_settings", None)
         if resolved is None:
             components["config"] = "not_loaded"
-            components["db"] = "unknown"
             return JSONResponse(
                 status_code=503,
                 content={
@@ -884,39 +1354,29 @@ def create_app(
                 },
             )
         components["config"] = "ok"
-        try:
-            import asyncio
+        cache = _ready_probe_cache(request.app)
 
-            async def _db_ok() -> None:
-                async for _ in get_session():
-                    break
-
-            asyncio.run(_db_ok())
-            components["db"] = "ok"
-        except Exception:
-            components["db"] = "unavailable"
+        components["db"] = (
+            "ok" if await _cached_probe(cache, "db", _db_reachable) else "unavailable"
+        )
         if resolved.vector_backend.value == "qdrant":
-            try:
-                import asyncio
-
-                from qdrant_client import AsyncQdrantClient
-
-                async def _qdrant_ok() -> bool:
-                    client = AsyncQdrantClient(url=resolved.qdrant_url, timeout=5)
-                    try:
-                        await client.get_collections()
-                        return True
-                    finally:
-                        await client.close()
-
-                components["qdrant"] = "ok" if asyncio.run(_qdrant_ok()) else "unavailable"
-            except Exception:
-                components["qdrant"] = "unavailable"
+            # The key carries backend identity so a generation switch cannot
+            # reuse the previous backend's verdict.
+            qdrant_key = (
+                f"qdrant:{resolved.qdrant_url}:{resolved.qdrant_collection_prefix}"
+                f":{resolved.qdrant_generation}"
+            )
+            qdrant_ok = await _cached_probe(
+                cache, qdrant_key, lambda: _qdrant_reachable(resolved)
+            )
+            components["qdrant"] = "ok" if qdrant_ok else "unavailable"
         ready_status = components.get("db") == "ok" and components.get("qdrant") in {"ok", "n/a"}
-        return {
-            "status": "ready" if ready_status else "not_ready",
-            "components": components,
-        }
+        if ready_status:
+            return {"status": "ready", "components": components}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "not_ready", "components": components},
+        )
 
     # ------------------------------------------------------------------
     # Legacy query (backward compatible)
@@ -1060,6 +1520,7 @@ def create_app(
         *,
         generation_id: str | None = None,
         background_tasks: BackgroundTasks | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> QueryResponse | JSONResponse:
         request_id = _request_id_for(request)
         trace_id = _trace_id_for(request)
@@ -1104,7 +1565,10 @@ def create_app(
                 )
                 if generation_id is None:
                     execution = await service.query_active(
-                        kb_id, payload.query, history=[item.model_dump() for item in payload.history]
+                        kb_id,
+                        payload.query,
+                        history=[item.model_dump() for item in payload.history],
+                        on_delta=on_delta,
                     )
                 else:
                     execution = await service.query_generation(
@@ -1115,6 +1579,7 @@ def create_app(
                         disable_llm_cache=(
                             request.headers.get("x-validation-disable-llm-cache") == "1"
                         ),
+                        on_delta=on_delta,
                     )
         except AppError as error:
             if error.code == "index_not_ready":
@@ -1238,6 +1703,37 @@ def create_app(
             kb_id, payload, request, background_tasks=background_tasks
         )
 
+    @application.post("/v1/knowledge-bases/{kb_id}/query/stream")
+    async def query_kb_stream(
+        kb_id: str,
+        payload: QueryRequest,
+        request: Request,
+        background_tasks: BackgroundTasks,
+    ) -> StreamingResponse:
+        """Same query as ``/query``, delivered as server-sent events.
+
+        The deltas are an unvalidated preview of the answer; the ``final`` event
+        carries the same payload the non-streaming endpoint returns.
+        """
+
+        async def _runner(on_delta: Callable[[str], None]) -> dict[str, Any]:
+            response = await _execute_kb_query(
+                kb_id,
+                payload,
+                request,
+                background_tasks=background_tasks,
+                on_delta=on_delta,
+            )
+            if isinstance(response, JSONResponse):
+                return {"error": json.loads(response.body)}
+            return jsonable_encoder(response)
+
+        return StreamingResponse(
+            _query_event_stream(_runner),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     @application.post(
         "/v1/knowledge-bases/{kb_id}/generations/{generation_id}/query",
         response_model=QueryResponse,
@@ -1265,8 +1761,10 @@ def create_app(
 
     application.include_router(admin_diagnostics.router)
     application.include_router(feedback.router)
+    application.include_router(evaluation.router)
     application.include_router(feedback.compat_router)
     application.include_router(graph.router)
+    application.include_router(voice.router)
     application.include_router(knowledge_bases.router)
     application.include_router(documents.router)
     application.include_router(tasks.router)

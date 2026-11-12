@@ -1,0 +1,75 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "industrial-rag"
+version = "0.1.0"
+description = "LightRAG knowledge-base QA for industrial centrifugal-pump manuals"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+  "lightrag-hku==1.5.4",
+  "openai>=1.97,<3",
+  "PyMuPDF>=1.24,<2",
+  "python-dotenv>=1.0,<2",
+  "streamlit>=1.46,<2",
+  "networkx>=3.2,<4",
+  "pyvis>=0.3.2,<0.4",
+  "httpx>=0.28,<1",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
+  "sqlalchemy>=2.0,<3",
+  "aiosqlite>=0.20,<1",
+  "alembic>=1.13,<2",
+  "qdrant-client==1.13.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4,<10",
+  "pytest-asyncio>=1.0,<2",
+  "ruff>=0.12,<1",
+]
+evaluation = [
+  "ragas==0.3.9",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/industrial_rag"]
+
+[tool.pytest.ini_options]
+addopts = [
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+]
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_mode = "strict"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src/industrial_rag", "tests"]
+include = [
+  "src/industrial_rag/**/*.py",
+  "app/**/*.py",
+  "tests/test_*.py",
+  "tests/test_api.py",
+  "scripts/inspect_environment.py",
+  "scripts/parse_manuals.py",
+  "scripts/ingest_documents.py",
+  "scripts/backfill_frozen_index_metadata.py",
+  "scripts/smoke_test.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["E501", "B008", "B904", "RUF006", "SIM103", "SIM105", "UP042", "B007"]
+allowed-confusables = ["，", "：", "；", "！", "？", "（", "）", "｜"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

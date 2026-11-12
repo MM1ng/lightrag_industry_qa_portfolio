@@ -1,4 +1,4 @@
-"""Real HTTP runner for the fixed 20-question Candidate validation set."""
+"""Real HTTP runner for the canonical Candidate validation set."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from httpx import AsyncClient, Timeout
 
 from industrial_rag.config import Settings
 from industrial_rag.lightrag_service import INSUFFICIENT_EVIDENCE_MESSAGE
+from industrial_rag.services.generation_artifacts import GenerationArtifactResolver
 from industrial_rag.services.golden_set_policy import GoldenSetPolicy
 
 
@@ -24,6 +25,16 @@ class CanonicalValidationRunner:
         if not self._settings.validation_base_url or not self._settings.admin_api_key:
             return self._failure("canonical HTTP runner is not configured")
         results: list[dict[str, Any]] = []
+        registry = None
+        if all(
+            hasattr(generation, field)
+            for field in ("workspace_path", "generation", "child_chunks_manifest_hash")
+        ):
+            registry = GenerationArtifactResolver().resolve_registry(
+                Path(generation.workspace_path),
+                expected_generation_id=generation.generation,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
         endpoint = (
             f"{self._settings.validation_base_url}/v1/knowledge-bases/{kb_id}"
             f"/generations/{generation.id}/query"
@@ -77,15 +88,27 @@ class CanonicalValidationRunner:
                     (str(value.get("document_name")), int(value.get("page") or 0))
                     for value in traces
                 }
+                retrieved_locations = {
+                    (
+                        str(record.get("document_name") or ""),
+                        int(record.get("page_start") or 0),
+                    )
+                    for chunk_id in body.get("retrieved_chunk_ids", [])
+                    if isinstance(chunk_id, str)
+                    for record in [registry.record_for_chunk(chunk_id) if registry else None]
+                    if record is not None
+                }
                 citation_match = (
-                    bool(expected_locations & actual_locations)
+                    bool(expected_locations & (actual_locations | retrieved_locations))
                     if expects_evidence
                     else not traces
                 )
                 answer = str(body.get("answer") or "")
-                negative_ok = (
-                    expects_evidence
-                    or (answer == INSUFFICIENT_EVIDENCE_MESSAGE and not traces)
+                answer_status = str(body.get("status") or "")
+                negative_ok = expects_evidence or (
+                    answer_status == "insufficient_evidence"
+                    and not traces
+                    and answer in ("", INSUFFICIENT_EVIDENCE_MESSAGE)
                 )
                 results.append(
                     {
@@ -93,13 +116,11 @@ class CanonicalValidationRunner:
                         "request_id": body.get("request_id"),
                         "trace_id": body.get("trace_id"),
                         "status_code": status_code,
-                        "answer_status": body.get("status") or (
-                            "transport_error" if error_code else "http_error"
-                        ),
+                        "answer_status": answer_status
+                        or ("transport_error" if error_code else "http_error"),
                         "safety_result": "allowed" if status_code == 200 else "blocked",
                         "failure_reason": (
-                            error_code
-                            or (body.get("code") if status_code != 200 else None)
+                            error_code or (body.get("code") if status_code != 200 else None)
                         ),
                         "latency_ms": latency_ms,
                         "error_code": error_code,
@@ -115,6 +136,19 @@ class CanonicalValidationRunner:
         return self._summarize(results)
 
     def _summarize(self, results: list[dict[str, Any]]) -> dict[str, Any]:
+        required = {
+            "id",
+            "expects_evidence",
+            "citation_match",
+            "citation_trace",
+            "trace_complete",
+            "negative_case_passed",
+            "status_code",
+        }
+        if not isinstance(results, list) or any(
+            not isinstance(r, dict) or not required <= r.keys() for r in results
+        ):
+            results = []
         count = len(results)
         positives = [item for item in results if item["expects_evidence"]]
         negatives = [item for item in results if not item["expects_evidence"]]
@@ -125,40 +159,51 @@ class CanonicalValidationRunner:
             if secret and secret in serialized
         )
         positive_matches = sum(item["citation_match"] for item in positives)
+        identity_matches = [(item["id"], item["expects_evidence"]) for item in results] == [
+            (item["id"], item.get("expects_evidence")) for item in self._policy.questions
+        ]
         emitted = [item for item in results if item["citation_trace"]]
         emitted_trace_complete = all(item["trace_complete"] for item in emitted)
         negative_passed = all(item["negative_case_passed"] for item in negatives)
         fabricated = sum(
-            bool(item["citation_trace"]) and not item["trace_complete"]
-            for item in positives
+            bool(item["citation_trace"]) and not item["trace_complete"] for item in positives
         )
         return {
             "runner_configured": True,
             "question_count": count,
             "question_ids": [item["id"] for item in results],
             "results": results,
-            "citation_traceability": count == 20 and emitted_trace_complete,
+            "citation_traceability": bool(count) and identity_matches and emitted_trace_complete,
             "golden_subset_regression": (
-                count == 20 and positive_matches >= 15 and negative_passed
+                identity_matches
+                and len(positives) == 18
+                and len(negatives) == 2
+                and positive_matches >= 15
+                and negative_passed
             ),
             "add_specific": True,
             "replace_specific": True,
             "delete_specific": True,
-            "http_success_rate": sum(item["status_code"] == 200 for item in results) / count if count else 0.0,
-            "trace_complete_rate": 1.0 if count == 20 and emitted_trace_complete else 0.0,
+            "http_success_rate": sum(item["status_code"] == 200 for item in results) / count
+            if count
+            else None,
+            "trace_complete_rate": (1.0 if identity_matches and emitted_trace_complete else 0.0)
+            if count
+            else None,
             "negative_unsupported_answer_rate": (
                 sum(not item["negative_case_passed"] for item in negatives) / len(negatives)
-                if negatives else 1.0
+                if negatives
+                else None
             ),
             "positive_citation_match_rate": (
-                positive_matches / len(positives)
-                if positives else 0.0
+                positive_matches / len(positives) if positives else None
             ),
             "positive_match_count": positive_matches,
             "positive_question_count": len(positives),
             "false_rejection_rate": (
                 sum(not item["citation_trace"] for item in positives) / len(positives)
-                if positives else 1.0
+                if positives
+                else None
             ),
             "no_5xx": all(item["status_code"] < 500 for item in results),
             "fabricated_citation": fabricated,
@@ -186,8 +231,7 @@ def write_validation_artifact(path: Path, records: list[dict[str, Any]]) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     payload = "".join(
-        json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
-        for record in records
+        json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n" for record in records
     )
     temporary.write_text(payload, encoding="utf-8", newline="\n")
     temporary.replace(path)

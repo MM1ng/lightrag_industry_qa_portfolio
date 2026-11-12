@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+pytest.importorskip("ragas", reason="optional dependency: pip install -e '.[dev,evaluation]'")
+
 from evaluation.ragas.conversation_adapter import (
     DATASET_PATH,
     build_ragas_dataset,

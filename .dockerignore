@@ -1,0 +1,28 @@
+# Keep the build context small and free of host-specific state.
+.git
+.github
+.venv
+.pytest_cache
+.ruff_cache
+.run
+.superpowers
+.codebuddy
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.egg-info
+
+# Never ship secrets or host data into an image layer.
+.env
+.env.docker
+.env.local_staging
+data
+lightrag_storage
+artifacts
+ira_demo_data
+reports
+docs
+
+# Frontend is served separately; it is not part of the Python image.
+frontend/node_modules
+frontend/dist

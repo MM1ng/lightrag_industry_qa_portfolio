@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import enum
+import re
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     Float,
@@ -104,6 +107,8 @@ class UpdateOperation(enum.StrEnum):
     add = "add"
     replace = "replace"
     delete = "delete"
+    reparse = "reparse"
+    reindex = "reindex"
 
 
 class UpdateJobStatus(enum.StrEnum):
@@ -121,11 +126,159 @@ class UpdateJobStatus(enum.StrEnum):
     rolled_back = "rolled_back"
 
 
+class UpdateJobExecutionStatus(enum.StrEnum):
+    """Candidate-build execution only; never evidence of validation or publication."""
+
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    RECOVERY_REQUIRED = "RECOVERY_REQUIRED"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+# NULL is the expand-only migration state for legacy, unclassified jobs.
+# This checks structural pairs only, not validation evidence or lease validity.
+UPDATE_JOB_EXECUTION_PAIR_CHECK = """
+execution_status IS NULL
+OR (execution_status = 'PENDING' AND status = 'pending')
+OR (execution_status = 'RUNNING' AND status IN ('claimed', 'running', 'building'))
+OR (execution_status = 'RECOVERY_REQUIRED' AND status = 'recovery_required')
+OR (execution_status = 'SUCCEEDED' AND status IN
+    ('building', 'validating', 'ready', 'succeeded', 'failed', 'cancelled',
+     'promoted', 'rolled_back'))
+OR (execution_status = 'FAILED' AND status = 'failed')
+OR (execution_status = 'CANCELLED' AND status = 'cancelled')
+"""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CandidateAttemptReference:
+    """Identity binding, not a mutable workspace path or permission to write."""
+
+    job_id: str
+    knowledge_base_id: str
+    attempt: int
+    candidate_generation_id: str
+
+    def __post_init__(self) -> None:
+        for value in (self.job_id, self.knowledge_base_id, self.candidate_generation_id):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("candidate identity must be non-empty")
+        if type(self.attempt) is not int or self.attempt < 1:
+            raise ValueError("candidate attempt must be a positive integer")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ParsedArtifactReference:
+    """C1B runtime contract for one parsed artifact owned by one job attempt."""
+
+    job_id: str
+    knowledge_base_id: str
+    attempt: int
+    document_id: str
+    artifact_path: str
+    artifact_digest: str | None = None
+
+    def __post_init__(self) -> None:
+        for value in (
+            self.job_id,
+            self.knowledge_base_id,
+            self.document_id,
+            self.artifact_path,
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("parsed artifact identity must be non-empty")
+        if type(self.attempt) is not int or self.attempt < 1:
+            raise ValueError("parsed artifact attempt must be a positive integer")
+        if self.artifact_digest is not None and (
+            not isinstance(self.artifact_digest, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", self.artifact_digest)
+        ):
+            raise ValueError("parsed artifact digest must be a SHA-256 hex digest")
+
+    def to_checkpoint(self) -> dict[str, object]:
+        return {
+            "job_id": self.job_id,
+            "knowledge_base_id": self.knowledge_base_id,
+            "attempt": self.attempt,
+            "document_id": self.document_id,
+            "artifact_path": self.artifact_path,
+            "artifact_digest": self.artifact_digest,
+        }
+
+    @classmethod
+    def from_checkpoint(cls, value: object) -> ParsedArtifactReference | None:
+        if value is None:
+            return None
+        if not isinstance(value, dict):
+            raise ValueError("parsed artifact reference checkpoint must be an object")
+        return cls(
+            job_id=value.get("job_id"),
+            knowledge_base_id=value.get("knowledge_base_id"),
+            attempt=value.get("attempt"),
+            document_id=value.get("document_id"),
+            artifact_path=value.get("artifact_path"),
+            artifact_digest=value.get("artifact_digest"),
+        )
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ClaimedExecutionContext:
+    """Carry an already acquired claim; construction does not authorize execution.
+
+    Consumers must check the current persisted Job AND KB lease at each commit.
+    This value object deliberately has no claim, renewal, or execution methods.
+    """
+
+    job_id: str
+    knowledge_base_id: str
+    attempt: int
+    worker_id: str
+    lease_token: str = field(repr=False)
+    fencing_token: int
+    lease_expires_at: datetime
+    candidate_reference: CandidateAttemptReference | None = None
+    parsed_artifact_reference: ParsedArtifactReference | None = None
+
+    def __post_init__(self) -> None:
+        for value in (self.job_id, self.knowledge_base_id, self.worker_id, self.lease_token):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("claim identity and lease token must be non-empty")
+        for value in (self.attempt, self.fencing_token):
+            if type(value) is not int or value < 1:
+                raise ValueError("attempt and fencing token must be positive integers")
+        if (
+            not isinstance(self.lease_expires_at, datetime)
+            or self.lease_expires_at.utcoffset() is None
+        ):
+            raise ValueError("lease expiry must be timezone-aware")
+        reference = self.candidate_reference
+        if reference is not None and (
+            not isinstance(reference, CandidateAttemptReference)
+            or (reference.job_id, reference.knowledge_base_id, reference.attempt)
+            != (self.job_id, self.knowledge_base_id, self.attempt)
+        ):
+            raise ValueError("candidate must belong to this job, KB, and attempt")
+        parsed_reference = self.parsed_artifact_reference
+        if parsed_reference is not None and (
+            not isinstance(parsed_reference, ParsedArtifactReference)
+            or (
+                parsed_reference.job_id,
+                parsed_reference.knowledge_base_id,
+                parsed_reference.attempt,
+            )
+            != (self.job_id, self.knowledge_base_id, self.attempt)
+        ):
+            raise ValueError("parsed artifact must belong to this job, KB, and attempt")
+
+
 class ValidationRunStatus(enum.StrEnum):
     running = "running"
     passed = "passed"
     failed = "failed"
     abandoned = "abandoned"
+    blocked = "blocked"
 
 
 class GCPlanStatus(enum.StrEnum):
@@ -286,6 +439,7 @@ class VectorIndexGeneration(Base):
     validated_fingerprint: Mapped[str | None] = mapped_column(
         String(64), nullable=True
     )
+    accepted_policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     knowledge_base: Mapped[KnowledgeBase] = relationship(
         "KnowledgeBase", back_populates="vector_generations", foreign_keys=[knowledge_base_id]
@@ -430,7 +584,7 @@ class LifecycleTask(Base):
 
 
 class UpdateJob(Base):
-    """One incremental knowledge-base update operation (add / replace / delete).
+    """One incremental knowledge-base update operation.
 
     Each job owns a candidate generation.  The candidate inherits unchanged
     documents from the active generation and only processes the changed
@@ -439,6 +593,16 @@ class UpdateJob(Base):
     """
 
     __tablename__ = "update_jobs"
+    __table_args__ = (
+        CheckConstraint(
+            "operation != 'reparse' OR document_id IS NOT NULL",
+            name="ck_update_jobs_reparse_requires_document",
+        ),
+        CheckConstraint(
+            UPDATE_JOB_EXECUTION_PAIR_CHECK,
+            name="ck_update_jobs_lifecycle_execution",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_new_uuid)
     knowledge_base_id: Mapped[str] = mapped_column(
@@ -458,6 +622,34 @@ class UpdateJob(Base):
     new_content_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     status: Mapped[UpdateJobStatus] = mapped_column(
         Enum(UpdateJobStatus), nullable=False, default=UpdateJobStatus.pending, index=True
+    )
+    # No PENDING default: unchanged Phase15-B writers remain legacy/unclassified.
+    # Existing databases require an explicit schema upgrade before this ORM is used.
+    execution_status: Mapped[UpdateJobExecutionStatus | None] = mapped_column(
+        Enum(
+            UpdateJobExecutionStatus,
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            name="ck_update_jobs_execution_status",
+        ),
+        nullable=True,
+        default=None,
+    )
+    next_run_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+    )
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
+    )
+    execution_finished_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        default=None,
     )
     current_stage: Mapped[str | None] = mapped_column(String(200), nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -528,7 +720,10 @@ class ValidationRun(Base):
     configured_model: Mapped[str] = mapped_column(String(100), nullable=False)
     strategy_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     generation_manifest_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    qdrant_content_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    qdrant_content_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    policy_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    validation_policy_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    effective_questions_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     document_registry_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     generation_content_epoch: Mapped[int] = mapped_column(Integer, nullable=False)
     metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True)

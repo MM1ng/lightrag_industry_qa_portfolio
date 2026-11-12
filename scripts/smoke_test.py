@@ -56,7 +56,18 @@ class _FakeBackend:
             },
         }
 
-    async def aquery(self, query: str, param: object, system_prompt: str) -> str:
+    async def generate(
+        self,
+        question: str,
+        context: str,
+        system_prompt: str,
+        *,
+        response_format: dict[str, str] | None = None,
+    ) -> str:
+        # No retrievable context must produce an empty generation so the
+        # no-evidence refusal path is exercised instead of a invented answer.
+        if not context.strip():
+            return ""
         return "启动前应检查阀门状态。"
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from evaluation.experiments.parser_backend.fixed_model_gate import (
     config_hashes,
     load_frozen_config,
@@ -69,6 +70,8 @@ def test_frozen_manifest_exists_and_is_immutable() -> None:
 
 def test_frozen_artifacts_verify_ok_on_disk() -> None:
     result = verify_frozen_artifacts()
+    if result["mismatches"] and all(item["issue"] == "missing" for item in result["mismatches"]):
+        pytest.skip("protected Phase 3A artifacts are not distributed in the public repository")
     assert result["ok"] is True
     assert result["checked"] == 25
 
@@ -77,6 +80,10 @@ def test_frozen_artifacts_detect_tamper(tmp_path: Path) -> None:
     manifest = json.loads(FROZEN_MANIFEST_PATH.read_text(encoding="utf-8"))
     entry = dict(manifest["entries"][0])
     entry["sha256"] = "0" * 64
+    source = tmp_path / "tampered-source.bin"
+    source.write_bytes(b"public fixture")
+    entry["path"] = str(source)
+    entry["size"] = source.stat().st_size
     tampered = {"entries": [entry]}
     path = tmp_path / "tampered.json"
     path.write_text(json.dumps(tampered), encoding="utf-8")

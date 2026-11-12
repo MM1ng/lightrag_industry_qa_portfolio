@@ -559,3 +559,46 @@ def test_html_escape_still_safe_with_provenance() -> None:
     assert "<script>" not in tip
     assert "<img" not in tip
     assert "<b>" not in tip
+
+
+def test_tooltip_labels_inferred_type_as_display_only() -> None:
+    tip = gv.build_node_tooltip("Bearing Temperature", {"entity_type": "inferred:measurement"})
+
+    assert "参数(推断)" in tip
+    assert "展示层推断" in tip
+    assert "inferred:" not in tip
+
+
+def test_tooltip_spells_out_missing_type_instead_of_unknown() -> None:
+    tip = gv.build_node_tooltip("Serial Number", {"entity_type": "UNKNOWN"})
+
+    assert "未标注类型" in tip
+    assert "UNKNOWN" not in tip
+
+
+def test_native_html_exposes_click_detail_panel() -> None:
+    """Clicking a node must surface its description, not only hover tooltips."""
+
+    graph = nx.Graph()
+    graph.add_node(
+        "Bearing Frame",
+        entity_type="inferred:component",
+        description="支撑轴承的泵体框架。",
+        file_path="manual.pdf",
+    )
+    html = gv.render_pyvis_html(graph)
+
+    assert 'id="ira-detail"' in html
+    assert "renderDetailPanel" in html
+    assert "industrial-rag:detail-panel" in html
+
+
+def test_detail_panel_writes_text_not_html() -> None:
+    """Descriptions are model output; the panel must not inject markup."""
+
+    graph = nx.Graph()
+    graph.add_node("Pump", entity_type="artifact", description="<b>x</b>")
+    html = gv.render_pyvis_html(graph)
+
+    assert "innerHTML" not in html.split("industrial-rag:detail-panel")[-1]
+    assert "textContent" in html

@@ -1,0 +1,132 @@
+# Local stack for the industrial-manual RAG service.
+#
+#   docker compose up -d --build      start qdrant + backend
+#   docker compose run --rm --profile acceptance acceptance
+#
+# Secrets are read from .env.docker, which is NOT tracked by git. Copy
+# .env.docker.example and fill in the keys before the first start.
+#
+# NOTE: Compose also auto-loads a file named ".env" in this directory and gives
+# it precedence for ${VAR} interpolation. The backend reads .env.docker through
+# env_file, so the two must not disagree on QDRANT_KB_ID / QDRANT_GENERATION —
+# see the explicit environment block below, which pins the serving generation.
+
+name: industrial-rag
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.13.3
+    container_name: ira-qdrant
+    restart: unless-stopped
+    ports:
+      - "16333:6333"
+    volumes:
+      # Default: a dedicated volume managed by Compose (starts empty).
+      # To serve an already-populated Qdrant, set QDRANT_STORAGE_SOURCE to the
+      # host path of that volume, e.g.
+      #   QDRANT_STORAGE_SOURCE=/var/lib/docker/volumes/ira-qdrant-.../_data
+      # (or a plain host directory). Without it the stack starts from zero
+      # collections and the backend answers nothing.
+      - ${QDRANT_STORAGE_SOURCE:-qdrant_storage}:/qdrant/storage
+    healthcheck:
+      # The qdrant image has no curl; the HTTP port answers a bare TCP probe.
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  # Named volumes are created as root. The app runs as uid 10001, so a one-shot
+  # init container fixes ownership before the backend starts. Without this the
+  # SQLite file cannot be created and the backend crash-loops.
+  init-volumes:
+    image: alpine:3.20
+    container_name: ira-init-volumes
+    command: >
+      sh -c "chown -R 10001:10001 /app/lightrag_storage /app/artifacts
+      && chmod -R 775 /app/lightrag_storage /app/artifacts"
+    volumes:
+      - backend_storage:/app/lightrag_storage
+      - backend_artifacts:/app/artifacts
+    restart: "no"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ira-backend
+    restart: unless-stopped
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      init-volumes:
+        condition: service_completed_successfully
+    env_file:
+      - .env.docker
+    environment:
+      # Container-internal overrides. These win over .env.docker because compose
+      # sets them explicitly; they keep host-specific values out of the image.
+      QDRANT_URL: http://qdrant:6333
+      KB_DATA_ROOT: /data/kb
+      # The generation workspace (graphml + KV stores) lives inside the mounted
+      # knowledge base, not in a separate volume. Pointing this elsewhere makes
+      # LightRAG create an empty graph and generation lookups fail with 409.
+      LIGHTRAG_WORKING_DIR: /data/kb/c6e9f2fb47e54ab9b55891da2b3658c9/qdrant/generations/g907761ec7e5a5d2528c3c90b/workspace
+      VALIDATION_ARTIFACT_DIR: /app/artifacts/validation-runs
+      VALIDATION_BASE_URL: http://127.0.0.1:8000
+      DATABASE_URL: sqlite+aiosqlite:////app/data/db/industrial_rag.db
+      # The startup path builds Settings.from_env() before any request is served,
+      # so the serving knowledge base and its active generation must be present
+      # in the environment. They describe the frozen data mounted at /data/kb.
+      # Literal values (no ${VAR}) on purpose: Compose interpolates ${VAR} from
+      # the project .env file, which would silently override these.
+      QDRANT_KB_ID: c6e9f2fb47e54ab9b55891da2b3658c9
+      QDRANT_GENERATION: g907761ec7e5a5d2528c3c90b
+      PYTHONPATH: /app/src
+    ports:
+      - "8000:8000"
+    volumes:
+      # Write access is required: LightRAG rewrites the per-generation workspace
+      # (index marker, KV stores) on start-up. A read-only mount fails with
+      # "Read-only file system". Mount a copy if the host data must stay pristine.
+      - ${IRA_KB_DATA:-D:/ira_demo_data}:/data/kb
+      # Reuse the host database when it exists: it carries the KB rows and the
+      # active-generation pointers. Seeding from the named volume would give an
+      # empty schema and the backend would refuse to start ("Qdrant backend
+      # requires an active generation").
+      - ${IRA_DB_FILE:-./data/db}:/app/data/db
+      - backend_storage:/app/lightrag_storage
+      - backend_artifacts:/app/artifacts
+
+  # One-shot job: runs the approved acceptance suite against the running stack.
+  # It is not started by `docker compose up`; invoke it explicitly.
+  acceptance:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["acceptance"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      KB_DATA_ROOT: /data/kb
+      BACKEND_BASE_URL: http://backend:8000
+      ACCEPTANCE_KB_ID: c6e9f2fb47e54ab9b55891da2b3658c9
+      # Same pinned serving generation as the backend, otherwise the acceptance
+      # job would resolve a different (or stale) generation than the one served.
+      QDRANT_KB_ID: c6e9f2fb47e54ab9b55891da2b3658c9
+      QDRANT_GENERATION: g907761ec7e5a5d2528c3c90b
+      PYTHONPATH: /app/src:/app
+    volumes:
+      - ${IRA_KB_DATA:-D:/ira_demo_data}:/data/kb:ro
+      - ${IRA_DB_FILE:-./data/db}:/app/data/db
+      - backend_storage:/app/lightrag_storage
+    entrypoint: ["python", "/app/tools/docker_acceptance.py"]
+
+volumes:
+  qdrant_storage:
+  backend_storage:
+  backend_artifacts:

@@ -53,6 +53,12 @@ class RetrievalTraceItem:
     # intentionally omitted from to_payload() so the persisted diagnostic
     # trace does not retain document content.
     content_excerpt: str = ""
+    sparse_rank: int | None = None
+    sparse_score: float | None = None
+    rrf_rank: int | None = None
+    rrf_score: float | None = None
+    selected: bool | None = None
+    rejected_reason: str | None = None
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -69,6 +75,12 @@ class RetrievalTraceItem:
             "reranked_score": self.reranked_score,
             "used_for_answer": self.used_for_answer,
             "cited_in_answer": self.cited_in_answer,
+            "sparse_rank": self.sparse_rank,
+            "sparse_score": self.sparse_score,
+            "rrf_rank": self.rrf_rank,
+            "rrf_score": self.rrf_score,
+            "selected": self.selected,
+            "rejected_reason": self.rejected_reason,
         }
 
 
@@ -113,6 +125,12 @@ class RetrievalExecutionTrace:
     retrieval_ms: float
     rerank_ms: float
     evidence_selection_ms: float
+    rerank_enabled: bool = False
+    rerank_provider: str | None = None
+    rerank_latency_ms: float = 0.0
+    rerank_candidate_count: int = 0
+    rerank_final_count: int = 0
+    rerank_fallback_reason: str | None = None
     feature_flags: tuple[tuple[str, object], ...] = ()
     detected_model: str | None = None
     detected_component: str | None = None
@@ -184,6 +202,12 @@ class RetrievalExecutionTrace:
     grounding_removed_answer_points: tuple[str, ...] = ()
     grounding_removal_reasons: tuple[dict[str, object], ...] = ()
     grounding_false_negative_diagnostics: tuple[dict[str, object], ...] = ()
+    # Admin-only audit of answer points that shipped while asserting identifiers
+    # (model/variant names, standard numbers) absent from their cited evidence.
+    # Observation only: it never changes the answer or the status, so operators
+    # can measure how often model prose outruns the manual before deciding
+    # whether to enforce a semantic grounding gate.
+    unsupported_assertion_audit: tuple[dict[str, object], ...] = ()
     generated_answer_points: tuple[str, ...] = ()
     rejected_answer_points: tuple[str, ...] = ()
     support_validation_reason_codes: tuple[str, ...] = ()
@@ -273,6 +297,12 @@ class RetrievalExecutionTrace:
             "normalization_ms": self.normalization_ms,
             "retrieval_ms": self.retrieval_ms,
             "rerank_ms": self.rerank_ms,
+            "rerank_enabled": self.rerank_enabled,
+            "rerank_provider": self.rerank_provider,
+            "rerank_latency_ms": self.rerank_latency_ms,
+            "rerank_candidate_count": self.rerank_candidate_count,
+            "rerank_final_count": self.rerank_final_count,
+            "rerank_fallback_reason": self.rerank_fallback_reason,
             "evidence_selection_ms": self.evidence_selection_ms,
             "feature_flags": dict(self.feature_flags),
             "detected_model": self.detected_model,
@@ -337,6 +367,7 @@ class RetrievalExecutionTrace:
             "grounding_removed_answer_points": list(self.grounding_removed_answer_points),
             "grounding_removal_reasons": list(self.grounding_removal_reasons),
             "grounding_false_negative_diagnostics": list(self.grounding_false_negative_diagnostics),
+            "unsupported_assertion_audit": list(self.unsupported_assertion_audit),
             "generated_answer_points": list(self.generated_answer_points),
             "rejected_answer_points": list(self.rejected_answer_points),
             "support_validation_reason_codes": list(self.support_validation_reason_codes),

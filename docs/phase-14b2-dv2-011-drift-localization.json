@@ -1,0 +1,334 @@
+{
+  "question_id": "D-V2-011",
+  "query": {
+    "canonical": "DESMI 水泵注液和排气时，吸入管路上的截断装置应处于什么状态？",
+    "replay": "DESMI 水泵注液和排气时，吸入管路上的截断装置应处于什么状态？",
+    "matches": true
+  },
+  "raw_retrieval": {
+    "canonical": "unavailable: canonical artifact stores no raw candidate list",
+    "replay_candidate_count": 40,
+    "observed_final_candidate_source_ranks_match": true
+  },
+  "fusion": {
+    "canonical": "partial: only final Top10 rows retain fusion metadata",
+    "replay_candidate_count": 20,
+    "compared_final_candidates": [
+      {
+        "candidate_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+        "canonical": {
+          "fusion_rank": 1,
+          "fusion_score": 0.03252247488101534,
+          "source_ranks": {
+            "lightrag": 1,
+            "sparse": 2
+          }
+        },
+        "replay": {
+          "candidate_id": "cchunk-pymupdf-v1-3c48ca477586c617-000",
+          "fusion_rank": 1,
+          "fusion_score": 0.03252247488101534,
+          "source_ranks": {
+            "lightrag": 1,
+            "sparse": 2
+          }
+        },
+        "matches": true
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "canonical": {
+          "fusion_rank": 2,
+          "fusion_score": 0.031746031746031744,
+          "source_ranks": {
+            "lightrag": 3,
+            "sparse": 3
+          }
+        },
+        "replay": {
+          "candidate_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+          "fusion_rank": 2,
+          "fusion_score": 0.031746031746031744,
+          "source_ranks": {
+            "lightrag": 3,
+            "sparse": 3
+          }
+        },
+        "matches": true
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "canonical": {
+          "fusion_rank": 3,
+          "fusion_score": 0.030886196246139225,
+          "source_ranks": {
+            "lightrag": 9,
+            "sparse": 1
+          }
+        },
+        "replay": {
+          "candidate_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+          "fusion_rank": 3,
+          "fusion_score": 0.030886196246139225,
+          "source_ranks": {
+            "lightrag": 9,
+            "sparse": 1
+          }
+        },
+        "matches": true
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "canonical": {
+          "fusion_rank": 4,
+          "fusion_score": 0.03055037313432836,
+          "source_ranks": {
+            "lightrag": 7,
+            "sparse": 4
+          }
+        },
+        "replay": {
+          "candidate_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+          "fusion_rank": 4,
+          "fusion_score": 0.03055037313432836,
+          "source_ranks": {
+            "lightrag": 7,
+            "sparse": 4
+          }
+        },
+        "matches": true
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "canonical": {
+          "fusion_rank": 5,
+          "fusion_score": 0.028258706467661692,
+          "source_ranks": {
+            "lightrag": 15,
+            "sparse": 7
+          }
+        },
+        "replay": {
+          "candidate_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+          "fusion_rank": 5,
+          "fusion_score": 0.028258706467661692,
+          "source_ranks": {
+            "lightrag": 15,
+            "sparse": 7
+          }
+        },
+        "matches": true
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+        "canonical": {
+          "fusion_rank": 6,
+          "fusion_score": 0.027809742999616416,
+          "source_ranks": {
+            "lightrag": 19,
+            "sparse": 6
+          }
+        },
+        "replay": {
+          "candidate_id": "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+          "fusion_rank": 6,
+          "fusion_score": 0.027809742999616416,
+          "source_ranks": {
+            "lightrag": 19,
+            "sparse": 6
+          }
+        },
+        "matches": true
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "canonical": {
+          "fusion_rank": 7,
+          "fusion_score": 0.027443609022556388,
+          "source_ranks": {
+            "lightrag": 16,
+            "sparse": 10
+          }
+        },
+        "replay": {
+          "candidate_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+          "fusion_rank": 7,
+          "fusion_score": 0.027443609022556388,
+          "source_ranks": {
+            "lightrag": 16,
+            "sparse": 10
+          }
+        },
+        "matches": true
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+        "canonical": {
+          "fusion_rank": 8,
+          "fusion_score": 0.027106227106227107,
+          "source_ranks": {
+            "lightrag": 10,
+            "sparse": 18
+          }
+        },
+        "replay": {
+          "candidate_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+          "fusion_rank": 8,
+          "fusion_score": 0.027106227106227107,
+          "source_ranks": {
+            "lightrag": 10,
+            "sparse": 18
+          }
+        },
+        "matches": true
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-f86158424224442d-000",
+        "canonical": {
+          "fusion_rank": 9,
+          "fusion_score": 0.027046783625730993,
+          "source_ranks": {
+            "lightrag": 12,
+            "sparse": 16
+          }
+        },
+        "replay": {
+          "candidate_id": "cchunk-pymupdf-v1-f86158424224442d-000",
+          "fusion_rank": 9,
+          "fusion_score": 0.027046783625730993,
+          "source_ranks": {
+            "lightrag": 12,
+            "sparse": 16
+          }
+        },
+        "matches": true
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-40b4f739da3cec6e-000",
+        "canonical": {
+          "fusion_rank": 10,
+          "fusion_score": 0.016129032258064516,
+          "source_ranks": {
+            "lightrag": 2
+          }
+        },
+        "replay": {
+          "candidate_id": "cchunk-pymupdf-v1-40b4f739da3cec6e-000",
+          "fusion_rank": 10,
+          "fusion_score": 0.016129032258064516,
+          "source_ranks": {
+            "lightrag": 2
+          }
+        },
+        "matches": true
+      }
+    ],
+    "all_observed_metadata_matches": true
+  },
+  "rerank_input": {
+    "canonical": "unavailable: no complete input pool or candidate fingerprint",
+    "replay_candidate_count": 20,
+    "replay_candidate_fingerprint": "daa0b96eb38b4f78b5501bcd1c1f26cd43bb022fb765c29fb43b6108067e8e85"
+  },
+  "rerank": {
+    "model": "qwen3-rerank",
+    "request": {
+      "canonical": "unavailable",
+      "replay": "same A2 runtime path; 20 candidates"
+    },
+    "candidate_fingerprint": {
+      "canonical": "unavailable",
+      "replay": "daa0b96eb38b4f78b5501bcd1c1f26cd43bb022fb765c29fb43b6108067e8e85"
+    },
+    "score_difference": "unavailable: canonical A2 final rows do not retain rerank_score",
+    "output_status": {
+      "canonical": "partial: final Top10 only",
+      "replay": "complete: 20 ranked candidates"
+    }
+  },
+  "final": {
+    "canonical_top5": [
+      "cchunk-pymupdf-v1-3c48ca477586c617-000",
+      "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+      "cchunk-pymupdf-v1-0261999df5570bed-000",
+      "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+      "cchunk-pymupdf-v1-53f148860125f4f4-000"
+    ],
+    "canonical_top10": [
+      "cchunk-pymupdf-v1-3c48ca477586c617-000",
+      "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+      "cchunk-pymupdf-v1-0261999df5570bed-000",
+      "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+      "cchunk-pymupdf-v1-53f148860125f4f4-000",
+      "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+      "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+      "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+      "cchunk-pymupdf-v1-f86158424224442d-000",
+      "cchunk-pymupdf-v1-40b4f739da3cec6e-000"
+    ],
+    "replay_top5": [
+      "cchunk-pymupdf-v1-3c48ca477586c617-000",
+      "cchunk-pymupdf-v1-0261999df5570bed-000",
+      "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+      "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+      "cchunk-pymupdf-v1-5178c456afbf1e5a-000"
+    ],
+    "replay_top10": [
+      "cchunk-pymupdf-v1-3c48ca477586c617-000",
+      "cchunk-pymupdf-v1-0261999df5570bed-000",
+      "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+      "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+      "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+      "cchunk-pymupdf-v1-92120ce2e7ee0096-000",
+      "cchunk-pymupdf-v1-fe95f94d24968921-000",
+      "cchunk-pymupdf-v1-53f148860125f4f4-000",
+      "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+      "cchunk-pymupdf-v1-c252bcbee91ab8cc-000"
+    ]
+  },
+  "candidate_difference": {
+    "added": [
+      "cchunk-pymupdf-v1-fe95f94d24968921-000",
+      "cchunk-pymupdf-v1-c252bcbee91ab8cc-000"
+    ],
+    "removed": [
+      "cchunk-pymupdf-v1-f86158424224442d-000",
+      "cchunk-pymupdf-v1-40b4f739da3cec6e-000"
+    ],
+    "rank_changed": [
+      {
+        "candidate_id": "cchunk-pymupdf-v1-08ad51d60ec4d01b-000",
+        "canonical_rank": 2,
+        "replay_rank": 4
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-0261999df5570bed-000",
+        "canonical_rank": 3,
+        "replay_rank": 2
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-4e14a3b265877fb1-000",
+        "canonical_rank": 4,
+        "replay_rank": 3
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-53f148860125f4f4-000",
+        "canonical_rank": 5,
+        "replay_rank": 8
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-5178c456afbf1e5a-000",
+        "canonical_rank": 7,
+        "replay_rank": 5
+      },
+      {
+        "candidate_id": "cchunk-pymupdf-v1-8cb55fe1213f5d02-000",
+        "canonical_rank": 8,
+        "replay_rank": 9
+      }
+    ]
+  },
+  "first_observable_divergence": "final_ranking",
+  "classification": "ARTIFACT_SCHEMA_MISMATCH",
+  "first_actual_divergence": "unavailable"
+}

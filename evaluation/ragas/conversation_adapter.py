@@ -12,6 +12,7 @@ from ragas import Dataset
 from ragas.backends.local_jsonl import LocalJSONLBackend
 from ragas.dataset_schema import SingleTurnSample
 
+from evaluation.phase10.conversation_e2e_contracts import portable_file_sha256
 from scripts.evaluate_conversation_retrieval_development import (
     SOURCE_GOLD_PATH,
     validate_development_cases,
@@ -39,14 +40,13 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
 def dataset_fingerprint(
     path: Path = DATASET_PATH, rows: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
-    raw = path.read_bytes()
     semantic_rows = rows if rows is not None else _load_jsonl(path)
     canonical = json.dumps(
         semantic_rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     return {
         "source_path": str(path.relative_to(PROJECT_ROOT)),
-        "raw_sha256": hashlib.sha256(raw).hexdigest(),
+        "raw_sha256": portable_file_sha256(path),
         "semantic_sha256": hashlib.sha256(canonical).hexdigest(),
         "case_count": len(semantic_rows),
         "case_ids": [row["case_id"] for row in semantic_rows],

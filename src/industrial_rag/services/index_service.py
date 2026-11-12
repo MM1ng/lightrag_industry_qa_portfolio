@@ -1,4 +1,4 @@
-"""Full knowledge-base shadow indexing with generation activation."""
+"""Explicit vector-backend migration indexing with generation activation."""
 
 from __future__ import annotations
 
@@ -21,8 +21,12 @@ from industrial_rag.repositories.task_repository import TaskRepository
 from industrial_rag.repositories.vector_index_generation_repository import (
     VectorIndexGenerationRepository,
 )
+from industrial_rag.services.generation_artifacts import (
+    freeze_generation_child_chunks,
+    load_generation_child_chunks,
+)
 from industrial_rag.services.generation_fingerprint_service import build_generation_fingerprint
-from industrial_rag.services.parse_service import load_child_chunks
+from industrial_rag.services.parse_service import load_child_chunks, load_parent_chunks
 from industrial_rag.services.qdrant_collection_service import QdrantCollectionService
 from industrial_rag.storage_layout import (
     kb_nano_workspace,
@@ -35,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 class IndexService:
-    """Build a complete local LightRAG workspace before activating one generation."""
+    """Build and activate an explicitly requested backend migration generation."""
 
     def __init__(
         self,
@@ -59,6 +63,11 @@ class IndexService:
         *,
         target_backend: VectorBackend | None = None,
     ) -> dict[str, Any]:
+        if target_backend is None:
+            raise RuntimeError(
+                "IndexService requires an explicit backend migration target; "
+                "document lifecycle updates must use UpdateJob"
+            )
         kb = await self._kb_repo.get(kb_id)
         if kb is None:
             raise RuntimeError(f"KnowledgeBase {kb_id} not found")
@@ -70,11 +79,14 @@ class IndexService:
         selected_backend = target_backend or VectorBackend(kb.vector_backend)
 
         all_children: list[tuple[Any, Any]] = []
+        all_parents: list[tuple[Any, Any]] = []
         for doc in active_docs:
-            children = load_child_chunks(kb_parsed_dir(kb_id) / "documents" / doc.id)
+            parsed_dir = kb_parsed_dir(kb_id) / "documents" / doc.id
+            children = load_child_chunks(parsed_dir)
             if not children:
                 logger.warning("No child chunks for doc=%s, skipping", doc.id)
             all_children.extend((doc, child) for child in children)
+            all_parents.extend((doc, parent) for parent in load_parent_chunks(parsed_dir))
         if not all_children:
             raise RuntimeError("No child chunks found for any active document")
 
@@ -109,6 +121,25 @@ class IndexService:
         if shadow_workspace.exists():
             shutil.rmtree(shadow_workspace, ignore_errors=True)
         shadow_workspace.mkdir(parents=True, exist_ok=True)
+        snapshot = freeze_generation_child_chunks(
+            shadow_workspace,
+            generation_id=generation_name,
+            document_children=all_children,
+            document_parents=all_parents,
+        )
+        if snapshot.child_manifest_hash != fingerprint.child_chunks_manifest_hash:
+            raise RuntimeError("generation snapshot hash does not match its persisted fingerprint")
+        frozen_children = load_generation_child_chunks(
+            shadow_workspace,
+            expected_generation_id=generation_name,
+            expected_child_manifest_hash=record.child_chunks_manifest_hash,
+        )
+        all_children = [
+            (document, child)
+            for document in active_docs
+            for child in frozen_children
+            if child.document_id == document.id
+        ]
         kb_settings = settings_for_knowledge_base(
             settings,
             kb,
@@ -168,11 +199,16 @@ class IndexService:
                 workspace_token=kb_settings.vector_workspace,
             )
             if selected_backend is VectorBackend.qdrant:
-                qdrant_chunks = await QdrantCollectionService(kb_settings).verify_generation(
+                collections = QdrantCollectionService(kb_settings)
+                qdrant_chunks = await collections.verify_generation(
                     expected_chunks=len(all_children)
                 )
+                entity_count, relationship_count = await collections.verify_graph()
             else:
                 qdrant_chunks = 0
+                entity_count, relationship_count = self._verify_nano_graph(
+                    shadow_workspace, kb_settings.vector_workspace
+                )
 
             if selected_backend is VectorBackend.nano:
                 backup = canonical_nano_workspace.parent / f"backup-{generation_name}"
@@ -188,6 +224,13 @@ class IndexService:
 
             if self._runtime_manager is not None:
                 await self._runtime_manager.close_runtime(kb_id)
+            from industrial_rag.services.generation_artifacts import load_generation_manifest
+
+            load_generation_manifest(
+                shadow_workspace,
+                expected_generation_id=generation_name,
+                expected_child_manifest_hash=record.child_chunks_manifest_hash,
+            )
             await self._generation_repo.activate(record)
             storage_root = (
                 shadow_workspace / kb_settings.vector_workspace
@@ -221,6 +264,8 @@ class IndexService:
                 "kb_id": kb_id,
                 "active_docs": len(active_docs),
                 "chunks": chunk_count,
+                "entities": entity_count,
+                "relationships": relationship_count,
                 "backend": selected_backend.value,
                 "generation": generation_name,
                 "generation_id": record.id,
@@ -235,6 +280,35 @@ class IndexService:
             if shadow_workspace.exists():
                 shutil.rmtree(shadow_workspace, ignore_errors=True)
             raise
+
+    @staticmethod
+    def _verify_nano_graph(workspace: Path, workspace_token: str | None) -> tuple[int, int]:
+        """Reject a Nano generation whose graph file holds no entities.
+
+        Nano keeps the graph in a GraphML file rather than Qdrant collections,
+        so the only cheap proof that extraction ran is a non-empty node set.
+        """
+        storage_root = workspace / workspace_token if workspace_token else workspace
+        graph_file = storage_root / "graph_chunk_entity_relation.graphml"
+        if not graph_file.is_file():
+            raise RuntimeError(
+                "Index health: knowledge graph file is missing "
+                f"({graph_file}); re-index the documents so entity extraction can write it"
+            )
+        with graph_file.open(encoding="utf-8", errors="ignore") as handle:
+            nodes = 0
+            edges = 0
+            for line in handle:
+                if "<node " in line:
+                    nodes += 1
+                elif "<edge " in line:
+                    edges += 1
+        if nodes == 0:
+            raise RuntimeError(
+                "Index health: knowledge graph is empty (0 entities); "
+                "re-index the documents so entity extraction can write the graph"
+            )
+        return nodes, edges
 
     async def _health_verify(
         self,

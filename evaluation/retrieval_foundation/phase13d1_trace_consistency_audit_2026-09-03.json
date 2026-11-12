@@ -1,0 +1,95 @@
+{
+  "final_status": "PASS_TO_NEXT_PHASE",
+  "root_cause": "REPORT_BUG",
+  "secondary_limitation": "TRACE_SCHEMA_GAP",
+  "recommendation": "FIX_EVALUATION_PIPELINE",
+  "scope": "read_only_existing_artifacts",
+  "inputs": {
+    "phase13b": "D:\\\u57fa\u4e8eLightrag\u7684\u5de5\u4e1a\u624b\u518c\u95ee\u7b54\u7cfb\u7edf\\lightrag_industry_qa_portfolio-retrieval-foundation-upgrade\\evaluation\\retrieval_foundation\\phase13b_multi_query_ablation_2026-09-03.json",
+    "phase13c1": "D:\\\u57fa\u4e8eLightrag\u7684\u5de5\u4e1a\u624b\u518c\u95ee\u7b54\u7cfb\u7edf\\lightrag_industry_qa_portfolio-retrieval-foundation-upgrade\\evaluation\\retrieval_foundation\\phase13c1_weighted_rrf_ablation_2026-09-03.json",
+    "phase13d0": "D:\\\u57fa\u4e8eLightrag\u7684\u5de5\u4e1a\u624b\u518c\u95ee\u7b54\u7cfb\u7edf\\lightrag_industry_qa_portfolio-retrieval-foundation-upgrade\\evaluation\\retrieval_foundation\\phase13d0_evidence_loss_audit_2026-09-03.json"
+  },
+  "identity": {
+    "dataset_fingerprint": "deac5832de37a95f933267aba10e40215582f1136cd6a60dfabf2d9784385060",
+    "generation_id": "dev-v2-20260902",
+    "question_count": 24,
+    "split": "Development",
+    "validation_or_holdout_accessed": false
+  },
+  "comparison": {
+    "phase13c1_reported": {
+      "fusion_top20": {
+        "hits": 10,
+        "gold": 21
+      },
+      "final_top10": {
+        "hits": 9,
+        "gold": 21
+      },
+      "final_top5": {
+        "hits": 6,
+        "gold": 21
+      },
+      "note": "C1 headline numerator counted all gold evidence across six questions while retaining the Phase13B missing-set denominator."
+    },
+    "phase13d0_audit": {
+      "fusion_top20": {
+        "hits": 1,
+        "gold": 21
+      },
+      "final_top10": {
+        "hits": 0,
+        "gold": 21
+      },
+      "final_top5": {
+        "hits": 0,
+        "gold": 21
+      }
+    },
+    "strict_recompute_missing_only": {
+      "fusion_top20": {
+        "hits": 1,
+        "gold": 21
+      },
+      "matches_d0": true
+    },
+    "c1_all_gold_fusion_hits": 10
+  },
+  "evidence_id_alignment": {
+    "expected_missing_count": 21,
+    "exact_child_id_alignment_count": 21,
+    "exact_child_id_alignment": true,
+    "mismatches": []
+  },
+  "trace_schema": {
+    "required_fields": [
+      "query_variants",
+      "retrieval_candidates",
+      "fusion_candidates",
+      "rerank_candidates",
+      "final_top_k"
+    ],
+    "missing_trace_fields": [
+      "query_variants",
+      "retrieval_candidates",
+      "fusion_candidates",
+      "rerank_candidates",
+      "final_top_k",
+      "evidence_lineage",
+      "retrieval_local_rank",
+      "query_source",
+      "rerank_rank"
+    ]
+  },
+  "missing_only_fusion_hit_ids": [
+    [
+      "S011",
+      "cchunk-pymupdf-v1-bf2be6315d2f187b-000"
+    ]
+  ],
+  "notes": [
+    "No retrieval or model was rerun.",
+    "Rerank Top20 and evidence lineage are unavailable in persisted C1 JSON; no ranks were inferred."
+  ],
+  "commit": "fdc6cbccf7e56a23c574383c5a4d524383ef4942"
+}

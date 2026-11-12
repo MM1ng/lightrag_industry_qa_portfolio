@@ -15,6 +15,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from evaluation.phase10.conversation_e2e_contracts import portable_file_sha256
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SNAPSHOT_PATH = PROJECT_ROOT / "evaluation/phase10/conversation_e2e_runtime_snapshot_development.jsonl"
 DATASET_PATH = PROJECT_ROOT / "data/evaluation/conversation_retrieval_development.jsonl"
@@ -68,7 +70,7 @@ def load_and_verify_snapshot() -> tuple[list[dict[str, Any]], dict[str, Any]]:
     dataset_ids = [str(row["case_id"]) for row in dataset_rows]
     if expected_ids != dataset_ids:
         raise AuditBlocked("snapshot and Development dataset case order differ")
-    raw_sha = hashlib.sha256(DATASET_PATH.read_bytes()).hexdigest()
+    raw_sha = portable_file_sha256(DATASET_PATH)
     semantic = json.dumps(dataset_rows, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     if manifest.get("dataset_fingerprint", {}).get("raw_sha256") != raw_sha:
         raise AuditBlocked("dataset raw fingerprint parity is false")

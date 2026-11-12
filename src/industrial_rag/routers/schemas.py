@@ -183,10 +183,19 @@ class GenerationActionResponse(BaseModel):
     previous_generation_id: str | None = None
 
 
+class GenerationValidateRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    suite_id: str | None = None
+    suite_sha256: str | None = None
+
+
 class GenerationValidateResponse(BaseModel):
     generation_id: str
     knowledge_base_id: str
     passed: bool
+    outcome: str | None = None
+    applicability: str | None = None
+    admission: str | None = None
     gates: dict[str, Any]
     report: dict[str, Any] | None = None
 

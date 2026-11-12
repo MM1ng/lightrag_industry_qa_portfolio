@@ -1,0 +1,359 @@
+{
+  "final_status": "PASS_TO_NEXT_PHASE",
+  "primary_bottleneck": "NO_MEANINGFUL_MULTI_QUERY_GAIN",
+  "next_recommendation": "MULTI_QUERY_STOP",
+  "source_branch": "dev/retrieval-foundation-qa-downstream",
+  "source_commit": "b63f7a7344ad760924b822c9697ba7771fe111c1",
+  "dataset_identity": {
+    "fingerprint": "deac5832de37a95f933267aba10e40215582f1136cd6a60dfabf2d9784385060",
+    "question_count": 24,
+    "split": "Development"
+  },
+  "generation_identity": {
+    "generation_id": "dev-v2-20260902",
+    "corpus_fingerprint": "ed7bf1da6aab63a7afcf88c21480c6e987d231b9de65de2dd0977ce4b4e60e68",
+    "child_manifest_hash": "b1a6334f6e725591e5d796f318e76d3eb77c46fa8c8cc3f6342dc850ad77d1e0"
+  },
+  "validation_or_holdout_accessed": false,
+  "retrieval_config": {
+    "candidate_top_n": 20,
+    "final_top_k": 10,
+    "rrf_k": 60
+  },
+  "reranker_config": {
+    "model": "qwen3-rerank",
+    "timeout_seconds": 2.0,
+    "one_call_per_question": true
+  },
+  "query_expansion_config": "original + 3 existing Phase 13B variants",
+  "metrics": {
+    "A2": {
+      "recall@5": 0.8177083333333334,
+      "recall@10": 0.8312499999999999,
+      "mrr@5": 0.8937499999999999,
+      "mrr@10": 0.8937499999999999,
+      "question_hit@5": 1.0,
+      "question_hit@10": 1.0,
+      "complete_evidence_coverage@5": 0.75,
+      "complete_evidence_coverage@10": 0.75,
+      "multi_evidence_complete@5": 0.25,
+      "multi_evidence_complete@10": 0.25
+    },
+    "A3.1": {
+      "recall@5": 0.8093750000000001,
+      "recall@10": 0.8312499999999999,
+      "mrr@5": 0.8833333333333333,
+      "mrr@10": 0.8892857142857142,
+      "question_hit@5": 0.9583333333333334,
+      "question_hit@10": 1.0,
+      "complete_evidence_coverage@5": 0.75,
+      "complete_evidence_coverage@10": 0.75,
+      "multi_evidence_complete@5": 0.25,
+      "multi_evidence_complete@10": 0.25
+    }
+  },
+  "missing_only_funnel": {
+    "gold": 21,
+    "retrieval": 7,
+    "fusion_top20": 1,
+    "rerank_top20": null,
+    "final_top10": 0,
+    "final_top5": 0
+  },
+  "missing_only_evidence": [
+    {
+      "question_id": "S003",
+      "gold_evidence_id": "cchunk-pymupdf-v1-6590f00e21e280d0-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S003",
+      "gold_evidence_id": "cchunk-pymupdf-v1-663e640852497df6-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S003",
+      "gold_evidence_id": "cchunk-pymupdf-v1-87557f88f4709fcc-000",
+      "retrieval_hit": true,
+      "retrieval_sources": [
+        "lightrag"
+      ],
+      "best_local_rank": 2,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S003",
+      "gold_evidence_id": "cchunk-pymupdf-v1-c97eb4631d5d2c9c-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S006",
+      "gold_evidence_id": "cchunk-pymupdf-v1-5388c52812f37351-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S006",
+      "gold_evidence_id": "cchunk-pymupdf-v1-a03be0b31badfb6b-000",
+      "retrieval_hit": true,
+      "retrieval_sources": [
+        "lightrag"
+      ],
+      "best_local_rank": 11,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S006",
+      "gold_evidence_id": "cchunk-pymupdf-v1-d8638f275d20c6d6-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-91e5666cf6078fb9-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-93807a18f7b7345f-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-ac2c48838803419d-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-acca8dbfb1b95f8f-000",
+      "retrieval_hit": true,
+      "retrieval_sources": [
+        "sparse"
+      ],
+      "best_local_rank": 14,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-bf2be6315d2f187b-000",
+      "retrieval_hit": true,
+      "retrieval_sources": [
+        "lightrag",
+        "sparse"
+      ],
+      "best_local_rank": 14,
+      "fusion_rank": 18,
+      "rerank_input_rank": 18,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S011",
+      "gold_evidence_id": "cchunk-pymupdf-v1-cc1f6fd20cdb46f6-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S014",
+      "gold_evidence_id": "cchunk-pymupdf-v1-93807a18f7b7345f-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S015",
+      "gold_evidence_id": "cchunk-pymupdf-v1-34cc49bd2766d02e-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S015",
+      "gold_evidence_id": "cchunk-pymupdf-v1-5989850607a8046c-000",
+      "retrieval_hit": true,
+      "retrieval_sources": [
+        "sparse"
+      ],
+      "best_local_rank": 3,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S015",
+      "gold_evidence_id": "cchunk-pymupdf-v1-78a156ed97cebd53-000",
+      "retrieval_hit": true,
+      "retrieval_sources": [
+        "lightrag"
+      ],
+      "best_local_rank": 18,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S016",
+      "gold_evidence_id": "cchunk-pymupdf-v1-16686d3e3ddcc21b-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S016",
+      "gold_evidence_id": "cchunk-pymupdf-v1-317e33cc54ca5b18-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S016",
+      "gold_evidence_id": "cchunk-pymupdf-v1-99121c418e138c64-000",
+      "retrieval_hit": false,
+      "retrieval_sources": [],
+      "best_local_rank": null,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    },
+    {
+      "question_id": "S016",
+      "gold_evidence_id": "cchunk-pymupdf-v1-f997c995a333b4ae-000",
+      "retrieval_hit": true,
+      "retrieval_sources": [
+        "sparse"
+      ],
+      "best_local_rank": 2,
+      "fusion_rank": null,
+      "rerank_input_rank": null,
+      "rerank_score": null,
+      "rerank_rank": null,
+      "final_top10_rank": null,
+      "final_top5_rank": null
+    }
+  ],
+  "trace_limitations": [
+    "A2 historical artifact has no raw retrieval/fusion/rerank Top20 trace; those A2 funnel stages are unavailable, not inferred.",
+    "A3.1 reranker runtime persists final Top10 scores; rerank Top20 rank for non-final candidates is unavailable."
+  ],
+  "algorithm_output_comparison": "A3.1 trace-capture output matches original Phase 13C-1 for both arms; selected arm is original_weight=1.5 because weights 1.5 and 2.0 were ranking/metric equivalent.",
+  "regression_count": 0
+}

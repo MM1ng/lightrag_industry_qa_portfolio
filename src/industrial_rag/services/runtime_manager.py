@@ -11,6 +11,7 @@ from typing import Any
 from industrial_rag.config import Settings
 from industrial_rag.lightrag_service import LightRAGService, QueryMode, QueryResult
 from industrial_rag.operational_metrics import operational_metrics
+from industrial_rag.runtime_chunk_hydration import ChunkRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,11 @@ class AsyncLightRAGService:
             await self._svc.close()
             self._initialized = False
 
+    def bind_chunk_registry(self, registry: ChunkRegistry) -> None:
+        if self._initialized:
+            raise RuntimeError("cannot replace a chunk registry on an initialized runtime")
+        self._svc.bind_chunk_registry(registry)
+
     async def query(
         self,
         question: str,
@@ -38,11 +44,16 @@ class AsyncLightRAGService:
         mode: QueryMode = "mix",
         top_k: int = 12,
         chunk_top_k: int = 20,
+        on_delta: Callable[[str], None] | None = None,
     ) -> QueryResult:
         if not self._initialized:
             raise RuntimeError("Service not initialized")
         return await self._svc.query(
-            question, mode=mode, top_k=top_k, chunk_top_k=chunk_top_k
+            question,
+            mode=mode,
+            top_k=top_k,
+            chunk_top_k=chunk_top_k,
+            on_delta=on_delta,
         )
 
     async def ingest(self, chunks: Any) -> str:
@@ -96,7 +107,13 @@ class KnowledgeBaseRuntimeManager:
         self._runtimes: dict[RuntimeCacheKey, Any] = {}
         self._locks: dict[str, asyncio.Lock] = {}
 
-    async def get_runtime(self, kb_id: str, settings: Settings) -> Any:
+    async def get_runtime(
+        self,
+        kb_id: str,
+        settings: Settings,
+        *,
+        chunk_registry: ChunkRegistry | None = None,
+    ) -> Any:
         key = RuntimeCacheKey.from_settings(kb_id, settings)
         cached = self._runtimes.get(key)
         if cached is not None and cached.initialized:
@@ -113,6 +130,11 @@ class KnowledgeBaseRuntimeManager:
             if len(self._runtimes) >= self._max_cached:
                 await self._evict_one()
             service = self._service_factory(settings)
+            if chunk_registry is not None:
+                bind_registry = getattr(service, "bind_chunk_registry", None)
+                if not callable(bind_registry):
+                    raise RuntimeError("runtime service does not support chunk registry binding")
+                bind_registry(chunk_registry)
             await service.initialize()
             self._runtimes[key] = service
             logger.info(

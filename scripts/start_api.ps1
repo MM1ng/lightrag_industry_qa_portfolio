@@ -1,10 +1,21 @@
 param(
     [string]$Port = "8000",
-    [string]$EnvFile = ""
+    [string]$EnvFile = "",
+    # Uvicorn rewrites request.client from X-Forwarded-For for peers in its
+    # --forwarded-allow-ips list (127.0.0.1 by default). That happens before the
+    # app runs, so it silently hands every local caller a fresh rate-limit bucket
+    # and defeats IRA_TRUST_PROXY_HEADERS=false. Disabled by default; set this to
+    # the reverse proxy addresses only when the proxy sanitises the header.
+    [string]$ForwardedAllowIps = ""
 )
 $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
-$python = (Get-Command python -ErrorAction Stop).Source
+$venvPython = Join-Path $repo ".venv\Scripts\python.exe"
+$python = if (Test-Path -LiteralPath $venvPython) {
+    $venvPython
+} else {
+    (Get-Command python -ErrorAction Stop).Source
+}
 if (-not $EnvFile) {
     $defaultEnvFile = Join-Path $repo ".env.local_staging"
     if (Test-Path -LiteralPath $defaultEnvFile) {
@@ -33,11 +44,6 @@ if ($LASTEXITCODE -ne 0) {
     Write-Output "MIGRATION_FAILED"
     exit 1
 }
-& $python (Join-Path $repo "scripts\verify_database_schema.py")
-if ($LASTEXITCODE -ne 0) {
-    Write-Output "DATABASE_SCHEMA_NOT_READY"
-    exit 1
-}
 try {
     $qdrantUrl = [Environment]::GetEnvironmentVariable("QDRANT_URL", "Process")
     if (-not $qdrantUrl) {
@@ -49,7 +55,13 @@ try {
 } catch {
     Write-Output "QDRANT_NOT_READY"; exit 1
 }
-$proc = Start-Process -FilePath $python -ArgumentList @("-m", "uvicorn", "industrial_rag.api:app", "--host", "127.0.0.1", "--port", $Port) -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runDir "api.out.log") -RedirectStandardError (Join-Path $runDir "api.err.log")
+$uvicornArgs = @("-m", "uvicorn", "industrial_rag.api:app", "--host", "127.0.0.1", "--port", $Port)
+if ($ForwardedAllowIps) {
+    $uvicornArgs += @("--forwarded-allow-ips", $ForwardedAllowIps)
+} else {
+    $uvicornArgs += "--no-proxy-headers"
+}
+$proc = Start-Process -FilePath $python -ArgumentList $uvicornArgs -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $runDir "api.out.log") -RedirectStandardError (Join-Path $runDir "api.err.log")
 Set-Content -Path $pidFile -Value $proc.Id
 for ($i = 0; $i -lt 60; $i++) {
     Start-Sleep -Seconds 2

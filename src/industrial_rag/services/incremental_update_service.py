@@ -1,7 +1,7 @@
 """Incremental knowledge-base updates with generation lifecycle (Phase 9).
 
 One candidate generation is created per update operation (add / replace /
-delete).  The candidate inherits unchanged documents from the active
+delete / reparse / reindex).  The candidate inherits unchanged documents from the active
 generation by *copying* its workspace and Qdrant points (vectors are reused,
 never recomputed for unchanged chunks).  Only the changed document is parsed,
 chunked, embedded and indexed.  Promote/rollback are atomic pointer switches;
@@ -11,9 +11,11 @@ physical cleanup is never part of this flow.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import logging
+import os
 import re
 import secrets
 import shutil
@@ -21,6 +23,7 @@ import time
 import uuid
 from collections.abc import Callable
 from contextlib import asynccontextmanager
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -28,10 +31,12 @@ from typing import Any
 from qdrant_client import AsyncQdrantClient, models
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from industrial_rag.config import Settings
+from industrial_rag.config import Settings, write_storage_metadata
 from industrial_rag.db.models import (
+    ClaimedExecutionContext,
     DocumentStatus,
     KBStatus,
+    ParsedArtifactReference,
     UpdateJobStatus,
     UpdateOperation,
     VectorIndexGenerationStatus,
@@ -39,6 +44,10 @@ from industrial_rag.db.models import (
 from industrial_rag.errors import AppError, AppErrorCode
 from industrial_rag.kb_runtime_settings import settings_for_knowledge_base
 from industrial_rag.operational_metrics import operational_metrics
+from industrial_rag.qdrant_graph_reader import (
+    load_graph_from_qdrant,
+    materialize_graphml,
+)
 from industrial_rag.repositories.document_repository import DocumentRepository
 from industrial_rag.repositories.knowledge_base_repository import (
     KnowledgeBaseRepository,
@@ -47,9 +56,17 @@ from industrial_rag.repositories.update_job_repository import UpdateJobRepositor
 from industrial_rag.repositories.vector_index_generation_repository import (
     VectorIndexGenerationRepository,
 )
-from industrial_rag.services.kb_lease_service import KBLeaseService
+from industrial_rag.services.generation_artifacts import (
+    freeze_generation_child_chunks,
+    load_generation_child_chunks,
+    load_generation_parent_records,
+)
+from industrial_rag.services.generation_fingerprint_service import build_generation_fingerprint
+from industrial_rag.services.kb_lease_service import KBLeaseService, LeaseHandle
+from industrial_rag.services.update_job_snapshot import build_input_snapshot
 from industrial_rag.storage_layout import (
     document_stored_path,
+    kb_parsed_attempt_staging_dir,
     kb_parsed_documents_dir,
     kb_qdrant_generation_workspace,
 )
@@ -57,11 +74,135 @@ from industrial_rag.vector_collections import CollectionNameResolver, VectorBack
 
 logger = logging.getLogger(__name__)
 LIGHTRAG_CLOSE_TIMEOUT_SECONDS = 30.0
-LIGHTRAG_INSERT_TIMEOUT_SECONDS = 300.0
+# Entity extraction is the slow half of an insert: every chunk costs one LLM
+# round trip before the merge stage writes any entity.  A short ceiling cut the
+# insert off between "chunks are durable" and "graph is merged", which left
+# generations active with a completely empty graph.  Entity extraction costs one
+# LLM round trip per chunk, so a 400+ chunk manual needs hours; the default is
+# generous on purpose and can be tuned per deployment.
+LIGHTRAG_INSERT_TIMEOUT_SECONDS = float(
+    os.environ.get("LIGHTRAG_INSERT_TIMEOUT_SECONDS", "21600") or 21600
+)
+
+# ``ainsert`` reports success even when a document failed to extract, so the
+# build re-checks the sidecar status and retries.  Chunk results already cached
+# make a retry incremental, which is why a small number of attempts is enough.
+_LIGHTRAG_INSERT_ATTEMPTS = max(
+    1, int(os.environ.get("LIGHTRAG_INSERT_ATTEMPTS", "3") or 3)
+)
 
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".pdf"}
 PDF_MAGIC = b"%PDF-"
+_ATTEMPT_ARTIFACT_FILES = ("complete.json", "parent_chunks.jsonl", "child_chunks.jsonl")
+
+
+def read_lightrag_doc_status(
+    storage_root: Path, internal_doc_id: str
+) -> tuple[str | None, str]:
+    """Return LightRAG's own verdict for one document.
+
+    ``ainsert`` swallows per-document extraction failures: it logs the error,
+    marks the document ``failed`` in this sidecar file and returns normally.  A
+    caller that only awaits the insert therefore believes the graph was merged
+    when in fact the document contributed nothing but chunks.
+    """
+    path = storage_root / "kv_store_doc_status.json"
+    if not path.is_file():
+        return None, ""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None, ""
+    record = data.get(internal_doc_id) if isinstance(data, dict) else None
+    if not isinstance(record, dict):
+        return None, ""
+    return record.get("status"), str(record.get("error_msg") or "")
+
+
+def finalize_timed_out_lightrag_status(
+    storage_root: Path, internal_doc_id: str, *, expected_chunk_count: int
+) -> bool:
+    """Close LightRAG's sidecar status after a durable insert timeout.
+
+    The timeout branch is allowed to converge only when the persisted status
+    record proves that every expected chunk was registered.  The update is
+    atomic and preserves all existing metadata, so a partial insert remains in
+    ``processing`` and the caller can fail the candidate safely.
+    """
+    path = storage_root / "kv_store_doc_status.json"
+    if expected_chunk_count <= 0 or not path.is_file():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    record = data.get(internal_doc_id) if isinstance(data, dict) else None
+    if not isinstance(record, dict) or record.get("status") != "processing":
+        return False
+    chunks = record.get("chunks_list")
+    try:
+        chunk_count = int(record.get("chunks_count", 0))
+    except (TypeError, ValueError):
+        chunk_count = -1
+    complete = (
+        chunk_count == expected_chunk_count
+        and isinstance(chunks, list)
+        and len(chunks) == expected_chunk_count
+    )
+    record["status"] = "processed" if complete else "failed"
+    record["updated_at"] = datetime.now(UTC).isoformat()
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    try:
+        tmp_path.write_text(json.dumps(data, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+        tmp_path.replace(path)
+    except OSError:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return False
+    return complete
+
+
+def _attempt_artifact_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    for name in _ATTEMPT_ARTIFACT_FILES:
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update((path / name).read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def validate_attempt_parsed_artifact(reference: ParsedArtifactReference) -> Path:
+    """Validate the closed C1B artifact contract before candidate consumption."""
+    artifact_dir = Path(reference.artifact_path)
+    if any(not (artifact_dir / name).is_file() for name in _ATTEMPT_ARTIFACT_FILES):
+        raise RuntimeError("Attempt parsed artifact is incomplete")
+    try:
+        manifest = json.loads((artifact_dir / "complete.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise RuntimeError("Attempt parsed artifact manifest is invalid") from error
+    if not isinstance(manifest, dict) or manifest.get("document_id") != reference.document_id:
+        raise RuntimeError("Attempt parsed artifact manifest does not match reference")
+    child_count = manifest.get("child_chunk_count")
+    parent_count = manifest.get("parent_chunk_count")
+    if type(child_count) is not int or type(parent_count) is not int:
+        raise RuntimeError("Attempt parsed artifact manifest is invalid")
+    actual_child_count = sum(
+        bool(line.strip())
+        for line in (artifact_dir / "child_chunks.jsonl").read_text(encoding="utf-8").splitlines()
+    )
+    actual_parent_count = sum(
+        bool(line.strip())
+        for line in (artifact_dir / "parent_chunks.jsonl").read_text(encoding="utf-8").splitlines()
+    )
+    if (child_count, parent_count) != (actual_child_count, actual_parent_count):
+        raise RuntimeError("Attempt parsed artifact manifest counts do not match content")
+    if reference.artifact_digest is None or _attempt_artifact_digest(artifact_dir) != reference.artifact_digest:
+        raise RuntimeError("Attempt parsed artifact digest does not match reference")
+    return artifact_dir
 
 # In-process per-KB lock registry so concurrent API requests serialize
 # promote/rollback even though each request creates a fresh service instance.
@@ -111,6 +252,32 @@ class IncrementalUpdateService:
         self._runtime_manager = runtime_manager
         self._qdrant_client_factory = qdrant_client_factory
         self._lightrag_service_factory = lightrag_service_factory
+
+    @staticmethod
+    def _snapshot_document(document: Any) -> dict[str, Any]:
+        return {
+            "document_id": document.id,
+            "version": document.version,
+            "source_hash": document.file_hash,
+            "stored_file_name": document.stored_file_name,
+        }
+
+    @staticmethod
+    def _snapshot_configuration(kb: Any) -> dict[str, Any]:
+        return {
+            "parser": kb.parser_name,
+            "parser_version": kb.parser_version,
+            "chunking_strategy": kb.chunking_strategy,
+            "chunking_version": kb.chunking_version,
+            "embedding_model": kb.embedding_model,
+            "embedding_dimension": kb.embedding_dimension,
+        }
+
+    @staticmethod
+    def _snapshot_base(base: Any | None) -> dict[str, Any] | None:
+        if base is None:
+            return None
+        return {"generation_id": base.id, "manifest_hash": base.document_manifest_hash}
 
     @asynccontextmanager
     async def _writer_lease(
@@ -218,6 +385,12 @@ class IncrementalUpdateService:
             request_id=request_id,
             trace_id=trace_id,
             created_by=created_by,
+            checkpoint={
+                "input_snapshot": build_input_snapshot(
+                    operation="add", knowledge_base_id=kb_id, base_generation=self._snapshot_base(base),
+                    configuration=self._snapshot_configuration(kb), source=self._snapshot_document(doc),
+                )
+            },
         )
         await self._session.commit()
         return await self._execute_persisted_job(kb_id, job.id)
@@ -295,6 +468,13 @@ class IncrementalUpdateService:
             trace_id=trace_id,
             created_by=created_by,
             metrics={"replaced_document_id": old_doc.id},
+            checkpoint={
+                "input_snapshot": build_input_snapshot(
+                    operation="replace", knowledge_base_id=kb_id, base_generation=self._snapshot_base(base),
+                    configuration=self._snapshot_configuration(kb), source=self._snapshot_document(new_doc),
+                    target=self._snapshot_document(old_doc), replacement=self._snapshot_document(new_doc),
+                )
+            },
         )
         await self._session.commit()
         return await self._execute_persisted_job(kb_id, job.id, old_doc=old_doc)
@@ -308,7 +488,7 @@ class IncrementalUpdateService:
         trace_id: str | None = None,
         created_by: str = "api",
     ) -> dict[str, Any]:
-        await self._require_kb(kb_id)
+        kb = await self._require_kb(kb_id)
         original = await self._doc_repo.get_by_kb_and_id(kb_id, doc_id)
         if original is None:
             raise AppError(AppErrorCode.document_not_found, f"文档不存在: {doc_id}")
@@ -331,6 +511,13 @@ class IncrementalUpdateService:
             request_id=request_id,
             trace_id=trace_id,
             created_by=created_by,
+            checkpoint={
+                "input_snapshot": build_input_snapshot(
+                    operation="delete", knowledge_base_id=kb_id, base_generation=self._snapshot_base(base),
+                    configuration=self._snapshot_configuration(kb),
+                    target=self._snapshot_document(doc),
+                )
+            },
         )
         await self._session.commit()
         return await self._execute_persisted_job(kb_id, job.id, old_doc=doc)
@@ -360,6 +547,8 @@ class IncrementalUpdateService:
         *,
         approved_by: str | None = None,
         golden_runner: Any = None,
+        suite_id: str | None = None,
+        suite_sha256: str | None = None,
     ) -> dict[str, Any]:
         async with self._writer_lease(
             kb_id,
@@ -372,6 +561,8 @@ class IncrementalUpdateService:
                 generation_id,
                 approved_by=approved_by,
                 golden_runner=golden_runner,
+                suite_id=suite_id,
+                suite_sha256=suite_sha256,
             )
 
     async def _validate_generation_under_lease(
@@ -381,6 +572,8 @@ class IncrementalUpdateService:
         *,
         approved_by: str | None = None,
         golden_runner: Any = None,
+        suite_id: str | None = None,
+        suite_sha256: str | None = None,
     ) -> dict[str, Any]:
         await self._require_kb(kb_id)
         generation = await self._generation_repo.get(generation_id)
@@ -399,6 +592,8 @@ class IncrementalUpdateService:
                 status_code=409,
             )
         generation.status = VectorIndexGenerationStatus.validating
+        generation.validated_fingerprint = None
+        generation.accepted_policy_snapshot = None
         await self._session.flush()
 
         from industrial_rag.services.generation_validation_service import (
@@ -416,21 +611,33 @@ class IncrementalUpdateService:
             generation,
             golden_runner=golden_runner,
             approved_by=approved_by,
+            suite_id=suite_id,
+            suite_sha256=suite_sha256,
         )
         operational_metrics.increment("validation_run_total")
         operational_metrics.increment(
-            "validation_pass_total" if report["passed"] else "validation_fail_total"
+            "validation_blocked_total" if report["outcome"] == "BLOCKED" else "validation_pass_total" if report["passed"] else "validation_fail_total"
         )
         job = await self._job_repo.find_by_candidate(generation_id)
-        if report["passed"]:
+        if report["outcome"] == "BLOCKED":
+            generation.status = VectorIndexGenerationStatus.building
+            generation.validated_fingerprint = None
+            generation.accepted_policy_snapshot = None
+            generation.last_error = "validation blocked: " + "; ".join(report["reason_codes"])
+            if job is not None:
+                job.result = {**(job.result or {}), "validation": report}
+                job.status = UpdateJobStatus.building
+                job.current_stage = "awaiting_validation"
+        elif report["passed"]:
             generation.status = VectorIndexGenerationStatus.ready
+            generation.last_error = None
             if job is not None:
                 job.result = {**(job.result or {}), "validation": report}
                 await self._job_repo.mark_ready(job.id)
         else:
             generation.status = VectorIndexGenerationStatus.failed
             generation.last_error = "validation failed: " + "; ".join(
-                gate for gate, ok in report["gates"].items() if not ok
+                gate for gate, ok in report["gates"].items() if ok.get("status") != "PASS"
             )
             if job is not None:
                 await self._job_repo.mark_failed(
@@ -448,6 +655,9 @@ class IncrementalUpdateService:
             "generation_id": generation_id,
             "knowledge_base_id": kb_id,
             "passed": report["passed"],
+            "outcome": report["outcome"],
+            "applicability": report["applicability"],
+            "admission": report["admission"],
             "gates": report["gates"],
             "report": report,
         }
@@ -490,6 +700,9 @@ class IncrementalUpdateService:
                 )
             active = await self._generation_repo.get_active(kb_id)
             if active is not None and active.id == generation.id:
+                job = await self._job_repo.find_by_candidate(generation.id)
+                if job is not None:
+                    await self._sync_active_knowledge_base_metadata(kb_id, generation, job)
                 await self._session.commit()
                 return {
                     "status": "already_active",
@@ -524,6 +737,7 @@ class IncrementalUpdateService:
                     self._qdrant_client_factory or self._new_qdrant_client
                 ),
             ).require_eligible(kb_id, generation)
+            self._require_frozen_generation_snapshot(generation)
             now = _utcnow()
             switched = await KBLeaseService(self._session).switch_active_generation(
                 lease,
@@ -539,6 +753,7 @@ class IncrementalUpdateService:
                     status_code=409,
                 )
             await self._apply_document_state(job, active_now=True)
+            await self._sync_active_knowledge_base_metadata(kb_id, generation, job)
             await self._job_repo.mark_promoted(job.id, approved_by=approved_by)
             if self._runtime_manager is not None:
                 await self._runtime_manager.close_runtime(kb_id)
@@ -609,6 +824,7 @@ class IncrementalUpdateService:
                     f"只能回滚到验收通过的 archived/ready Generation（当前 {target.status.value}）",
                     status_code=409,
                 )
+            self._require_frozen_generation_snapshot(target)
             now = _utcnow()
             switched = await KBLeaseService(self._session).switch_active_generation(
                 lease,
@@ -679,6 +895,61 @@ class IncrementalUpdateService:
         if job is None:
             raise AppError(AppErrorCode.update_job_not_found, f"更新任务不存在: {job_id}")
         return self._job_summary(job)
+
+    async def execute_job(
+        self,
+        kb_id: str,
+        job_id: str,
+        *,
+        actor: str | None = None,
+    ) -> dict[str, Any]:
+        """Build one pending UpdateJob into an isolated candidate generation.
+
+        This is intentionally synchronous for LifecycleTask compatibility. It
+        does not validate or promote the candidate; those remain explicit
+        existing lifecycle operations.
+        """
+        await self._require_kb(kb_id)
+        job = await self._job_repo.get_by_kb_and_id(kb_id, job_id)
+        if job is None:
+            raise AppError(AppErrorCode.update_job_not_found, f"更新任务不存在: {job_id}")
+        if job.candidate_generation_id is not None:
+            candidate = await self._generation_repo.get(job.candidate_generation_id)
+            if candidate is not None and candidate.status in {
+                VectorIndexGenerationStatus.building,
+                VectorIndexGenerationStatus.validating,
+                VectorIndexGenerationStatus.ready,
+                VectorIndexGenerationStatus.active,
+            }:
+                if (
+                    candidate.status == VectorIndexGenerationStatus.building
+                    and job.current_stage != "awaiting_validation"
+                ):
+                    raise AppError(
+                        AppErrorCode.invalid_state_transition,
+                        "Candidate construction is incomplete; inspect or resume the job before reporting success.",
+                        status_code=409,
+                    )
+                return {
+                    "status": "candidate_built",
+                    "idempotent": True,
+                    "knowledge_base_id": kb_id,
+                    "job_id": job.id,
+                    "document_id": job.document_id,
+                    "operation": job.operation.value,
+                    "candidate_generation_id": candidate.id,
+                    "candidate_generation": candidate.generation,
+                }
+        if job.status not in {
+            UpdateJobStatus.pending,
+            UpdateJobStatus.recovery_required,
+        }:
+            raise AppError(
+                AppErrorCode.invalid_state_transition,
+                f"更新任务状态为 {job.status.value}，无法构建候选 Generation",
+                status_code=409,
+            )
+        return await self._execute_persisted_job(kb_id, job.id, actor=actor)
 
     async def resume_job(
         self,
@@ -808,7 +1079,24 @@ class IncrementalUpdateService:
                     "更新任务无法被当前 worker 领取。",
                     status_code=409,
                 )
-            result = await self._run_job(kb_id, job_id, old_doc=old_doc)
+            context = ClaimedExecutionContext(
+                job_id=claimed.id,
+                knowledge_base_id=claimed.knowledge_base_id,
+                attempt=claimed.attempt,
+                worker_id=worker_id,
+                lease_token=lease.lease_token,
+                fencing_token=lease.fencing_token,
+                lease_expires_at=lease.expires_at,
+                parsed_artifact_reference=ParsedArtifactReference.from_checkpoint(
+                    (claimed.checkpoint or {}).get("parsed_artifact_reference")
+                )
+                if (
+                    (claimed.checkpoint or {}).get("parsed_artifact_reference", {}).get("attempt")
+                    == claimed.attempt
+                )
+                else None,
+            )
+            result = await self._run_job(kb_id, job_id, old_doc=old_doc, context=context)
             if not await KBLeaseService(self._session).is_current(lease, now=_utcnow()):
                 await self._session.rollback()
                 raise AppError(
@@ -819,12 +1107,37 @@ class IncrementalUpdateService:
             await self._session.commit()
             return result
 
+    async def execute_claimed_job(
+        self, context: ClaimedExecutionContext, *, old_doc: Any | None = None
+    ) -> dict[str, Any]:
+        """Consume an existing Worker claim without acquiring another claim.
+
+        This is an integration boundary only; it starts no Worker or poller.
+        The persisted job and KB lease are checked before candidate work.
+        """
+        job = await self._job_repo.get_by_kb_and_id(context.knowledge_base_id, context.job_id)
+        if job is None or (job.worker_id, job.lease_token, job.fencing_token, job.attempt) != (
+            context.worker_id, context.lease_token, context.fencing_token, context.attempt
+        ):
+            raise AppError(AppErrorCode.invalid_state_transition, "Update job claim is not current.", status_code=409)
+        lease = LeaseHandle(
+            kb_id=context.knowledge_base_id,
+            owner=context.worker_id,
+            lease_token=context.lease_token,
+            fencing_token=context.fencing_token,
+            expires_at=context.lease_expires_at,
+        )
+        if not await KBLeaseService(self._session).is_current(lease, now=_utcnow()):
+            raise AppError(AppErrorCode.knowledge_base_busy, "Update job lease is not current.", status_code=409)
+        return await self._run_job(context.knowledge_base_id, context.job_id, old_doc=old_doc, context=context)
+
     async def _run_job(
         self,
         kb_id: str,
         job_id: str,
         *,
         old_doc: Any | None = None,
+        context: ClaimedExecutionContext | None = None,
     ) -> dict[str, Any]:
         """Build the candidate generation for one update job."""
         job = await self._job_repo.get(job_id)
@@ -855,7 +1168,24 @@ class IncrementalUpdateService:
                 chunking_config_hash="",
             )
             generation.status = VectorIndexGenerationStatus.building
-            await self._job_repo.mark_building(job_id, generation.id)
+            if context is None:
+                await self._job_repo.mark_building(job_id, generation.id)
+            else:
+                bound = await self._job_repo.mark_building_fenced(
+                    job_id,
+                    worker_id=context.worker_id,
+                    lease_token=context.lease_token,
+                    fencing_token=context.fencing_token,
+                    attempt=context.attempt,
+                    candidate_generation_id=generation.id,
+                    now=_utcnow(),
+                )
+                if not bound:
+                    raise AppError(
+                        AppErrorCode.invalid_state_transition,
+                        "Update job claim is no longer current.",
+                        status_code=409,
+                    )
             await self._session.flush()
             # Candidate collections are always created up front (even when the
             # KB has no active generation yet) so namespaces are stable.
@@ -873,7 +1203,7 @@ class IncrementalUpdateService:
             t_parse = t_embed = t_graph = 0.0
 
             # 1. Inherit unchanged content from the active generation.
-            if active is not None:
+            if active is not None and job.operation != UpdateOperation.reindex:
                 t0 = time.perf_counter()
                 reused = await self._inherit_active(
                     kb_id, active, generation, candidate_workspace
@@ -885,15 +1215,144 @@ class IncrementalUpdateService:
             doc = (
                 await self._doc_repo.get(job.document_id)
                 if job.document_id is not None
+                and job.operation != UpdateOperation.reindex
                 else None
             )
+            if job.operation == UpdateOperation.reparse:
+                if doc is None:
+                    raise RuntimeError("Reparse update job has no document")
+                old_doc = doc
             removed_internal_ids: list[str] = []
-            if job.operation in (UpdateOperation.add, UpdateOperation.replace) and doc is not None:
+            if job.operation in (
+                UpdateOperation.add,
+                UpdateOperation.replace,
+                UpdateOperation.reparse,
+            ) and doc is not None:
                 t0 = time.perf_counter()
-                await self._parse_document_pymupdf(kb, doc)
+                parsed_staging_dir = (
+                    kb_parsed_attempt_staging_dir(kb_id, context.job_id, context.attempt, doc.id)
+                    if context is not None else None
+                )
+                parse_result = await self._parse_document_pymupdf(
+                    kb,
+                    doc,
+                    artifact_dir=parsed_staging_dir,
+                    persist_document_metadata=context is None,
+                )
                 t_parse += time.perf_counter() - t0
+                if context is not None:
+                    reference = ParsedArtifactReference(
+                        job_id=context.job_id,
+                        knowledge_base_id=context.knowledge_base_id,
+                        attempt=context.attempt,
+                        document_id=doc.id,
+                        artifact_path=str(parsed_staging_dir),
+                        artifact_digest=_attempt_artifact_digest(parsed_staging_dir),
+                    )
+                    registered = await self._job_repo.register_parsed_artifact_reference(
+                        context.job_id,
+                        worker_id=context.worker_id,
+                        lease_token=context.lease_token,
+                        fencing_token=context.fencing_token,
+                        attempt=context.attempt,
+                        reference=reference,
+                        now=_utcnow(),
+                    )
+                    if not registered:
+                        raise AppError(
+                            AppErrorCode.knowledge_base_busy,
+                            "Update job ownership changed before parsed artifact registration.",
+                            status_code=409,
+                        )
+                    metadata_written = await self._doc_repo.mark_parsed_fenced(
+                        doc.id,
+                        job_id=context.job_id,
+                        knowledge_base_id=context.knowledge_base_id,
+                        worker_id=context.worker_id,
+                        lease_token=context.lease_token,
+                        fencing_token=context.fencing_token,
+                        attempt=context.attempt,
+                        page_count=parse_result["page_count"],
+                        parent_chunk_count=parse_result["parent_chunk_count"],
+                        child_chunk_count=parse_result["child_chunk_count"],
+                        now=_utcnow(),
+                    )
+                    if not metadata_written:
+                        raise AppError(
+                            AppErrorCode.knowledge_base_busy,
+                            "Update job ownership changed before parsed metadata persistence.",
+                            status_code=409,
+                        )
+                    context = replace(context, parsed_artifact_reference=reference)
+
+            snapshot_pairs, previous_children, snapshot_parents = await self._candidate_snapshot_pairs(
+                kb_id=kb_id,
+                active=active,
+                job=job,
+                changed_document=doc,
+                old_document=old_doc,
+                parsed_artifact_reference=(
+                    context.parsed_artifact_reference if context is not None else None
+                ),
+            )
+            snapshot = freeze_generation_child_chunks(
+                candidate_workspace,
+                generation_id=token,
+                document_children=snapshot_pairs,
+                document_parents=snapshot_parents,
+                replace_existing=active is not None,
+            )
+            fingerprint = build_generation_fingerprint(kb, snapshot_pairs)
+            if snapshot.child_manifest_hash != fingerprint.child_chunks_manifest_hash:
+                raise RuntimeError("candidate generation snapshot hash is not reproducible")
+            generation.document_manifest_hash = fingerprint.document_manifest_hash
+            generation.child_chunks_manifest_hash = fingerprint.child_chunks_manifest_hash
+            generation.embedding_config_hash = fingerprint.embedding_config_hash
+            generation.chunking_config_hash = fingerprint.chunking_config_hash
+            frozen_children = load_generation_child_chunks(
+                candidate_workspace,
+                expected_generation_id=token,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
+
+            # Reindex must recreate vectors from the frozen input, including
+            # when the active vector store has disappeared. Copying an empty
+            # active collection is not a rebuild.
+            if job.operation == UpdateOperation.reindex:
                 t0 = time.perf_counter()
-                added = await self._ingest_document(kb, generation, candidate_workspace, doc)
+                documents = {document.id: document for document, _child in snapshot_pairs}
+                for document in documents.values():
+                    stats["added_chunks"] += await self._ingest_document(
+                        kb, generation, candidate_workspace, document,
+                        children=[child for child in frozen_children if child.document_id == document.id],
+                    )
+                t_embed += time.perf_counter() - t0
+
+            if job.operation == UpdateOperation.reparse and old_doc is not None:
+                t0 = time.perf_counter()
+                removed_internal_ids = await self._remove_document_points(
+                    kb_id,
+                    generation,
+                    candidate_workspace,
+                    old_doc,
+                    children=previous_children.get(old_doc.id, []),
+                )
+                stats["invalidated_chunks"] = len(removed_internal_ids)
+                t_graph += time.perf_counter() - t0
+
+            if job.operation in (
+                UpdateOperation.add,
+                UpdateOperation.replace,
+                UpdateOperation.reparse,
+            ) and doc is not None:
+                t0 = time.perf_counter()
+                added = await self._ingest_document(
+                    kb,
+                    generation,
+                    candidate_workspace,
+                    doc,
+                    children=[child for child in frozen_children if child.document_id == doc.id],
+                )
                 stats["added_chunks"] = added
                 t_embed += time.perf_counter() - t0
 
@@ -903,7 +1362,11 @@ class IncrementalUpdateService:
             ):
                 t0 = time.perf_counter()
                 removed_internal_ids = await self._remove_document_points(
-                    kb_id, generation, candidate_workspace, old_doc
+                    kb_id,
+                    generation,
+                    candidate_workspace,
+                    old_doc,
+                    children=previous_children.get(old_doc.id, []),
                 )
                 stats["invalidated_chunks"] = len(removed_internal_ids)
                 t_graph += time.perf_counter() - t0
@@ -918,6 +1381,12 @@ class IncrementalUpdateService:
             entity_relation_delta = await self._count_delta(
                 kb_id, active, generation
             )
+            if job.operation == UpdateOperation.reindex:
+                actual = entity_relation_delta["candidate"]["chunks"]
+                if actual != len(frozen_children):
+                    raise RuntimeError(
+                        f"Reindex candidate point count mismatch: expected {len(frozen_children)}, got {actual}"
+                    )
             metrics = {
                 "replaced_document_id": old_doc.id
                 if job.operation == UpdateOperation.replace and old_doc is not None
@@ -937,9 +1406,7 @@ class IncrementalUpdateService:
                 "documents": await self._document_state_snapshot(kb_id, job),
                 "candidate_generation": token,
             }
-            generation.document_manifest_hash = self._manifest_hash(
-                await self._doc_repo.list_active_for_kb(kb_id)
-            )
+            job.current_stage = "awaiting_validation"
             await self._session.flush()
             return {
                 "status": "candidate_built",
@@ -952,16 +1419,32 @@ class IncrementalUpdateService:
                 "metrics": metrics,
             }
         except Exception as error:
+            if context is not None:
+                failed = await self._job_repo.mark_failed_fenced(
+                    job_id,
+                    knowledge_base_id=context.knowledge_base_id,
+                    worker_id=context.worker_id,
+                    lease_token=context.lease_token,
+                    fencing_token=context.fencing_token,
+                    attempt=context.attempt,
+                    error_code="build_failed",
+                    sanitized_error_message=_sanitize_error(error),
+                    now=_utcnow(),
+                )
+                if not failed:
+                    await self._session.rollback()
+                    raise
             if job.operation in {UpdateOperation.add, UpdateOperation.replace} and job.document_id:
                 failed_document = await self._doc_repo.get(job.document_id)
                 if failed_document is not None:
                     failed_document.status = DocumentStatus.failed
                     failed_document.is_active = False
-            await self._job_repo.mark_failed(
-                job_id,
-                error_code="build_failed",
-                sanitized_error_message=_sanitize_error(error),
-            )
+            if context is None:
+                await self._job_repo.mark_failed(
+                    job_id,
+                    error_code="build_failed",
+                    sanitized_error_message=_sanitize_error(error),
+                )
             await self._session.commit()
             raise
 
@@ -1039,7 +1522,121 @@ class IncrementalUpdateService:
                 await client.close()
         return reused
 
-    async def _parse_document_pymupdf(self, kb: Any, doc: Any) -> dict[str, Any]:
+    async def _candidate_snapshot_pairs(
+        self,
+        *,
+        kb_id: str,
+        active: Any | None,
+        job: Any,
+        changed_document: Any | None,
+        old_document: Any | None,
+        parsed_artifact_reference: ParsedArtifactReference | None = None,
+    ) -> tuple[list[tuple[Any, Any]], dict[str, list[Any]], list[tuple[Any, Any]]]:
+        """Build the candidate's complete ChildChunk input before LightRAG sees it.
+
+        Unchanged documents come from the active generation's frozen snapshot;
+        only a newly parsed candidate document may be sourced from its claimed attempt.
+        """
+        from industrial_rag.services.parse_service import load_child_chunks, load_parent_chunks
+
+        active_documents = await self._doc_repo.list_active_for_kb(kb_id)
+        documents = [
+            document
+            for document in active_documents
+            if old_document is None or document.id != old_document.id
+        ]
+        if (
+            changed_document is not None
+            and job.operation in (
+                UpdateOperation.add,
+                UpdateOperation.replace,
+                UpdateOperation.reparse,
+            )
+            and all(document.id != changed_document.id for document in documents)
+        ):
+            documents.append(changed_document)
+
+        previous_children: dict[str, list[Any]] = {}
+        previous_parents: dict[str, list[dict[str, object]]] = {}
+        if active is not None:
+            active_children = load_generation_child_chunks(
+                Path(active.workspace_path),
+                expected_generation_id=active.generation,
+                expected_child_manifest_hash=active.child_chunks_manifest_hash,
+            )
+            for child in active_children:
+                previous_children.setdefault(child.document_id, []).append(child)
+            for parent in load_generation_parent_records(
+                Path(active.workspace_path),
+                expected_generation_id=active.generation,
+                expected_child_manifest_hash=active.child_chunks_manifest_hash,
+            ):
+                previous_parents.setdefault(str(parent["document_id"]), []).append(parent)
+
+        pairs: list[tuple[Any, Any]] = []
+        parent_pairs: list[tuple[Any, Any]] = []
+        for document in documents:
+            if changed_document is not None and document.id == changed_document.id:
+                reference = parsed_artifact_reference
+                if reference is None:
+                    raise RuntimeError("Candidate build requires an attempt-owned parsed artifact reference")
+                if (
+                    reference.knowledge_base_id != kb_id
+                    or reference.document_id != document.id
+                    or reference.job_id != job.id
+                    or reference.attempt != job.attempt
+                ):
+                    raise RuntimeError("Attempt parsed artifact reference does not match candidate ownership")
+                parsed_dir = validate_attempt_parsed_artifact(reference)
+                children = self._load_attempt_child_chunks(parsed_dir)
+                parents = self._load_attempt_parent_chunks(parsed_dir)
+            elif active is not None:
+                children = previous_children.get(document.id, [])
+                parents = previous_parents.get(document.id, [])
+            else:
+                parsed_dir = kb_parsed_documents_dir(kb_id) / document.id
+                children = load_child_chunks(parsed_dir)
+                parents = load_parent_chunks(parsed_dir)
+            if not children:
+                raise RuntimeError(
+                    f"No provable child snapshot available for candidate document {document.id}"
+                )
+            pairs.extend((document, child) for child in children)
+            parent_pairs.extend((document, parent) for parent in parents)
+        return pairs, previous_children, parent_pairs
+
+    @staticmethod
+    def _load_attempt_child_chunks(parsed_dir: Path) -> list[Any]:
+        from industrial_rag.parser_models import ChildChunk
+
+        path = parsed_dir / "child_chunks.jsonl"
+        if not path.is_file():
+            return []
+        return [
+            ChildChunk.from_dict(json.loads(line))
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+
+    @staticmethod
+    def _load_attempt_parent_chunks(parsed_dir: Path) -> list[dict[str, object]]:
+        path = parsed_dir / "parent_chunks.jsonl"
+        if not path.is_file():
+            return []
+        return [
+            dict(json.loads(line))
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+
+    async def _parse_document_pymupdf(
+        self,
+        kb: Any,
+        doc: Any,
+        *,
+        artifact_dir: Path | None = None,
+        persist_document_metadata: bool = True,
+    ) -> dict[str, Any]:
         from industrial_rag.document_parser import parse_pdf
         from industrial_rag.structured_chunker import (
             ChunkerConfig,
@@ -1061,7 +1658,7 @@ class IncrementalUpdateService:
         if not children:
             raise RuntimeError("未能生成 ChildChunk")
         parsed_doc_dir = kb_parsed_documents_dir(kb.id) / doc.id
-        current_dir = parsed_doc_dir / "current"
+        current_dir = artifact_dir or parsed_doc_dir / "current"
         current_dir.mkdir(parents=True, exist_ok=True)
         with (current_dir / "child_chunks.jsonl").open(
             "w", encoding="utf-8", newline="\n"
@@ -1104,16 +1701,30 @@ class IncrementalUpdateService:
                     )
                     + "\n"
                 )
-        await self._doc_repo.update(
-            doc.id,
-            page_count=max((c.page_start or 1) for c in children),
-            parent_chunk_count=len(parents),
-            child_chunk_count=len(children),
-            parse_status="done",
-            status=DocumentStatus.parsed,
-            parser_version="1.28.0",
-        )
-        return {"child_chunk_count": len(children), "parent_chunk_count": len(parents)}
+        if artifact_dir is not None:
+            (current_dir / "complete.json").write_text(
+                json.dumps(
+                    {"document_id": doc.id, "child_chunk_count": len(children), "parent_chunk_count": len(parents)},
+                    sort_keys=True,
+                ),
+                encoding="utf-8",
+            )
+        page_count = max((c.page_start or 1) for c in children)
+        if persist_document_metadata:
+            await self._doc_repo.update(
+                doc.id,
+                page_count=page_count,
+                parent_chunk_count=len(parents),
+                child_chunk_count=len(children),
+                parse_status="done",
+                status=DocumentStatus.parsed,
+                parser_version="1.28.0",
+            )
+        return {
+            "page_count": page_count,
+            "child_chunk_count": len(children),
+            "parent_chunk_count": len(parents),
+        }
 
     async def _ingest_document(
         self,
@@ -1121,12 +1732,13 @@ class IncrementalUpdateService:
         generation: Any,
         candidate_workspace: Path,
         doc: Any,
+        *,
+        children: list[Any] | None = None,
     ) -> int:
         from industrial_rag.citation_formatter import Citation, encode_chunk_header
         from industrial_rag.lightrag_service import LightRAGService
-        from industrial_rag.services.parse_service import load_child_chunks
-
-        children = load_child_chunks(kb_parsed_documents_dir(kb.id) / doc.id)
+        if children is None:
+            raise RuntimeError("LightRAG ingestion requires a frozen generation child snapshot")
         if not children:
             raise RuntimeError(f"No child chunks for document {doc.id}")
         settings = settings_for_knowledge_base(
@@ -1136,6 +1748,20 @@ class IncrementalUpdateService:
             generation=generation.generation,
             working_dir=candidate_workspace,
         )
+        # The candidate already contains its frozen parsed/snapshot inputs, so
+        # mark this attempt-owned workspace before LightRAG applies its legacy
+        # storage compatibility guard.  This is metadata only; the candidate
+        # input and embedding configuration remain immutable.
+        write_storage_metadata(
+            candidate_workspace,
+            settings.embedding_model,
+            settings.embedding_dim,
+        )
+        if settings.vector_workspace:
+            (candidate_workspace / settings.vector_workspace).mkdir(
+                parents=True,
+                exist_ok=True,
+            )
         boundary = "\n\n<<<INDUSTRIAL_RAG_CHUNK_BOUNDARY>>>\n\n"
         parts = [
             (
@@ -1157,35 +1783,93 @@ class IncrementalUpdateService:
         )
         await service.initialize()
         try:
-            insert_task = asyncio.create_task(
-                service._backend.ainsert(
-                    input=[boundary.join(parts)],
-                    ids=[f"kb-{identity}"],
-                    file_paths=[doc.original_file_name],
-                    split_by_character=boundary,
-                    split_by_character_only=True,
+            # The candidate inherited the active generation's document registry,
+            # which still lists this document as processed.  LightRAG treats a
+            # re-insert with the same id/content as a duplicate and skips the
+            # whole pipeline — including entity extraction — so the graph would
+            # stay exactly as empty as the generation we are trying to repair.
+            storage_root = (
+                candidate_workspace / settings.vector_workspace
+                if settings.vector_workspace
+                else candidate_workspace
+            )
+            await self._purge_workspace_references(
+                storage_root, set(), internal_doc_id=f"kb-{identity}"
+            )
+            for attempt in range(1, _LIGHTRAG_INSERT_ATTEMPTS + 1):
+                # Re-purging on every attempt is deliberate: LightRAG would
+                # otherwise treat the retried document as a duplicate and skip
+                # the pipeline again.  Chunk-level LLM cache keeps the retry
+                # cheap — only the chunks that never finished are re-extracted.
+                await self._purge_workspace_references(
+                    storage_root, set(), internal_doc_id=f"kb-{identity}"
                 )
-            )
-            done, _pending = await asyncio.wait(
-                {insert_task}, timeout=LIGHTRAG_INSERT_TIMEOUT_SECONDS
-            )
-            if done:
-                await insert_task
-            else:
-                insert_task.cancel()
-                internal_ids = [
-                    f"kb-{identity}-chunk-{index:03d}"
-                    for index in range(len(children))
-                ]
-                if not await self._candidate_chunks_are_durable(
-                    generation.collections["chunks"], internal_ids
-                ):
+                insert_task = asyncio.create_task(
+                    service._backend.ainsert(
+                        input=[boundary.join(parts)],
+                        ids=[f"kb-{identity}"],
+                        file_paths=[doc.original_file_name],
+                        split_by_character=boundary,
+                        split_by_character_only=True,
+                    )
+                )
+                done, _pending = await asyncio.wait(
+                    {insert_task}, timeout=LIGHTRAG_INSERT_TIMEOUT_SECONDS
+                )
+                if not done:
+                    insert_task.cancel()
+                    try:
+                        await insert_task
+                    except asyncio.CancelledError:
+                        pass
+                    # Do not fall back to "chunks are durable, carry on".  A timed-out
+                    # insert stops before the merge stage, so the generation would be
+                    # promoted with an empty knowledge graph and every query would
+                    # silently degrade to vector-only retrieval.
                     raise RuntimeError(
-                        "LightRAG insert timed out before candidate chunks were durable"
+                        "LightRAG insert exceeded "
+                        f"{LIGHTRAG_INSERT_TIMEOUT_SECONDS:.0f}s before entity extraction "
+                        "finished; the candidate generation was discarded so an empty "
+                        "knowledge graph cannot be promoted. Raise "
+                        "LIGHTRAG_INSERT_TIMEOUT_SECONDS for large documents."
+                    )
+                await insert_task
+                status, detail = read_lightrag_doc_status(storage_root, f"kb-{identity}")
+                if status == "processed":
+                    break
+                if attempt == _LIGHTRAG_INSERT_ATTEMPTS:
+                    raise RuntimeError(
+                        f"LightRAG left {doc.original_file_name} in status {status!r} "
+                        f"after {attempt} attempt(s): {detail or 'no error message'}; "
+                        "the candidate generation was discarded instead of being "
+                        "promoted with a partially extracted document"
                     )
                 logger.warning(
-                    "LightRAG insert exceeded %.0fs after candidate chunks became durable; continuing",
-                    LIGHTRAG_INSERT_TIMEOUT_SECONDS,
+                    "LightRAG did not finish %s (status=%s: %s); retrying insert "
+                    "(attempt %d/%d)",
+                    doc.original_file_name,
+                    status,
+                    detail or "no error message",
+                    attempt + 1,
+                    _LIGHTRAG_INSERT_ATTEMPTS,
+                )
+            entity_count, relationship_count = await self._verify_candidate_graph(generation)
+            logger.info(
+                "Candidate generation %s graph: %d entities, %d relationships",
+                generation.generation,
+                entity_count,
+                relationship_count,
+            )
+            if getattr(generation, "backend", None) == VectorBackend.qdrant.value:
+                # Qdrant holds entities/relationships in vector collections only;
+                # LightRAG's query path traverses the graph through its GraphML
+                # storage.  Materialise that file from the collections we just
+                # verified, otherwise every ``mix`` query degrades to vectors.
+                materialised = await self._materialise_graph_file(settings, storage_root)
+                logger.info(
+                    "Materialised graph structure for %s at %s",
+                    generation.generation,
+                    materialised,
                 )
         finally:
             try:
@@ -1204,6 +1888,57 @@ class IncrementalUpdateService:
             indexed_at=_utcnow(),
         )
         return len(children)
+
+    async def _materialise_graph_file(self, settings: Any, storage_root: Path) -> Path:
+        """Write the generation's graph projection next to its workspace."""
+        # Reuse the instance's client (which tests replace with a fake) instead of
+        # letting the reader open its own connection to settings.qdrant_url.
+        client = self._new_qdrant_client()
+        try:
+            graph, _ = await load_graph_from_qdrant(settings, client=client)
+        finally:
+            close = getattr(client, "close", None)
+            if close is not None:
+                with contextlib.suppress(Exception):
+                    await close()
+        if graph.number_of_nodes() == 0:
+            raise RuntimeError(
+                "Index health: refusing to materialise an empty graph file"
+            )
+        return materialize_graphml(graph, storage_root)
+
+    async def _verify_candidate_graph(self, generation: Any) -> tuple[int, int]:
+        """Prove the candidate actually contains entities and relationships.
+
+        A chunk-only candidate answers from vectors alone, so promotion must be
+        refused instead of silently shipping an empty graph.  Nano generations
+        keep their graph in a workspace file and are checked elsewhere.
+        """
+        collections = generation.collections or {}
+        entities_name = collections.get("entities")
+        relationships_name = collections.get("relationships")
+        if not entities_name or not relationships_name:
+            if getattr(generation, "backend", None) != VectorBackend.qdrant.value:
+                return 0, 0
+            raise RuntimeError(
+                "Index health: candidate generation has no entity/relationship "
+                "collections; the graph was never provisioned"
+            )
+        client = self._new_qdrant_client()
+        try:
+            entities = (await client.count(collection_name=entities_name, exact=True)).count
+            relationships = (
+                await client.count(collection_name=relationships_name, exact=True)
+            ).count
+        finally:
+            await client.close()
+        if entities == 0 or relationships == 0:
+            raise RuntimeError(
+                "Index health: candidate knowledge graph is empty "
+                f"(entities={entities}, relationships={relationships}); "
+                "the generation was discarded instead of being promoted without a graph"
+            )
+        return entities, relationships
 
     async def _candidate_chunks_are_durable(
         self, collection_name: str, internal_ids: list[str]
@@ -1234,10 +1969,11 @@ class IncrementalUpdateService:
         generation: Any,
         candidate_workspace: Path,
         doc: Any,
+        *,
+        children: list[Any] | None = None,
     ) -> list[str]:
-        from industrial_rag.services.parse_service import load_child_chunks
-
-        children = load_child_chunks(kb_parsed_documents_dir(kb_id) / doc.id)
+        if children is None:
+            raise RuntimeError("removal requires the prior generation child snapshot")
         identity = ""
         internal_ids: list[str] = []
         if children:
@@ -1474,6 +2210,14 @@ class IncrementalUpdateService:
             )
 
     def _new_qdrant_client(self) -> AsyncQdrantClient:
+        """Return a client the caller owns and must close.
+
+        Every call site wraps the returned client in ``try/finally: close()``, so
+        ``qdrant_client_factory`` **must return a newly created client**, not a
+        shared singleton -- closing a shared client would break other callers.
+        Tests that inject a fake should therefore return a fresh fake per call
+        (``lambda: FakeQdrant()``) rather than one long-lived instance.
+        """
         if self._qdrant_client_factory is not None:
             return self._qdrant_client_factory()
         return AsyncQdrantClient(
@@ -1504,6 +2248,30 @@ class IncrementalUpdateService:
                 ),
             )
 
+    async def _sync_active_knowledge_base_metadata(
+        self, kb_id: str, generation: Any, job: Any
+    ) -> None:
+        """Keep UI readiness metadata aligned with the promoted generation."""
+        children = load_generation_child_chunks(
+            Path(generation.workspace_path),
+            expected_generation_id=generation.generation,
+            expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+        )
+        active_document_ids = {
+            str(getattr(child, "document_id", ""))
+            for child in children
+            if getattr(child, "document_id", None)
+        }
+        active_document_count = len(active_document_ids)
+        await self._kb_repo.update(
+            kb_id,
+            vector_backend=generation.backend,
+            workspace_path=generation.workspace_path,
+            document_count=active_document_count,
+            active_document_count=active_document_count,
+            chunk_count=len(children),
+        )
+
     async def _document_state_snapshot(
         self, kb_id: str, job: Any
     ) -> list[dict[str, Any]]:
@@ -1511,6 +2279,18 @@ class IncrementalUpdateService:
         rows: list[dict[str, Any]] = []
         for d in docs:
             effective_active = d.is_active and d.status != DocumentStatus.deleted
+            # An add/reparse candidate owns the changed document even while its
+            # persisted row is still in an intermediate parse/index status.
+            # Otherwise a successful Promote can apply the candidate snapshot
+            # with the new document marked inactive and hide it from the KB.
+            if (
+                job.operation in {
+                    UpdateOperation.add,
+                    UpdateOperation.reparse,
+                }
+                and d.id == job.document_id
+            ):
+                effective_active = True
             if job.operation == UpdateOperation.delete and d.id == job.document_id:
                 effective_active = False
             if job.operation == UpdateOperation.replace and d.id == job.document_id:
@@ -1539,6 +2319,26 @@ class IncrementalUpdateService:
             for d in sorted(docs, key=lambda d: d.id)
         ]
         return hashlib.sha256("\n".join(payload).encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _require_frozen_generation_snapshot(generation: Any) -> None:
+        from industrial_rag.services.generation_artifacts import (
+            GenerationArtifactError,
+            load_generation_manifest,
+        )
+
+        try:
+            load_generation_manifest(
+                Path(generation.workspace_path),
+                expected_generation_id=generation.generation,
+                expected_child_manifest_hash=generation.child_chunks_manifest_hash,
+            )
+        except GenerationArtifactError as error:
+            raise AppError(
+                AppErrorCode.generation_invalid_state,
+                "Generation 的冻结检索快照不可验证。",
+                status_code=409,
+            ) from error
 
     async def _resolve_active_version(self, kb_id: str, doc: Any) -> Any:
         """Return the active row of the same logical document (by identity)."""

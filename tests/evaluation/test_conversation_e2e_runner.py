@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("ragas", reason="optional dependency: pip install -e '.[dev,evaluation]'")
+
 from evaluation.phase10.conversation_e2e_contracts import JudgeConfig, fingerprint_dataset
 from evaluation.phase10.conversation_e2e_runner import (
     SnapshotValidationError,

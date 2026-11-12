@@ -13,14 +13,14 @@ if ($EnvFile -and (Test-Path $EnvFile)) {
 }
 $required = @{
     "DASHSCOPE_API_KEY" = "must be configured"
-    "LLM_MODEL" = "must be qwen-plus-2025-07-28"
+    "LLM_MODEL" = "must be qwen3.8-flash"
     "MODEL_FALLBACK_ENABLED" = "must be false"
     "EMBEDDING_MODEL" = "must be text-embedding-v4"
     "EMBEDDING_DIM" = "must be 1024"
     "QDRANT_URL" = "must be configured"
     "QDRANT_COLLECTION_PREFIX" = "must be configured"
-    "SERVICE_API_KEY" = "must be configured"
-    "ADMIN_API_KEY" = "must be configured and differ from SERVICE_API_KEY"
+    "SERVICE_API_KEY" = "must be configured and at least 32 characters"
+    "ADMIN_API_KEY" = "must be configured, at least 32 characters, and differ from SERVICE_API_KEY"
     "IRA_DEPLOYMENT_ENVIRONMENT" = "must be local_staging"
     "VALIDATION_BASE_URL" = "must be configured"
     "VALIDATION_ARTIFACT_DIR" = "must be configured"
@@ -36,6 +36,14 @@ if (
     Write-Output "invalid: SERVICE_API_KEY and ADMIN_API_KEY must differ"
     $fail += "SERVICE_API_KEY_ADMIN_API_KEY_EQUAL"
 }
+foreach ($name in @("SERVICE_API_KEY", "ADMIN_API_KEY")) {
+    $value = [System.Environment]::GetEnvironmentVariable($name, "Process")
+    if ($value -and $value.Length -lt 32) {
+        Write-Output ("invalid: " + $name + " must be at least 32 characters " +
+            "(generate with: python -c ""import secrets;print(secrets.token_urlsafe(32))"")")
+        $fail += ($name + "_TOO_SHORT")
+    }
+}
 foreach ($name in $required.Keys) {
     $value = [System.Environment]::GetEnvironmentVariable($name, "Process")
     if (-not $value) {
@@ -44,7 +52,7 @@ foreach ($name in $required.Keys) {
         continue
     }
     $ok = switch ($name) {
-        "LLM_MODEL" { $value -eq "qwen-plus-2025-07-28" }
+        "LLM_MODEL" { $value -eq "qwen3.8-flash" }
         "MODEL_FALLBACK_ENABLED" { $value.ToLower() -eq "false" }
         "EMBEDDING_MODEL" { $value -eq "text-embedding-v4" }
         "EMBEDDING_DIM" { $value -eq "1024" }
@@ -54,6 +62,11 @@ foreach ($name in $required.Keys) {
     }
     if (-not $ok) {
         Write-Output ("invalid: " + $name)
+        $fail += $name
+    } elseif ($fail -contains ($name + "_TOO_SHORT")) {
+        # Already reported by the minimum-length check above; do not claim it is
+        # "configured" as well, which reads as contradictory to an operator.
+        Write-Output ("invalid: " + $name + " (shorter than 32 characters)")
         $fail += $name
     } else {
         Write-Output ("configured: " + $name)
