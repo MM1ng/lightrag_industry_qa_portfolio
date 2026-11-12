@@ -438,6 +438,22 @@ IRA_VOICE_ENABLED=true
 
 - 识别结果**填入输入框而非自动发送**，工业术语需人工校对
 - 朗读前剥离 `[1]` 引用标记并转换单位（`°C`→`摄氏度`），否则会念出「方括号一」
+- **长回答按句子边界分段合成再拼接为单个 WAV**，不再截到 600 字符就丢掉后半段。
+  分段只认 `。！？；`，不认英文句点，避免 `0.6MPa`、`3.5mm` 被从数字中间切断。
+  上游以流式产出 WAV，`RIFF`/`data` 长度字段是占位值（实测 `data`=2147483547 对应
+  真实 16 万字节），解析按「读到缓冲区末尾」处理，拼接时重写为真实长度；拼接只接受
+  PCM（audio format 1）且格式参数完全一致的片段，否则退回首段而不是返回损坏文件。
+  两道预算：`IRA_VOICE_TTS_MAX_SEGMENTS`（默认 8 次计费调用）和
+  `IRA_VOICE_TTS_BUDGET_SECONDS`（默认 120 秒，按实测 0.15 秒/字符预估下一段，
+  装不下就不发起该次调用）。`IRA_VOICE_TIMEOUT_SECONDS` 默认 120 秒——实测一段
+  600 字符要 88.7 秒，原先适配器硬编码的 60 秒必然失败。中途某段失败时已合成的片段
+  照常返回并置 `X-Voice-Truncated: true`，不丢弃已经付费的音频；只有第一段就失败
+  才返回 503。响应头 `X-Voice-Segments` 恒为实际合成次数。
+  真实容器端到端已验证（1230 字符 → `X-Voice-Segments: 3`、64.7 秒、15037484 字节 /
+  313 秒音频，头部长度字段为真实值且 `wave` 标准库可完整读取；400 字符单段基线 17.8
+  秒）。复验脚本 `.run/verify_segmented_speak.py`，注意两点：`uvicorn` 下发的响应头是
+  小写（大小写敏感查询会误判成「分段没触发」），且镜像是 COPY 源码而非 bind mount，
+  改完代码要 `docker compose build backend` + `up -d --force-recreate`。
 - **ASR 对无效音频不报错而是幻觉出文字**（实测：随机字节返回「啊。」），因此有三道防线：前端最短时长（500ms）、后端文件头校验（415）、结果低置信度判定
 - 音频不落盘，仅在请求内存中中转；日志只记字节数与字符数，不记识别文本原文
 - 两个端点匿名公开（与 `POST /query` 同一模型），靠 `BUCKET_VOICE` 限流（默认 10 次/分钟）
@@ -464,6 +480,20 @@ python -m pytest -q --basetemp=.run/pytest-tmp -p no:cacheprovider \
 | 覆盖偏低（已知短板） | `services/index_service.py` 31%；其余服务模块已由集成测试补齐 |
 
 HTML 报告在 `.run/coverage/html/index.html`（不入库），XML 在 `.run/coverage/coverage.xml`。
+
+Windows 本地跑全量时有两个环境陷阱会造成**与业务无关**的失败，排查前先排除：
+
+1. **`--basetemp` 名称长度**。仓库路径本身已占 45 字符，pytest 把每个测试的临时目录
+   展开到 `…\kb_data\{kb}\qdrant\generations\{g}\workspace\qdrant-{g}\…graphml.tmp`，
+   用 `.run/pytest-tmp` 时该路径为 256 字符，正好卡在 `MAX_PATH=260` 以内；一旦加上
+   时间戳后缀（如 `.run/pytest-tmp-1763000000`，272 字符）就会有 36 个 phase9 测试报
+   `FileNotFoundError`。结论：basetemp 目录名要**新**但**短**，例如 `.run/t3`。
+2. **`NO_PROXY` 含方括号 IPv6**。`NO_PROXY` 里出现 `[::1]`（部分 shell profile 与桌面
+   代理工具默认注入）时，httpx 在**构造客户端**阶段就抛
+   `InvalidURL: Invalid port: ':1]'`，语音装配与依赖 httpx 的用例会一起失败。
+   `src/industrial_rag/http_client.py` 的 `build_async_client()` 会捕获它、降级为
+   `trust_env=False` 并 warning 记录原因；若在 PowerShell 与 Git Bash 之间看到结果不
+   一致，先对比这两个变量。
 
 关于两个此前为 0% 的模块：
 

@@ -27,6 +27,11 @@ _UNIT_SPEECH = (
 )
 _WHITESPACE = re.compile(r"\s+")
 
+# Sentence endings that are safe to cut on. A full stop is deliberately absent:
+# these manuals are full of measurements such as 0.6MPa and 3.5mm, and cutting
+# on "." would split numbers in half.
+_SENTENCE_ENDS = "。！？；!?;"
+
 _MIME_BY_KIND = {
     "wav": "audio/wav",
     "webm": "audio/webm",
@@ -35,12 +40,17 @@ _MIME_BY_KIND = {
 }
 
 
-def clean_for_speech(text: str, *, max_chars: int = 600) -> str:
+def clean_for_speech(text: str, *, max_chars: int | None = 600) -> str:
     """Turn an API answer into text suitable for text-to-speech.
 
     Removes citation markers and markdown, expands units into their spoken
-    Chinese form, collapses whitespace, and truncates to ``max_chars`` because
-    the TTS model rejects longer input.
+    Chinese form, and collapses whitespace.
+
+    ``max_chars`` keeps the original truncating behaviour for callers that pass
+    a number. The speak endpoint now leaves it unset and segments the full text
+    instead: answers were median 82 and at most 424 characters in the observed
+    corpus, so truncation never actually fired — it was a silent cut waiting
+    for a longer answer.
     """
 
     if not text:
@@ -50,7 +60,68 @@ def clean_for_speech(text: str, *, max_chars: int = 600) -> str:
     for symbol, spoken in _UNIT_SPEECH:
         cleaned = cleaned.replace(symbol, spoken)
     cleaned = _WHITESPACE.sub(" ", cleaned).strip()
+    if max_chars is None:
+        return cleaned
     return cleaned[:max_chars]
+
+
+def _split_sentences(text: str) -> list[str]:
+    """Split on sentence endings, keeping each terminator with its own sentence."""
+
+    sentences: list[str] = []
+    current: list[str] = []
+    for char in text:
+        current.append(char)
+        if char in _SENTENCE_ENDS:
+            sentence = "".join(current).strip()
+            if sentence:
+                sentences.append(sentence)
+            current = []
+    tail = "".join(current).strip()
+    if tail:
+        sentences.append(tail)
+    return sentences
+
+
+def split_for_speech(
+    text: str,
+    *,
+    max_chars: int = 600,
+    max_segments: int = 8,
+) -> list[str]:
+    """Cut cleaned speech text into chunks the TTS endpoint will accept.
+
+    Sentences are packed up to ``max_chars`` so a short answer still produces
+    one call; a single sentence longer than the limit is wrapped hard rather
+    than dropped. ``max_segments`` bounds the billed work per request, so an
+    unexpectedly long answer costs a known maximum instead of an open-ended one.
+    """
+
+    if not text or max_chars < 1:
+        return []
+
+    segments: list[str] = []
+    current = ""
+    for sentence in _split_sentences(text):
+        if len(sentence) > max_chars:
+            if current:
+                segments.append(current)
+                current = ""
+            segments.extend(
+                sentence[start : start + max_chars]
+                for start in range(0, len(sentence), max_chars)
+            )
+            continue
+        if not current:
+            current = sentence
+        elif len(current) + len(sentence) <= max_chars:
+            current += sentence
+        else:
+            segments.append(current)
+            current = sentence
+    if current:
+        segments.append(current)
+    return segments[:max_segments]
 
 
 def is_low_confidence(text: str) -> bool:

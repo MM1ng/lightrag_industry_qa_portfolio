@@ -232,3 +232,27 @@ def test_voice_settings_defaults() -> None:
     assert settings.voice_max_audio_seconds == 60
     assert settings.voice_tts_max_chars == 600
     assert settings.voice_rate_limit_per_minute == 10
+
+
+def test_voice_timeout_covers_a_measured_full_segment() -> None:
+    """60 s was not enough: a 600-char segment took 88.7 s upstream.
+
+    Measured on 2026-11-12 against the real container with
+    ``IRA_VOICE_ENABLED=true``: the old 60 s ceiling produced
+    ``VOICE_UPSTREAM_UNAVAILABLE`` for exactly that segment size.
+    """
+    from industrial_rag.config import Settings
+
+    settings = Settings(api_key="offline-test-key")
+    assert settings.voice_timeout_seconds == 120.0
+
+
+def test_voice_tts_budget_is_read_and_bounded() -> None:
+    from industrial_rag.config import Settings
+
+    settings = Settings.from_mapping({**_valid_values(), "IRA_VOICE_TTS_BUDGET_SECONDS": "30"})
+    assert settings.voice_tts_budget_seconds == 30.0
+    with pytest.raises(ValueError, match="IRA_VOICE_TTS_BUDGET_SECONDS"):
+        Settings.from_mapping({**_valid_values(), "IRA_VOICE_TTS_BUDGET_SECONDS": "0"})
+    with pytest.raises(ValueError, match="IRA_VOICE_TIMEOUT_SECONDS"):
+        Settings.from_mapping({**_valid_values(), "IRA_VOICE_TIMEOUT_SECONDS": "-1"})

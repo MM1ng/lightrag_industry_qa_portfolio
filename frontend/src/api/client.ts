@@ -9,6 +9,7 @@ import type {
   KnowledgeBase,
   KnowledgeBaseDetail,
   QueryResult,
+  SpeechClip,
   TranscriptionResult,
   UpdateJob,
   EvaluationDashboard,
@@ -189,8 +190,8 @@ export class ApiClient {
     return (await response.json()) as TranscriptionResult
   }
 
-  /** Synthesize spoken audio for one answer and return the audio blob. */
-  async synthesizeSpeech(text: string): Promise<Blob> {
+  /** Synthesize spoken audio for one answer and return the clip with its flags. */
+  async synthesizeSpeech(text: string): Promise<SpeechClip> {
     const headers = new Headers({ 'Content-Type': 'application/json' })
     const token = this.tokenProvider()
     if (token) headers.set('Authorization', `Bearer ${token}`)
@@ -211,7 +212,16 @@ export class ApiClient {
         response.status,
       )
     }
-    return await response.blob()
+    // Both headers describe how the clip was built, not what it contains: the
+    // segment count is how many calls were billed, and truncated means the text
+    // ran past the segment cap or the time budget. A missing header means one
+    // whole segment, which is the common case.
+    const rawSegments = Number(response.headers.get('X-Voice-Segments'))
+    return {
+      blob: await response.blob(),
+      segments: Number.isInteger(rawSegments) && rawSegments > 0 ? rawSegments : 1,
+      truncated: response.headers.get('X-Voice-Truncated') === 'true',
+    }
   }
 
   async verifyAdminAccess(): Promise<void> {

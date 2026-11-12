@@ -122,8 +122,31 @@ describe('voice methods', () => {
     // Blob returned by Response.blob() comes from a different realm than the
     // global Blob, so `toBeInstanceOf(Blob)` fails there while passing on
     // Node 24. Size and type are what the caller actually relies on.
-    expect(audio.size).toBe(2)
-    expect(audio.type).toContain('audio')
-    expect(Object.prototype.toString.call(audio)).toBe('[object Blob]')
+    expect(audio.blob.size).toBe(2)
+    expect(audio.blob.type).toContain('audio')
+    expect(Object.prototype.toString.call(audio.blob)).toBe('[object Blob]')
+    // Absent headers mean the answer was spoken whole.
+    expect(audio.truncated).toBe(false)
+    expect(audio.segments).toBe(1)
+  })
+
+  it('synthesizeSpeech reads the segmentation headers', async () => {
+    // Long answers come back as several billed segments, and the tail can be
+    // dropped by the segment or time budget. The UI needs both numbers.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      new Uint8Array([9, 9]).buffer,
+      {
+        status: 200,
+        headers: {
+          'content-type': 'audio/wav',
+          'X-Voice-Segments': '3',
+          'X-Voice-Truncated': 'true',
+        },
+      },
+    )))
+
+    const audio = await new ApiClient().synthesizeSpeech('很长的回答')
+    expect(audio.segments).toBe(3)
+    expect(audio.truncated).toBe(true)
   })
 })

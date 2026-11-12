@@ -57,6 +57,17 @@ DEFAULT_VOICE_RATE_LIMIT_PER_MINUTE = 10
 DEFAULT_VOICE_MAX_AUDIO_BYTES = 5_242_880
 DEFAULT_VOICE_MAX_AUDIO_SECONDS = 60
 DEFAULT_VOICE_TTS_MAX_CHARS = 600
+# Upper bound on billed synthesis calls per request: an unexpectedly long
+# answer costs a known maximum instead of an open-ended number of calls.
+DEFAULT_VOICE_TTS_MAX_SEGMENTS = 8
+# Measured on 2026-11-12 against the real upstream with IRA_VOICE_ENABLED=true:
+# one 600-char segment took 88.7 s to synthesize, so the previous 60 s ceiling
+# turned a legitimate long answer into VOICE_UPSTREAM_UNAVAILABLE.
+DEFAULT_VOICE_TIMEOUT_SECONDS = 120.0
+# Wall-clock budget for the whole speak request. Segments synthesize one after
+# another, so without a bound an unexpectedly long answer could hold a browser
+# for many minutes while still costing billed calls.
+DEFAULT_VOICE_TTS_BUDGET_SECONDS = 120.0
 
 
 def validate_api_key_length(name: str, value: str | None, environment: str) -> None:
@@ -173,6 +184,9 @@ class Settings:
     voice_max_audio_bytes: int = DEFAULT_VOICE_MAX_AUDIO_BYTES
     voice_max_audio_seconds: int = DEFAULT_VOICE_MAX_AUDIO_SECONDS
     voice_tts_max_chars: int = DEFAULT_VOICE_TTS_MAX_CHARS
+    voice_tts_max_segments: int = DEFAULT_VOICE_TTS_MAX_SEGMENTS
+    voice_timeout_seconds: float = DEFAULT_VOICE_TIMEOUT_SECONDS
+    voice_tts_budget_seconds: float = DEFAULT_VOICE_TTS_BUDGET_SECONDS
     voice_rate_limit_per_minute: int = DEFAULT_VOICE_RATE_LIMIT_PER_MINUTE
     # Off by default: trusting ``X-Forwarded-For`` without a sanitising proxy in
     # front of the API lets a client forge its own rate-limit identity.
@@ -457,6 +471,18 @@ class Settings:
                 raise ValueError(f"{name} 不能小于 {minimum}")
             return parsed
 
+        def _voice_float(name: str, default: float, *, exclusive_minimum: float) -> float:
+            raw = (values.get(name) or "").strip()
+            if not raw:
+                return default
+            try:
+                parsed = float(raw)
+            except ValueError as error:
+                raise ValueError(f"{name} 必须是数字") from error
+            if parsed <= exclusive_minimum:
+                raise ValueError(f"{name} 必须大于 {exclusive_minimum}")
+            return parsed
+
         voice_enabled = _voice_bool("IRA_VOICE_ENABLED", False)
         voice_asr_model = (values.get("IRA_VOICE_ASR_MODEL") or "qwen3-asr-flash").strip()
         voice_tts_model = (values.get("IRA_VOICE_TTS_MODEL") or "qwen3-tts-flash").strip()
@@ -469,6 +495,19 @@ class Settings:
         )
         voice_tts_max_chars = _voice_int(
             "IRA_VOICE_TTS_MAX_CHARS", DEFAULT_VOICE_TTS_MAX_CHARS, minimum=1
+        )
+        voice_tts_max_segments = _voice_int(
+            "IRA_VOICE_TTS_MAX_SEGMENTS", DEFAULT_VOICE_TTS_MAX_SEGMENTS, minimum=1
+        )
+        voice_timeout_seconds = _voice_float(
+            "IRA_VOICE_TIMEOUT_SECONDS",
+            DEFAULT_VOICE_TIMEOUT_SECONDS,
+            exclusive_minimum=0.0,
+        )
+        voice_tts_budget_seconds = _voice_float(
+            "IRA_VOICE_TTS_BUDGET_SECONDS",
+            DEFAULT_VOICE_TTS_BUDGET_SECONDS,
+            exclusive_minimum=0.0,
         )
         voice_rate_limit_per_minute = _voice_int(
             "IRA_VOICE_RATE_LIMIT_PER_MINUTE",
@@ -572,6 +611,9 @@ class Settings:
             voice_max_audio_bytes=voice_max_audio_bytes,
             voice_max_audio_seconds=voice_max_audio_seconds,
             voice_tts_max_chars=voice_tts_max_chars,
+            voice_tts_max_segments=voice_tts_max_segments,
+            voice_timeout_seconds=voice_timeout_seconds,
+            voice_tts_budget_seconds=voice_tts_budget_seconds,
             voice_rate_limit_per_minute=voice_rate_limit_per_minute,
             trust_proxy_headers=trust_proxy_headers,
             mineru_enabled=mineru_enabled,

@@ -1033,6 +1033,10 @@ def create_app(
                     model=resolved_settings.voice_asr_model,
                     tts_model=resolved_settings.voice_tts_model,
                     voice=resolved_settings.voice_tts_voice,
+                    # A full 600-char segment measured 88.7 s upstream on
+                    # 2026-11-12, so the ceiling comes from settings rather than
+                    # the adapter default, which was too short for that call.
+                    timeout=resolved_settings.voice_timeout_seconds,
                 )
             else:
                 application.state.voice_provider = None

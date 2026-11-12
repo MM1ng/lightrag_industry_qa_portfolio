@@ -25,6 +25,21 @@ export interface TranscriptionResult {
   low_confidence: boolean
 }
 
+/**
+ * One spoken answer, as returned by `POST /v1/voice/speak`.
+ *
+ * Long answers are synthesized in several billed segments and stitched into a
+ * single clip, so the response carries how many segments it took and whether
+ * any of the text was dropped (segment cap, time budget, or a failed call part
+ * way through). Without `truncated` the user would only hear an answer stop
+ * mid-sentence.
+ */
+export interface SpeechClip {
+  blob: Blob
+  segments: number
+  truncated: boolean
+}
+
 export interface Citation {
   citation_id: string
   document_name: string

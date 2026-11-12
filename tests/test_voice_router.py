@@ -197,6 +197,23 @@ def test_enabling_voice_builds_a_real_provider_at_startup() -> None:
         assert client.post("/v1/voice/speak", json={"text": "x"}).status_code in {502, 503}
 
 
+def test_voice_timeout_reaches_the_provider_client() -> None:
+    """A setting nobody passes down is a setting that does not exist.
+
+    The adapter used to hard-code 60 s, which was measured too short for a full
+    600-char segment (88.7 s upstream), so the ceiling now comes from settings.
+    """
+    settings = Settings(
+        api_key="offline-test-key",
+        voice_enabled=True,
+        voice_timeout_seconds=37.5,
+    )
+    app = create_app(settings=settings, runtime_factory=lambda _: NoRuntime())
+    with TestClient(app):
+        provider = app.state.voice_provider
+        assert provider._client.timeout.read == 37.5
+
+
 class TestNativeBaseUrl:
     """The speech API is not on the OpenAI-compatible path used for chat.
 
@@ -265,3 +282,264 @@ def test_voice_provider_build_failure_is_logged_not_hidden(
     # with "something was degraded" and no way to find out what.
     causes = [repr(rec.exc_info[1]) for rec in warnings if rec.exc_info and rec.exc_info[1]]
     assert any("provider build failed" in cause for cause in causes), causes
+
+
+def pcm_clip(frames: int = 8) -> bytes:
+    """A real mono PCM WAV, so stitching has something legitimate to join."""
+    import io
+    import wave
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(24000)
+        handle.writeframes(bytes([(i * 5) % 233 for i in range(frames * 2)]))
+    return buffer.getvalue()
+
+
+class ClipProvider(FakeProvider):
+    """Returns one distinct PCM clip per synthesized segment."""
+
+    def __init__(self, *, fail_on: int | None = None) -> None:
+        super().__init__()
+        self.fail_on = fail_on
+
+    async def synthesize(self, text: str) -> bytes:
+        self.calls.append(("synthesize", text))
+        if self.fail_on is not None and len(self.calls) == self.fail_on:
+            raise VoiceProviderError("upstream down")
+        return pcm_clip(frames=len(self.calls) * 4)
+
+
+def make_segmented_app(
+    provider: FakeProvider,
+    *,
+    max_chars: int,
+    max_segments: int = 8,
+    budget: float = 120.0,
+):
+    settings = Settings(
+        api_key="offline-test-key",
+        voice_enabled=True,
+        deployment_environment="local_dev",
+        voice_tts_max_chars=max_chars,
+        voice_tts_max_segments=max_segments,
+        voice_tts_budget_seconds=budget,
+    )
+    return create_app(
+        settings=settings,
+        runtime_factory=lambda _: NoRuntime(),
+        voice_provider=provider,
+    )
+
+
+class TestSegmentedSpeak:
+    """Long answers are spoken in full instead of being cut at the TTS limit."""
+
+    def test_short_text_still_makes_one_call(self) -> None:
+        provider = ClipProvider()
+        app = make_segmented_app(provider, max_chars=600)
+        with TestClient(app) as client:
+            response = client.post("/v1/voice/speak", json={"text": "轴承温度上限85摄氏度。"})
+        assert response.status_code == 200
+        assert len(provider.calls) == 1
+        assert response.headers.get("X-Voice-Segments") == "1"
+        assert "X-Voice-Truncated" not in response.headers
+
+    def test_long_text_is_split_into_several_upstream_calls(self) -> None:
+        provider = ClipProvider()
+        app = make_segmented_app(provider, max_chars=20)
+        text = "轴承温度不应超过85摄氏度。" * 6
+        with TestClient(app) as client:
+            response = client.post("/v1/voice/speak", json={"text": text})
+        assert response.status_code == 200
+        assert len(provider.calls) > 1
+        assert all(len(call[1]) <= 20 for call in provider.calls)
+
+    def test_segments_are_concatenated_into_one_playable_clip(self) -> None:
+        import io
+        import wave
+
+        provider = ClipProvider()
+        app = make_segmented_app(provider, max_chars=20)
+        text = "轴承温度不应超过85摄氏度。" * 6
+        with TestClient(app) as client:
+            response = client.post("/v1/voice/speak", json={"text": text})
+
+        assert response.headers["Content-Type"] == "audio/wav"
+        with wave.open(io.BytesIO(response.content), "rb") as handle:
+            total_frames = handle.getnframes()
+        # Clip i carries (i+1)*4 frames, so the merged file is the triangular sum.
+        expected = sum((i + 1) * 4 for i in range(len(provider.calls)))
+        assert total_frames == expected
+
+    def test_no_content_is_lost_when_the_text_fits_the_segment_budget(self) -> None:
+        provider = ClipProvider()
+        app = make_segmented_app(provider, max_chars=20)
+        text = "轴承温度不应超过85摄氏度。" * 6
+        with TestClient(app) as client:
+            client.post("/v1/voice/speak", json={"text": text})
+        assert "".join(call[1] for call in provider.calls) == text
+
+    def test_segment_budget_is_capped_and_marked(self) -> None:
+        provider = ClipProvider()
+        app = make_segmented_app(provider, max_chars=20, max_segments=2)
+        text = "轴承温度不应超过85摄氏度。" * 6
+        with TestClient(app) as client:
+            response = client.post("/v1/voice/speak", json={"text": text})
+        assert len(provider.calls) == 2
+        assert response.headers["X-Voice-Segments"] == "2"
+        assert response.headers["X-Voice-Truncated"] == "true"
+
+    def test_citation_markers_never_reach_the_upstream(self) -> None:
+        provider = ClipProvider()
+        app = make_segmented_app(provider, max_chars=20)
+        text = "轴承温度上限85摄氏度。[1]测量位置为轴承支架外侧。[2]"
+        with TestClient(app) as client:
+            client.post("/v1/voice/speak", json={"text": text})
+        spoken = "".join(call[1] for call in provider.calls)
+        assert "[1]" not in spoken
+        assert "[2]" not in spoken
+
+    def test_units_are_spoken_in_every_segment(self) -> None:
+        provider = ClipProvider()
+        app = make_segmented_app(provider, max_chars=20)
+        text = "振动速度有效值不超过7.1mm/s。压力为0.6MPa。"
+        with TestClient(app) as client:
+            client.post("/v1/voice/speak", json={"text": text})
+        spoken = "".join(call[1] for call in provider.calls)
+        assert "mm/s" not in spoken
+        assert "MPa" not in spoken
+        assert "毫米每秒" in spoken and "兆帕" in spoken
+
+    def test_non_pcm_clips_fall_back_instead_of_returning_a_broken_file(self) -> None:
+        """The existing fake answers with b"RIFFfakeaudio": not a real WAV."""
+        provider = FakeProvider()
+        app = make_segmented_app(provider, max_chars=20)
+        text = "轴承温度不应超过85摄氏度。" * 6
+        with TestClient(app) as client:
+            response = client.post("/v1/voice/speak", json={"text": text})
+        assert response.status_code == 200
+        assert response.content == b"RIFFfakeaudio"
+        assert response.headers["X-Voice-Truncated"] == "true"
+        assert len(provider.calls) > 1
+
+    def test_failure_part_way_through_serves_what_was_synthesized(self) -> None:
+        """Segments already paid for are delivered instead of thrown away."""
+        provider = ClipProvider(fail_on=2)
+        app = make_segmented_app(provider, max_chars=20)
+        text = "轴承温度不应超过85摄氏度。" * 6
+        with TestClient(app) as client:
+            response = client.post("/v1/voice/speak", json={"text": text})
+        assert response.status_code == 200
+        assert response.content == pcm_clip(frames=4)
+        assert response.headers["X-Voice-Segments"] == "1"
+        assert response.headers["X-Voice-Truncated"] == "true"
+        # Nothing after the failure is attempted.
+        assert len(provider.calls) == 2
+
+    def test_failure_on_the_first_segment_is_reported_as_unavailable(self) -> None:
+        provider = ClipProvider(fail_on=1)
+        app = make_segmented_app(provider, max_chars=20)
+        text = "轴承温度不应超过85摄氏度。" * 6
+        with TestClient(app) as client:
+            response = client.post("/v1/voice/speak", json={"text": text})
+        assert response.status_code == 503
+        assert response.json()["code"] == "VOICE_UPSTREAM_UNAVAILABLE"
+
+    def test_mid_list_failure_logs_which_segment_gave_up(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import logging
+
+        provider = ClipProvider(fail_on=3)
+        app = make_segmented_app(provider, max_chars=20)
+        text = "轴承温度不应超过85摄氏度。" * 6
+        with (
+            caplog.at_level(logging.WARNING, logger="industrial_rag.voice"),
+            TestClient(app) as client,
+        ):
+            client.post("/v1/voice/speak", json={"text": text})
+        messages = [rec.getMessage() for rec in caplog.records if rec.levelno == logging.WARNING]
+        assert any("segment 3/" in message for message in messages), messages
+
+
+class _ClockProvider(ClipProvider):
+    """Charges a fake clock per segment so the request budget is testable offline.
+
+    Real timing matters here — a 600-char segment measured 88.7 s upstream — but
+    a test cannot wait for that, so the clock advances on demand instead.
+    """
+
+    def __init__(self, *, clock: list[float], cost: float) -> None:
+        super().__init__()
+        self.clock = clock
+        self.cost = cost
+
+    async def synthesize(self, text: str) -> bytes:
+        self.clock[0] += self.cost
+        return await super().synthesize(text)
+
+
+class TestRequestBudget:
+    """One request cannot hold a browser for an unbounded number of segments."""
+
+    LONG_TEXT = "轴承温度不应超过85摄氏度。" * 6
+
+    def _run(self, monkeypatch, *, clock: list[float], cost: float, budget: float):
+        provider = _ClockProvider(clock=clock, cost=cost)
+        monkeypatch.setattr("industrial_rag.routers.voice.monotonic", lambda: clock[0])
+        app = make_segmented_app(provider, max_chars=20, budget=budget)
+        with TestClient(app) as client:
+            response = client.post("/v1/voice/speak", json={"text": self.LONG_TEXT})
+        return provider, response
+
+    def test_a_segment_that_cannot_fit_the_budget_is_never_started(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # 90 s already spent, the next segment is projected at ~2 s, budget 50 s.
+        provider, response = self._run(
+            monkeypatch, clock=[0.0], cost=90.0, budget=50.0
+        )
+        assert response.status_code == 200
+        assert len(provider.calls) == 1
+        assert response.headers["X-Voice-Segments"] == "1"
+        assert response.headers["X-Voice-Truncated"] == "true"
+
+    def test_a_budget_that_fits_every_segment_costs_nothing_extra(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        provider, response = self._run(
+            monkeypatch, clock=[0.0], cost=2.0, budget=600.0
+        )
+        assert response.status_code == 200
+        assert len(provider.calls) > 1
+        assert "X-Voice-Truncated" not in response.headers
+
+    def test_the_first_segment_is_always_synthesized(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A budget smaller than one call still answers something."""
+        provider, response = self._run(
+            monkeypatch, clock=[0.0], cost=5.0, budget=0.001
+        )
+        assert response.status_code == 200
+        assert len(provider.calls) == 1
+
+    def test_budget_exhaustion_is_logged(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import logging
+
+        clock = [0.0]
+        provider = _ClockProvider(clock=clock, cost=90.0)
+        monkeypatch.setattr("industrial_rag.routers.voice.monotonic", lambda: clock[0])
+        app = make_segmented_app(provider, max_chars=20, budget=50.0)
+        with (
+            caplog.at_level(logging.INFO, logger="industrial_rag.voice"),
+            TestClient(app) as client,
+        ):
+            client.post("/v1/voice/speak", json={"text": self.LONG_TEXT})
+        notes = [rec.getMessage() for rec in caplog.records if rec.levelno == logging.INFO]
+        assert any("voice segment budget" in note for note in notes), notes

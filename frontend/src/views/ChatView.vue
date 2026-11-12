@@ -106,7 +106,11 @@ async function toggleSpeech() {
   if (speech.state.value === 'playing') { speech.stop(); voiceNotice.value = ''; return }
   if (!latestAnswer.value) return
   await speech.speak(latestAnswer.value)
-  if (speech.state.value === 'error') voiceNotice.value = speech.errorMessage.value
+  // A truncated clip still plays: that is a notice, not a failure, and the
+  // user has to be told the answer was not read whole.
+  voiceNotice.value = speech.state.value === 'error'
+    ? speech.errorMessage.value
+    : speech.notice.value
 }
 
 function selectCitation(messageId: string, citationId: string) { selectedAssistantId.value = messageId; selectedCitationId.value = citationId }
