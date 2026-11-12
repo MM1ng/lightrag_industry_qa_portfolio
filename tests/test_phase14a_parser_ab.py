@@ -65,6 +65,14 @@ requires_source_manuals = pytest.mark.skipif(
     reason="protected source manuals are not distributed",
 )
 
+# The development dataset is excluded from the public repository (see
+# .gitignore: evaluation/retrieval_foundation/*), so tests that read it must
+# skip instead of failing when it is absent.
+requires_development_dataset = pytest.mark.skipif(
+    not DATASET.is_file(),
+    reason="development dataset is not distributed",
+)
+
 
 def record(text, page=1, doc="d"):
     return canonical_parser_record(document_id=doc, page_no=page, block_id=f"b{page}",
@@ -118,6 +126,7 @@ def test_denominator_cross_document_and_inclusive_page_range():
     assert len(evaluate([c], [], "fixture")) == 1
 
 
+@requires_development_dataset
 def test_frozen_denominators_and_no_gold_mutation():
     cases = [json.loads(line) for line in DATASET.read_text(encoding="utf-8").splitlines()]
     before = copy.deepcopy(cases)

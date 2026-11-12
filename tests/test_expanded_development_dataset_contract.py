@@ -16,6 +16,13 @@ from industrial_rag.services.expanded_development_dataset import (
 ROOT = Path(__file__).resolve().parents[1]
 GENERATION = ROOT / "evaluation/retrieval_foundation/dev_generation_v2"
 
+# The frozen development generation is excluded from the public repository, so a
+# fresh clone cannot exercise these contracts. Skip instead of failing.
+pytestmark = pytest.mark.skipif(
+    not (GENERATION / "generation_metadata.json").is_file(),
+    reason="development generation is not distributed",
+)
+
 
 def _snapshot():
     return load_generation_snapshot(GENERATION)

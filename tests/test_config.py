@@ -215,9 +215,15 @@ def test_llm_enable_thinking_rejects_unknown_values() -> None:
         Settings.from_mapping({**_valid_values(), "LLM_ENABLE_THINKING": "maybe"})
 
 def test_voice_settings_defaults() -> None:
+    """Voice defaults must not require a provider key to be present.
+
+    This asserts the dataclass defaults directly. Calling ``Settings.from_env()``
+    here would fail on CI, where DASHSCOPE_API_KEY is absent, even though the
+    defaults themselves are correct.
+    """
     from industrial_rag.config import Settings
 
-    settings = Settings.from_env()
+    settings = Settings(api_key="offline-test-key")
     assert settings.voice_enabled is False
     assert settings.voice_asr_model == "qwen3-asr-flash"
     assert settings.voice_tts_model == "qwen3-tts-flash"

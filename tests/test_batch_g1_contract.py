@@ -244,7 +244,15 @@ def test_empty_database_url_uses_default_and_sync_url_preserves_query(monkeypatc
     monkeypatch.setenv("DATABASE_URL", " ")
     assert session._database_url() == session.DEFAULT_DB_URL
     monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///file:shared?mode=memory&uri=true")
-    assert session.get_sync_url() == "sqlite:///file:shared?mode=memory&uri=true"
+    # Compare the parsed URL rather than the rendered string: SQLAlchemy's
+    # renderer normalises the sqlite path per platform, so a byte-for-byte
+    # comparison passes on Windows and fails on Linux CI for the same input.
+    from sqlalchemy.engine import make_url
+
+    rendered = make_url(session.get_sync_url())
+    assert rendered.drivername == "sqlite"
+    assert rendered.database == "file:shared"
+    assert dict(rendered.query) == {"mode": "memory", "uri": "true"}
 
 
 def test_validate_request_cannot_supply_approval_or_thresholds():

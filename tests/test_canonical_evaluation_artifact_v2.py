@@ -109,6 +109,8 @@ def test_v2_schema_rejects_metrics_that_do_not_match_artifact_replay() -> None:
 
 
 def test_legacy_v1_is_readable_without_mutating_historical_artifact() -> None:
+    if not CANONICAL_V1.is_file():
+        pytest.skip("historical canonical artifact embeds protected excerpts and is not distributed")
     before = hashlib.sha256(CANONICAL_V1.read_bytes()).hexdigest()
     inspection = inspect_legacy_canonical_artifact(json.loads(CANONICAL_V1.read_text(encoding="utf-8")))
     after = hashlib.sha256(CANONICAL_V1.read_bytes()).hexdigest()

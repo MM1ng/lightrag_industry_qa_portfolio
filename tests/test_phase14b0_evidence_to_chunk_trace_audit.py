@@ -3,11 +3,21 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "phase14b0_evidence_to_chunk_trace_audit.py"
+RETRIEVAL_FOUNDATION = Path(__file__).resolve().parents[1] / "evaluation" / "retrieval_foundation"
 SPEC = importlib.util.spec_from_file_location("phase14b0_audit", SCRIPT)
 assert SPEC and SPEC.loader
 audit = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(audit)
+
+# The audit reads frozen development artifacts that embed protected manual
+# excerpts; those are excluded from the public repository, so skip when absent.
+pytestmark = pytest.mark.skipif(
+    not (RETRIEVAL_FOUNDATION / "formal_development_effectiveness_2026-09-03.json").is_file(),
+    reason="frozen retrieval artifacts are not distributed",
+)
 
 
 def record(**overrides: object) -> dict[str, object]:
