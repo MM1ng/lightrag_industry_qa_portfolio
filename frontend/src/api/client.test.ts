@@ -118,6 +118,12 @@ describe('voice methods', () => {
     )))
 
     const audio = await new ApiClient().synthesizeSpeech('温度 85 摄氏度')
-    expect(audio).toBeInstanceOf(Blob)
+    // Assert the blob contract, not constructor identity: under Node 20 the
+    // Blob returned by Response.blob() comes from a different realm than the
+    // global Blob, so `toBeInstanceOf(Blob)` fails there while passing on
+    // Node 24. Size and type are what the caller actually relies on.
+    expect(audio.size).toBe(2)
+    expect(audio.type).toContain('audio')
+    expect(Object.prototype.toString.call(audio)).toBe('[object Blob]')
   })
 })
