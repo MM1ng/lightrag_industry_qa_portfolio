@@ -12,6 +12,19 @@ export interface ChatHistoryItem {
   content: string
 }
 
+/**
+ * Result of transcribing one recorded clip.
+ *
+ * `low_confidence` is set by the backend when the recognised text is too short
+ * to be a real question: the ASR service returns a short hallucinated phrase
+ * for unusable audio instead of failing, so the UI must not paste it blindly.
+ */
+export interface TranscriptionResult {
+  text: string
+  language: string | null
+  low_confidence: boolean
+}
+
 export interface Citation {
   citation_id: string
   document_name: string

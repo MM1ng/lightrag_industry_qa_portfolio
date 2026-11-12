@@ -81,3 +81,43 @@ describe('ApiClient', () => {
     ).rejects.toMatchObject({ code: 'QA_TIMEOUT', retryable: true } satisfies Partial<ApiClientError>)
   })
 })
+describe('voice methods', () => {
+  it('transcribeAudio posts multipart and returns text', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ text: '泵的温度是多少？', language: 'zh', low_confidence: false }),
+      { status: 200 },
+    ))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' })
+    const result = await new ApiClient().transcribeAudio(blob, 1500)
+
+    expect(result.text).toBe('泵的温度是多少？')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/v1/voice/transcribe')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeInstanceOf(FormData)
+  })
+
+  it('transcribeAudio surfaces http errors', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ code: 'VOICE_AUDIO_UNRECOGNISED', message: '无法识别音频格式' }),
+      { status: 415 },
+    )))
+
+    const blob = new Blob([new Uint8Array([1])], { type: 'audio/webm' })
+    await expect(new ApiClient().transcribeAudio(blob, 1500)).rejects.toMatchObject({
+      code: 'VOICE_AUDIO_UNRECOGNISED',
+    })
+  })
+
+  it('synthesizeSpeech returns an audio blob', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+      new Uint8Array([9, 9]).buffer,
+      { status: 200, headers: { 'content-type': 'audio/wav' } },
+    )))
+
+    const audio = await new ApiClient().synthesizeSpeech('温度 85 摄氏度')
+    expect(audio).toBeInstanceOf(Blob)
+  })
+})

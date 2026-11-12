@@ -9,6 +9,7 @@ import type {
   KnowledgeBase,
   KnowledgeBaseDetail,
   QueryResult,
+  TranscriptionResult,
   UpdateJob,
   EvaluationDashboard,
 } from '../types/api'
@@ -151,6 +152,66 @@ export class ApiClient {
 
   async submitFeedback(input: FeedbackInput): Promise<void> {
     await this.request('/v1/feedback', { method: 'POST', body: JSON.stringify(input) })
+  }
+
+  /**
+   * Send one recorded clip for transcription.
+   *
+   * The returned text is meant to be placed in the input box for the user to
+   * review, not submitted automatically: misheard industrial terms are costly.
+   */
+  async transcribeAudio(audio: Blob, durationMs: number): Promise<TranscriptionResult> {
+    const form = new FormData()
+    const ext = audio.type.includes('webm') ? 'webm' : 'wav'
+    form.append('file', audio, `recording.${ext}`)
+    form.append('duration_ms', String(Math.round(durationMs)))
+
+    const headers = new Headers()
+    const token = this.tokenProvider()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+
+    const response = await fetch(`${this.baseUrl}/v1/voice/transcribe`, {
+      method: 'POST',
+      headers,
+      body: form,
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as { code?: string; message?: string }
+      throw new ApiClientError(
+        {
+          code: body.code ?? 'voice_failed',
+          message: body.message ?? '语音识别失败，请重试。',
+          retryable: response.status >= 500 || response.status === 429,
+        },
+        response.status,
+      )
+    }
+    return (await response.json()) as TranscriptionResult
+  }
+
+  /** Synthesize spoken audio for one answer and return the audio blob. */
+  async synthesizeSpeech(text: string): Promise<Blob> {
+    const headers = new Headers({ 'Content-Type': 'application/json' })
+    const token = this.tokenProvider()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+
+    const response = await fetch(`${this.baseUrl}/v1/voice/speak`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ text }),
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as { code?: string; message?: string }
+      throw new ApiClientError(
+        {
+          code: body.code ?? 'speech_failed',
+          message: body.message ?? '语音合成失败，请稍后重试。',
+          retryable: response.status >= 500 || response.status === 429,
+        },
+        response.status,
+      )
+    }
+    return await response.blob()
   }
 
   async verifyAdminAccess(): Promise<void> {
