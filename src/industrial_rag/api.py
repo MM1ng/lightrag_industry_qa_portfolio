@@ -544,6 +544,11 @@ _PUBLIC_EXACT_ROUTES: frozenset[tuple[str, str]] = frozenset(
     {
         ("GET", "/v1/knowledge-bases"),
         ("POST", "/v1/feedback"),
+        # Speech endpoints are reachable anonymously like POST /query: the
+        # workbench carries no browser token. Abuse is bounded by BUCKET_VOICE
+        # rather than by credentials.
+        ("POST", "/v1/voice/transcribe"),
+        ("POST", "/v1/voice/speak"),
     }
 )
 

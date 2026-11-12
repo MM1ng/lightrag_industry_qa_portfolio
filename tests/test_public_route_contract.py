@@ -27,6 +27,8 @@ PUBLIC_CASES: tuple[tuple[str, str], ...] = (
     ("POST", "/v1/feedback"),
     ("POST", "/v1/knowledge-bases/kb-1/query"),
     ("POST", "/v1/knowledge-bases/kb-1/query/stream"),
+    ("POST", "/v1/voice/transcribe"),
+    ("POST", "/v1/voice/speak"),
 )
 
 # Routes that must keep requiring credentials. The near-misses are the
@@ -46,6 +48,12 @@ PRIVATE_CASES: tuple[tuple[str, str], ...] = (
     ("GET", "/v1/knowledge-bases/kb-1/query/stream"),
     ("POST", "/v1/knowledge-bases/kb-1/query/stream/extra"),
     ("POST", "/v1/knowledge-bases/kb-1/query/streaming"),
+    # Voice endpoints are public, but only in their exact shape: a deeper path,
+    # the bare prefix, or the wrong method must still require credentials.
+    ("POST", "/v1/voice/transcribe/extra"),
+    ("POST", "/v1/voice"),
+    ("GET", "/v1/voice/speak"),
+    ("GET", "/v1/voice/transcribe"),
     ("POST", "/v1/knowledge-bases/kb-1/documents/doc-1/reprocess"),
     ("POST", "/v1/knowledge-bases//query"),
     ("GET", "/v1/tasks"),
