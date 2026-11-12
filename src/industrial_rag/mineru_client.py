@@ -19,6 +19,8 @@ from typing import Any, Literal
 
 import httpx
 
+from industrial_rag.http_client import build_async_client
+
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
@@ -201,7 +203,7 @@ class MinerUClient:
             headers: dict[str, str] = {"Accept": "application/json"}
             if self._config.api_key:
                 headers["Authorization"] = f"Bearer {self._config.api_key}"
-            self._client = httpx.AsyncClient(
+            self._client = build_async_client(
                 base_url=self._config.api_base_url,
                 timeout=httpx.Timeout(self._config.request_timeout),
                 headers=headers,
@@ -310,7 +312,9 @@ class MinerUClient:
 
         # Downloads go through a separate CDN / OSS URL, so use a temporary
         # client without the base_url prefix.
-        async with httpx.AsyncClient(timeout=httpx.Timeout(self._config.request_timeout)) as dl:
+        async with build_async_client(
+            timeout=httpx.Timeout(self._config.request_timeout)
+        ) as dl:
             response = await dl.get(url, follow_redirects=True)
             response.raise_for_status()
             dest.write_bytes(response.content)

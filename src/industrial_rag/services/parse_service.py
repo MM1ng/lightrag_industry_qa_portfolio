@@ -422,8 +422,10 @@ class ParseService:
         # Step 2: PUT file to signed URL
         import httpx
 
+        from industrial_rag.http_client import build_async_client
+
         pdf_bytes = pdf_path.read_bytes()
-        async with httpx.AsyncClient(timeout=httpx.Timeout(cfg.request_timeout)) as put_client:
+        async with build_async_client(timeout=httpx.Timeout(cfg.request_timeout)) as put_client:
             put_resp = await put_client.put(
                 upload_urls[0],
                 content=pdf_bytes,

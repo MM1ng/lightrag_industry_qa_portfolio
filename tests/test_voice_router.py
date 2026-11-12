@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 from industrial_rag.api import create_app
 from industrial_rag.config import Settings
@@ -224,3 +225,43 @@ class TestNativeBaseUrl:
 
         settings = Settings(api_key="k", llm_base_url="")
         assert _dashscope_native_base_url(settings) == "https://dashscope.aliyuncs.com/api/v1"
+
+
+def test_voice_provider_build_failure_is_logged_not_hidden(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A failed provider build must leave a trace, not look like a disabled feature.
+
+    Regression guard: with ``NO_PROXY`` containing the bracketed IPv6 literal
+    ``[::1]``, httpx raised ``InvalidURL`` while *constructing* the client inside
+    ``DashScopeVoiceProvider.__init__``. The lifespan swallowed it because
+    ``local_dev`` tolerates partial startup, so the only symptom was 404 on every
+    voice call with nothing in the log explaining it.
+    """
+    import logging
+
+    def boom(**kwargs):
+        raise RuntimeError("provider build failed")
+
+    monkeypatch.setattr("industrial_rag.voice_provider.DashScopeVoiceProvider", boom)
+    settings = Settings(
+        api_key="offline-test-key",
+        voice_enabled=True,
+        deployment_environment="local_dev",
+    )
+    app = create_app(settings=settings, runtime_factory=lambda _: NoRuntime())
+    with (
+        caplog.at_level(logging.WARNING, logger="industrial_rag.api"),
+        TestClient(app) as client,
+    ):
+        response = client.post("/v1/voice/speak", json={"text": "温度不超过85摄氏度。"})
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "VOICE_DISABLED"
+    warnings = [rec for rec in caplog.records if rec.levelno == logging.WARNING]
+    assert any("startup incomplete" in rec.getMessage() for rec in warnings), warnings
+    # The traceback has to ride along with the warning, or the operator is left
+    # with "something was degraded" and no way to find out what.
+    causes = [repr(rec.exc_info[1]) for rec in warnings if rec.exc_info and rec.exc_info[1]]
+    assert any("provider build failed" in cause for cause in causes), causes

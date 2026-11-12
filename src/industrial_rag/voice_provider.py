@@ -13,6 +13,8 @@ from typing import Any, Protocol
 
 import httpx
 
+from industrial_rag.http_client import build_async_client
+
 logger = logging.getLogger("industrial_rag.voice_provider")
 
 _MULTIMODAL_PATH = "/services/aigc/multimodal-generation/generation"
@@ -58,7 +60,7 @@ class DashScopeVoiceProvider:
         self._tts_model = tts_model
         self._voice = voice
         self._owns_client = client is None
-        self._client = client or httpx.AsyncClient(timeout=timeout)
+        self._client = client or build_async_client(timeout=timeout)
 
     async def aclose(self) -> None:
         if self._owns_client:

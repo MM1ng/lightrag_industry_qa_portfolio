@@ -125,7 +125,14 @@ def test_runner_rejects_equal_role_credentials(tmp_path: Path) -> None:
     """Catches accidental collapse of service and admin identity in the evaluator."""
     with pytest.raises(ValueError, match="must differ"):
         Phase10BaselineRunner(
-            client=httpx.AsyncClient(base_url="http://test"),
+            # A mock transport keeps construction from parsing environment
+            # proxies: this client only satisfies the signature, and a stray
+            # NO_PROXY on the developer machine must not decide whether the
+            # credential check is exercised at all.
+            client=httpx.AsyncClient(
+                base_url="http://test",
+                transport=httpx.MockTransport(lambda request: httpx.Response(500)),
+            ),
             knowledge_base_id="kb-1",
             expected_generation_id="generation-1",
             service_api_key="same",

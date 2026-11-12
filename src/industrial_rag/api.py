@@ -1102,6 +1102,14 @@ def create_app(
             )
             if deployment_environment in {"local_staging", "staging", "production"}:
                 raise
+            # local_dev must still boot with a partial environment, but "still
+            # booting" cannot mean "cause discarded": without this line a failed
+            # provider build looked exactly like a disabled feature.
+            logger.warning(
+                "startup incomplete in %s; continuing with degraded wiring",
+                deployment_environment,
+                exc_info=True,
+            )
             if resolved_settings is None and settings is None:
                 (
                     application.state.service_api_key,
